@@ -23,6 +23,9 @@ private struct PixelContent: View {
     /// The tray sheet's visible height (the notice sits above it).
     @State private var trayInset: CGFloat = 0
 
+    /// Lets the visual check below move the sheet; the normal demo never calls it.
+    @State private var trayHandle = GiftTrayHandle()
+
     init(model: PixelModel, effects: GiftEffectController, tray: GiftTrayModel) {
         self.model = model
         self.effects = effects
@@ -91,6 +94,38 @@ private struct PixelContent: View {
         .onAppear {
             model.start()
         }
+        .task {
+            // Visual check in CI (`xcrun simctl launch ... -gs-autoplay`): without the argument the
+            // demo behaves exactly as before.
+            guard ProcessInfo.processInfo.arguments.contains("-gs-autoplay") else {
+                return
+            }
+            await runAutoplay()
+        }
+    }
+
+    /// Opens the tray, moves the sheet through every height, closes it and opens it once more, on a
+    /// fixed timeline, so a screen recording shows how the tray opens, drags and closes. Not part of
+    /// the product.
+    private func runAutoplay() async {
+        func wait(_ seconds: Double) async {
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+        }
+        let post = PixelData.posts[0]
+        await wait(2.0)
+        model.openTray(post)
+        await wait(2.5)
+        trayHandle.snapTo(.expanded)
+        await wait(2.0)
+        trayHandle.snapTo(.peek)
+        await wait(1.5)
+        trayHandle.snapTo(.default)
+        await wait(1.5)
+        tray.close()
+        await wait(1.5)
+        model.openTray(post)
+        await wait(2.5)
+        tray.close()
     }
 
     /// Above the open tray, else above the tab bar.
@@ -133,6 +168,7 @@ private struct PixelContent: View {
             onInsetChange: { inset in trayInset = inset },
             onSelect: { gift in model.selectedId = gift.id },
             collapseOnSelect: true,
+            handle: trayHandle,
             scrim: true,
             scrimTap: .dismiss
         )
