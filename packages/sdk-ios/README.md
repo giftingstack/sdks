@@ -5,7 +5,7 @@ tray. It implements the shared contract in `packages/sdk-spec` (spec version 1.0
 of the TypeScript reference in `packages/sdk-js`.
 
 > **Status: preview.** The package builds on macOS and for the iOS Simulator and passes all 156 tests
-> (every fixture of the shared contract), checked in CI for every release. The UI has not been tried
+> (every fixture of the shared contract), checked on a macOS machine before every release. The UI has not been tried
 > on a physical device since the bottom sheet, themes and the gift wall, away card and leaderboard
 > were added: expect rough edges in the sheet drag and scrolling. See [Verification](#verification).
 
@@ -301,7 +301,7 @@ The pure model (`battleBarModel`, `formatBattleScore`, `formatBattleClock`, `bat
 ## Demo app
 
 `Demo/Sources` is "Pixel", a pretend social app that is one example integration of the SDK (the
-same app as the web demo, `packages/sdk-js/demo/web.ts`; design: `docs/design/demo-app.md`). A
+same app as the web demo, `packages/sdk-js/demo/web.ts`). A
 mock client with 250 ms latency and 60,000 coins, about 90 gifts from the live library
 (`https://assets.giftingstack.com/library.json`, a 10-gift fallback), mock data in
 `PixelData.swift` and `DemoComponentData.swift` (same people, posts, leaderboard and away summary
@@ -335,7 +335,7 @@ and Run.
 
 ```sh
 node packages/sdk-ios/tool/generate-spec-data.mjs          # after recipes.json changes
-node packages/sdk-ios/tool/generate-spec-data.mjs --check  # CI: fails if the Swift file is stale
+node packages/sdk-ios/tool/generate-spec-data.mjs --check  # fails if the Swift file is stale
 cd packages/sdk-ios && swift test                          # on a Mac
 ```
 
@@ -348,7 +348,7 @@ recipes, combo, `EffectScheduler`, `PictureGate`, `EffectTimeline`, `GiftTrayCon
 
 ## Verification
 
-The package is built and tested on a macOS runner in CI for every release:
+The package is built and tested on a macOS machine before every release:
 
 | step                                       | proves                                                                                                                                                                                     | status                                                                                                                                                                   |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

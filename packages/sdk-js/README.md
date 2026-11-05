@@ -192,8 +192,7 @@ import {
   seen less than 30 s ago shows at once; older ones show their rows while they refresh.
 - Hooks, when you draw your own: `useGiftWall`, `useGiftAway`, `useGiftLeaderboard`. The logic is
   in the shared core (`wallChips`, `planAwayReplay`, `AwayController`, `LeaderboardController`).
-- Not tested on a real phone yet: the tests run on react-native-web. The Expo demo
-  (`examples/expo-demo`) has a "Demo only" bar for the three screens and their states.
+- Not tested on a real phone yet: the tests run on react-native-web.
 
 ## Web (browser)
 
@@ -653,9 +652,9 @@ effects without you shipping an update. Caps and the queue never come from the n
   strings, sync or async, so `AsyncStorage` fits) to keep it between app starts:
   `<GiftEffectLayer recipesStorage={AsyncStorage} />`. No dependency is added.
 
-The file is live at `https://assets.giftingstack.com/recipes.json`. To prepare the hosted files:
-`pnpm --filter @giftingstack/sdk-spec build:remote` writes `packages/sdk-spec/dist/recipes.json`
-and `recipes.<specVersion>.json`; it does not upload anything.
+The file is live at `https://assets.giftingstack.com/recipes.json`. To prepare the hosted files, run
+`npm run build:remote` in `packages/sdk-spec`: it writes `dist/recipes.json` and
+`recipes.<specVersion>.json` and does not upload anything.
 
 ### Content-Security-Policy
 
@@ -794,12 +793,14 @@ conformance fixtures that every platform runs). The pure logic every platform po
 ## Try it
 
 ```bash
-pnpm --filter @giftingstack/sdk demo   # http://localhost:5800 (React Native on react-native-web)
-                                       # http://localhost:5800/web.html (the web player, mock client)
-                                       # http://localhost:5800/desktop.html (popover and inline tray)
-                                       # "+ Coins" opens a pretend coin store in both demos
-pnpm --filter @giftingstack/sdk test
+cd packages/sdk-js
+npm install
+npm test         # unit tests, including every conformance fixture of packages/sdk-spec
+npm run build    # ESM and types in dist
 ```
+
+The interactive demo (a pretend app on a mock client) needs gift pictures that live in
+GiftingStack's own repository, so it does not run from this repository.
 
 ## Honest limits
 

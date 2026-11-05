@@ -28,7 +28,7 @@ First release on pub.dev. Everything below was built before it; the API can stil
   `GiftRoom(socket: ...)`.
 - Fix: a sheet tray with an empty catalog now becomes visible (it waited for a measured first row).
 - Publishing: `publish_to` removed, description, `homepage`, `repository`, `issue_tracker` and `topics` set, `.pubignore`
-  (docs, TESTFLIGHT.md, tool, example build output). `flutter pub publish --dry-run` reports only the git state.
+  (docs, tool, example build output). `flutter pub publish --dry-run` reports only the git state.
 - New fixtures: `pictures.json`, `tray.json` (`testMode`, icons-only prefetch), `client.json` (lost-connection repeat),
   `rooms-session.json` (rate-limit waits), `leaderboard.json` (`pollMs`).
 
@@ -135,5 +135,5 @@ First version. Conforms to spec 1.0.0 (`packages/sdk-spec`).
   `sendButtonState`.
 - Flutter UI: `GiftEffectLayer` with `GiftEffectController`, `GiftTray`, `GiftTrayNotifier`, `GiftingTheme`.
 - All conformance fixtures of `packages/sdk-spec/conformance` run in `test/`.
-- Example app in `example/` (mock client, mirrors `examples/expo-demo`).
+- Example app in `example/` (mock client, mirrors the web demo).
 - Not yet checked on a device (spec level L4).

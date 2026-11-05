@@ -113,6 +113,6 @@ First version of the Android SDK (Kotlin, Jetpack Compose), for spec version 1.0
   `GiftTrayController` and `sendButtonState`, ported from `packages/sdk-js/src/core`.
 - Compose UI in `com.giftingstack.ui`: `GiftEffectLayer` with `GiftEffectLayerState`, notice with
   combo counter, `GiftTray`, `GiftTrayHolder`, `GiftingTheme`, a small picture loader.
-- Demo app (`demo`) that mirrors `examples/expo-demo`.
+- Demo app (`demo`) that mirrors the web demo.
 - Tests: every file in `packages/sdk-spec/conformance` runs on the JVM, plus a spec drift test and
   instrumented Compose tests (picture gate and layer behaviour).

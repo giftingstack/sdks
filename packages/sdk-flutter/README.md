@@ -5,7 +5,7 @@ GiftingStack API. Flutter port of
 `@giftingstack/sdk` (React Native), built from the shared contract in `packages/sdk-spec`
 (spec 1.0.0). Dart 3, null-safe. Dependencies: `flutter` and `http`.
 
-Status: 0.1.0, a preview: the API can still change before 1.0 (see `CHANGELOG.md`). The logic is
+Status: 0.1.1, a preview: the API can still change before 1.0 (see `CHANGELOG.md`). The logic is
 machine-checked; how the animations and the sheet drag feel is not checked on a device yet (see
 "Verification"). The newest Flutter demo was not run on a phone or an emulator at all.
 
@@ -361,7 +361,7 @@ What is proven by which test, and what only a person with a phone can judge.
 | example app: gift wall under the post counts what you send, Away summary (demo), Leaderboard (demo) with ties and a pinned viewer, debug bar stays in one Wrap (the demo buttons are pressed by calling their handler: in the test font the sheet covers the third row)                                                                  | `example/test/widget_test.dart` (15 tests in total)                                                                                     | L3            |
 | how the wall, the card, the replay and the leaderboard LOOK and FEEL on a phone (chip size, card slide, 44 dp cells in a feed, tab wrapping on a 360 dp phone, real fonts); the new demo on a device                                                                                                                                     | nothing: only read from the code and the widget tree; nothing was run on a phone or an emulator                                         | L4            |
 | smoothness on a mid and a low-end phone, frame rate, heat                                                                                                                                                                                                                                                                                | nothing: a person on a device                                                                                                           | L4            |
-| easing feel, overshoot, spark and coin spread, ray look                                                                                                                                                                                                                                                                                  | nothing: side by side with `examples/expo-demo`                                                                                         | L4            |
+| easing feel, overshoot, spark and coin spread, ray look                                                                                                                                                                                                                                                                                  | nothing: side by side with the React Native reference app                                                                               | L4            |
 | notice slide and the combo pop (spring is a physical match of React Native's, not pixels)                                                                                                                                                                                                                                                | nothing: by eye                                                                                                                         | L4            |
 | no flicker of the previous picture, no late first frame on a real network                                                                                                                                                                                                                                                                | nothing: on a device, cold cache                                                                                                        | L4            |
 | example app builds and runs on the Android emulator (API 35, software GPU); tray, small/medium/large effects, combo x3 notice, "Get coins", real pictures from assets.giftingstack.com, touches pass through the layer                                                                                                                   | by eye, screenshots in `docs/screenshots/` (see below)                                                                                  | L4 (emulator) |
@@ -484,13 +484,6 @@ A tap on "Reset coins" during a large effect worked (the layer takes no touches)
 GPU here is software; Flutter draws into a SurfaceView, so `dumpsys gfxinfo` shows 0 frames. Via
 SurfaceFlinger while spamming Send (every 300 ms, medium gift): median frame gap 62 ms, p90 102 ms,
 p99 158 ms (about 14 fps). That says nothing about a real phone.
-
-### iPhone through TestFlight (no Mac)
-
-The workflow `.github/workflows/sdk-flutter-ios-testflight.yml` ("SDK Flutter iOS TestFlight",
-manual) builds `example/` on a GitHub macOS runner, signs it with the same App Store Connect API key
-as the Swift demo and uploads it to TestFlight. Setup: `TESTFLIGHT.md` (only the differences from
-`../sdk-ios/TESTFLIGHT.md`). Untested: written on Windows without Xcode.
 
 ## Development
 

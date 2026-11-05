@@ -383,7 +383,7 @@ Shared rules for the three files:
   compared as an exact string (order of parameters, percent-encoding). A call that returns
   nothing (`ackAway`) has `"result": null`. A `204` response has no body (`bodyText: ""`): build
   the response without one.
-- **`client` response bodies are exactly what the API sends** (the schemas of `apps/api`, SPEC
+- **`client` response bodies are exactly what the API sends** (the API's response schemas, SPEC
   14-16): full objects, every field, no `"gift": "<id>"` shorthand, also in `result`. A typed
   client parses them as they are, with nothing rewritten. The gift-id shorthand is allowed ONLY in
   these pure-logic sections: `wall.json` `chips`, `loader` (`respond.walls`, `resolved`) and

@@ -125,7 +125,7 @@ without a compiler: nothing here has been built, tested or run on a device.
   like every other client scenario (full request and parsed result): its fixture now writes the
   gift objects the API sends (2026-10-12; it used to write `"gift": "<id>"`, which the runner
   had to expand).
-- Demo rebuilt as "Pixel" (docs/design/demo-app.md), the same pretend app as the web demo: tabs
+- Demo rebuilt as "Pixel", the same pretend app as the web demo: tabs
   Feed / Top / Inbox / Me in plain SwiftUI, a Gift button per post (tray for the author,
   `reference` = post id, closes after a send), walls per post and on the profile, a coin store
   that adds, an offline banner, the away card once after install. No debug buttons on screen:
@@ -192,4 +192,4 @@ in a later release.
 - SwiftUI: `GiftEffectLayer` + `GiftEffectController`, notice with combo counter, `GiftTray`,
   `GiftTrayModel`, `GiftImageCache` with prefetch and decode ahead, `GiftingTheme`.
 - Tests: a runner for every conformance fixture, a recipes drift test, state holder tests.
-- Demo app sources mirroring `examples/expo-demo`.
+- Demo app sources mirroring the web demo.

@@ -12,5 +12,5 @@ flutter run
 flutter test
 ```
 
-The `android/` and `ios/` platform folders are included. iPhone without a Mac: `../TESTFLIGHT.md`.
+The `android/` and `ios/` platform folders are included.
 See `../README.md` for the package itself and what has been verified.

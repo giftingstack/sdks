@@ -16,7 +16,7 @@ Files in this package:
 | `recipes.json`              | the shared numbers (thresholds, combo window, caps, effect recipes). Generated from the reference; never edit by hand |
 | `conformance/*.json`        | language-neutral test cases every platform MUST pass                                                                  |
 | `conformance/README.md`     | the exact fixture formats and matching rules                                                                          |
-| `scripts/build-recipes.mjs` | regenerates `recipes.json` (`pnpm --filter @giftingstack/sdk-spec build:recipes`)                                     |
+| `scripts/build-recipes.mjs` | regenerates `recipes.json` (`npm run build:recipes` in `packages/sdk-spec`)                                           |
 | `scripts/build-remote.mjs`  | writes the hosted copies `dist/recipes.json` and `dist/recipes.<specVersion>.json` (section 13.6)                     |
 
 A platform conforms when (1) its constants equal `recipes.json`, (2) its test suite runs every
@@ -231,7 +231,7 @@ Derived, read-only:
 - `insufficientBalance` = `type == "insufficient_balance"`.
 
 The API's error body is `{ "error": { "type", "message", "request_id", "retryable", "details"? } }`
-(`apps/api/src/lib/http-errors.ts`). The SDK computes `retryable` itself; it does not read the
+(the API's error format). The SDK computes `retryable` itself; it does not read the
 body's `retryable`. Errors the API returns on these endpoints include `invalid_client_token` (401),
 `invalid_request` (400), `room_not_allowed` (403, a `room_id` outside the token's `rooms`),
 `not_found` (404), `payload_too_large` (413), `insufficient_balance`,
@@ -1127,7 +1127,7 @@ Fixtures: `tray-scrim.json` (format in `conformance/README.md`). Component check
 | L1 constants        | thresholds, combo window, caps, queue size, default sender, all recipe fields                                                                                                                                                                                                                                                                                                                                                             | compare with `recipes.json` in a unit test                                                                              |
 | L2 logic            | client (headers, bodies, retries, errors), tiers, combo, scheduler traces, tray controller, send button, sheet snapping, placement, remote recipes (parse, clamp, merge, URL), gift wall (chips, `formatCount`, loader), away (replay plan, sender label, controller), leaderboard (rank label, pinning, controller, medal contrast), the component client calls, rooms (frames, reconnect policy, event filter, mapping, session traces) | `conformance/*.json` in the platform's runner                                                                           |
 | L3 component timing | picture gate (effect + notice start together), notice timer, effect end time from 7.3, layer passes touches through, labels and a11y                                                                                                                                                                                                                                                                                                      | component/UI tests with a fake clock, as the reference does in `test/react-native.test.tsx`; `effects.json#pictureGate` |
-| L4 device feel      | smoothness (frame rate) on a mid and a low-end device, easing feel, overshoot, spark and coin spread, ray look, notice slide and pop, no flicker of the previous picture, no late first frame, heat, sheet drag and flick feel, nested scroll on a phone                                                                                                                                                                                  | a person on a real device, side by side with the React Native reference app (`examples/expo-demo`)                      |
+| L4 device feel      | smoothness (frame rate) on a mid and a low-end device, easing feel, overshoot, spark and coin spread, ray look, notice slide and pop, no flicker of the previous picture, no late first frame, heat, sheet drag and flick feel, nested scroll on a phone                                                                                                                                                                                  | a person on a real device, side by side with the React Native reference app                                             |
 
 L1 and L2 are machine-checked and binary. L3 is checked by tests that each platform writes from
 sections 7 and 9. L4 cannot be automated: random spark/coin layouts and easing curves differ per
@@ -1349,7 +1349,7 @@ can change during a session).
 
 ### 13.6 Publishing
 
-`pnpm --filter @giftingstack/sdk-spec build:remote` writes `dist/recipes.json` and
+`npm run build:remote` in `packages/sdk-spec` writes `dist/recipes.json` and
 `dist/recipes.<specVersion>.json` (gitignored) from `recipes.json`, or from a tuned file given as
 the first argument, after running it through `parseRemoteRecipes`: it refuses a document the SDK
 would ignore and refuses values that would be clamped. Uploading `dist/` to
@@ -1357,7 +1357,7 @@ would ignore and refuses values that would be clamped. Uploading `dist/` to
 
 ## 14. Gift wall
 
-Added on 2026-10-11 (design: `docs/design/leaderboard-and-away.md` A.2). A row of chips (gift icon +
+Added on 2026-10-11. A row of chips (gift icon +
 count) under a post or on a profile: `[rose 12] [heart 3] [dragon 1] [+37]`. Read-only, no senders,
 no messages. Reference: `packages/sdk-js/src/core/wall.ts` (pure). Fixture: `conformance/wall.json`.
 
@@ -2178,7 +2178,7 @@ ms) but never on the first frame of a round.
 
 ## 19. Gift inbox
 
-Added on 2026-11-02 (owner decision): a list of who sent the signed-in user which gift and when,
+Added on 2026-11-02: a list of who sent the signed-in user which gift and when,
 over the last 24 hours, one row per gift, newest first. Read only: there is no server-side "read"
 state; an app keeps the time of the newest row it showed and asks `inboxUnread` for a badge.
 Reference: `packages/sdk-js/src/core/inbox.ts`. Fixture: `conformance/inbox.json`.
