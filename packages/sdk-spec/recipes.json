@@ -1,0 +1,111 @@
+{
+  "specVersion": "1.0.0",
+  "thresholds": {
+    "mediumFrom": 100,
+    "largeFrom": 10000
+  },
+  "comboWindowMs": 2500,
+  "maxConcurrentEffects": {
+    "small": 6,
+    "medium": 2,
+    "large": 1
+  },
+  "maxQueuedLarge": 5,
+  "defaultSenderName": "Someone",
+  "recipes": {
+    "high": {
+      "small": {
+        "tier": "small",
+        "peakScale": 0.9,
+        "flyInMs": 700,
+        "holdMs": 0,
+        "flyOutMs": 600,
+        "stage": "float-up",
+        "sparks": 0,
+        "sparkSpread": 0,
+        "coins": 0,
+        "dim": false,
+        "rays": false,
+        "noticeMs": 2400,
+        "noticeBig": false
+      },
+      "medium": {
+        "tier": "medium",
+        "peakScale": 1.5,
+        "flyInMs": 800,
+        "holdMs": 700,
+        "flyOutMs": 600,
+        "stage": "center",
+        "sparks": 24,
+        "sparkSpread": 130,
+        "coins": 0,
+        "dim": false,
+        "rays": false,
+        "noticeMs": 2400,
+        "noticeBig": false
+      },
+      "large": {
+        "tier": "large",
+        "peakScale": 2.8,
+        "flyInMs": 900,
+        "holdMs": 1600,
+        "flyOutMs": 550,
+        "stage": "center",
+        "sparks": 50,
+        "sparkSpread": 230,
+        "coins": 34,
+        "dim": true,
+        "rays": true,
+        "noticeMs": 2800,
+        "noticeBig": true
+      }
+    },
+    "low": {
+      "small": {
+        "tier": "small",
+        "peakScale": 0.9,
+        "flyInMs": 700,
+        "holdMs": 0,
+        "flyOutMs": 600,
+        "stage": "float-up",
+        "sparks": 0,
+        "sparkSpread": 0,
+        "coins": 0,
+        "dim": false,
+        "rays": false,
+        "noticeMs": 2400,
+        "noticeBig": false
+      },
+      "medium": {
+        "tier": "medium",
+        "peakScale": 1.5,
+        "flyInMs": 800,
+        "holdMs": 700,
+        "flyOutMs": 600,
+        "stage": "center",
+        "sparks": 8,
+        "sparkSpread": 130,
+        "coins": 0,
+        "dim": false,
+        "rays": false,
+        "noticeMs": 2400,
+        "noticeBig": false
+      },
+      "large": {
+        "tier": "large",
+        "peakScale": 2.8,
+        "flyInMs": 900,
+        "holdMs": 1600,
+        "flyOutMs": 550,
+        "stage": "center",
+        "sparks": 16,
+        "sparkSpread": 230,
+        "coins": 0,
+        "dim": true,
+        "rays": false,
+        "noticeMs": 2800,
+        "noticeBig": true
+      }
+    }
+  }
+}

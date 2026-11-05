@@ -1,0 +1,12 @@
+{
+  "name": "@giftingstack/sdk-spec",
+  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "The shared contract of the GiftingStack SDKs: spec, recipes and conformance fixtures.",
+  "scripts": {
+    "build:recipes": "node scripts/build-recipes.mjs",
+    "build:remote": "node scripts/build-remote.mjs"
+  }
+}

@@ -1,0 +1,725 @@
+{
+  "description": "EffectScheduler traces (no pixels) and picture-gate timing. Format and matching rules: conformance/README.md.",
+  "gifts": {
+    "rose": {
+      "id": "rose",
+      "name": "Rose",
+      "price": 10,
+      "image": "https://assets.test/rose/512.webp",
+      "icon": "https://assets.test/rose/256.webp"
+    },
+    "hat": {
+      "id": "hat",
+      "name": "Hat",
+      "price": 350,
+      "image": "https://assets.test/hat/512.webp",
+      "icon": "https://assets.test/hat/256.webp"
+    },
+    "dragon": {
+      "id": "dragon",
+      "name": "Dragon",
+      "price": 40000,
+      "image": "https://assets.test/dragon/512.webp",
+      "icon": "https://assets.test/dragon/256.webp"
+    },
+    "lion": {
+      "id": "lion",
+      "name": "Lion",
+      "price": 20000,
+      "image": "https://assets.test/lion/512.webp",
+      "icon": "https://assets.test/lion/256.webp"
+    },
+    "star": {
+      "id": "star",
+      "name": "Star",
+      "price": 5,
+      "image": "https://assets.test/star/512.webp",
+      "icon": null
+    },
+    "moon": {
+      "id": "moon",
+      "name": "Moon",
+      "price": 5,
+      "image": "https://assets.test/moon/512.webp"
+    },
+    "dot": { "id": "dot", "name": "Dot", "price": 5, "image": null, "icon": null },
+    "b0": { "id": "b0", "name": "B0", "price": 50000, "image": null },
+    "b1": { "id": "b1", "name": "B1", "price": 50000, "image": null },
+    "b2": { "id": "b2", "name": "B2", "price": 50000, "image": null },
+    "b3": { "id": "b3", "name": "B3", "price": 50000, "image": null },
+    "b4": { "id": "b4", "name": "B4", "price": 50000, "image": null },
+    "b5": { "id": "b5", "name": "B5", "price": 50000, "image": null },
+    "b6": { "id": "b6", "name": "B6", "price": 50000, "image": null },
+    "b7": { "id": "b7", "name": "B7", "price": 50000, "image": null },
+    "b8": { "id": "b8", "name": "B8", "price": 50000, "image": null }
+  },
+  "scenarios": [
+    {
+      "name": "each tier enters at once; the notice waits for started()",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "rose", "sender": "ayla" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "hat", "sender": "ayla" }, "returns": 2 },
+        { "atMs": 0, "play": { "gift": "dragon", "sender": "ayla" }, "returns": 3 },
+        {
+          "expect": {
+            "events": ["enter:1", "enter:2", "enter:3"],
+            "active": [1, 2, 3],
+            "activeTiers": ["small", "medium", "large"],
+            "queued": [],
+            "notice": null,
+            "noticeVisible": false
+          }
+        },
+        { "started": 1 },
+        {
+          "expect": {
+            "events": ["notice:1"],
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false
+            },
+            "noticeVisible": true,
+            "noticeDurationMs": 2400,
+            "noticeOwner": 1
+          }
+        },
+        { "started": 3 },
+        {
+          "expect": {
+            "events": ["notice:2"],
+            "notice": {
+              "id": 2,
+              "senderName": "ayla",
+              "giftName": "Dragon",
+              "image": "https://assets.test/dragon/256.webp",
+              "count": 1,
+              "big": true
+            },
+            "noticeDurationMs": 2800,
+            "noticeOwner": 3
+          }
+        },
+        { "finished": 1 },
+        { "expect": { "events": ["exit:1", "end:1"], "active": [2, 3], "ended": [1] } }
+      ]
+    },
+    {
+      "name": "custom thresholds decide the tier",
+      "options": { "thresholds": { "mediumFrom": 5, "largeFrom": 20 } },
+      "steps": [
+        { "atMs": 0, "play": { "gift": "rose" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "hat" }, "returns": 2 },
+        { "expect": { "active": [1, 2], "activeTiers": ["medium", "large"] } }
+      ]
+    },
+    {
+      "name": "large gifts play one at a time, in order; the next starts when one finishes",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "dragon", "sender": "ayla" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "lion", "sender": "mert" }, "returns": 2 },
+        { "expect": { "events": ["enter:1"], "active": [1], "queued": [2] } },
+        { "started": 1 },
+        { "finished": 1 },
+        {
+          "expect": {
+            "events": ["notice:1", "exit:1", "enter:2", "end:1"],
+            "active": [2],
+            "queued": [],
+            "ended": [1]
+          }
+        },
+        { "started": 2 },
+        {
+          "expect": {
+            "events": ["notice:2"],
+            "notice": {
+              "id": 2,
+              "senderName": "mert",
+              "giftName": "Lion",
+              "image": "https://assets.test/lion/256.webp",
+              "count": 1,
+              "big": true
+            },
+            "noticeOwner": 2
+          }
+        },
+        { "finished": 2 },
+        { "expect": { "events": ["exit:2", "end:2"], "active": [], "ended": [1, 2] } }
+      ]
+    },
+    {
+      "name": "at most 5 large gifts wait; a new one drops the OLDEST waiting one, silently",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "b0" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "b1" }, "returns": 2 },
+        { "atMs": 0, "play": { "gift": "b2" }, "returns": 3 },
+        { "atMs": 0, "play": { "gift": "b3" }, "returns": 4 },
+        { "atMs": 0, "play": { "gift": "b4" }, "returns": 5 },
+        { "atMs": 0, "play": { "gift": "b5" }, "returns": 6 },
+        { "expect": { "events": ["enter:1"], "active": [1], "queued": [2, 3, 4, 5, 6] } },
+        { "atMs": 0, "play": { "gift": "b6" }, "returns": 7 },
+        { "atMs": 0, "play": { "gift": "b7" }, "returns": 8 },
+        { "atMs": 0, "play": { "gift": "b8" }, "returns": 9 },
+        {
+          "expect": {
+            "events": [],
+            "active": [1],
+            "queued": [5, 6, 7, 8, 9],
+            "notice": null
+          }
+        },
+        { "cancel": 2 },
+        { "expect": { "events": [], "queued": [5, 6, 7, 8, 9] } },
+        { "finished": 1 },
+        {
+          "expect": {
+            "events": ["exit:1", "enter:5", "end:1"],
+            "active": [5],
+            "queued": [6, 7, 8, 9]
+          }
+        }
+      ]
+    },
+    {
+      "name": "at most 6 small effects; the 7th shows only the notice",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "rose", "sender": "u0" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "rose", "sender": "u1" }, "returns": 2 },
+        { "atMs": 0, "play": { "gift": "rose", "sender": "u2" }, "returns": 3 },
+        { "atMs": 0, "play": { "gift": "rose", "sender": "u3" }, "returns": 4 },
+        { "atMs": 0, "play": { "gift": "rose", "sender": "u4" }, "returns": 5 },
+        { "atMs": 0, "play": { "gift": "rose", "sender": "u5" }, "returns": 6 },
+        { "atMs": 0, "play": { "gift": "rose", "sender": "u6" }, "returns": 7 },
+        {
+          "expect": {
+            "events": [
+              "enter:1",
+              "enter:2",
+              "enter:3",
+              "enter:4",
+              "enter:5",
+              "enter:6",
+              "notice:1"
+            ],
+            "active": [1, 2, 3, 4, 5, 6],
+            "queued": [],
+            "notice": {
+              "id": 1,
+              "senderName": "u6",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false
+            },
+            "noticeOwner": 7
+          }
+        },
+        { "finished": 1 },
+        { "atMs": 10, "play": { "gift": "rose", "sender": "u7" }, "returns": 8 },
+        { "expect": { "events": ["exit:1", "end:1", "enter:8"], "active": [2, 3, 4, 5, 6, 8] } }
+      ]
+    },
+    {
+      "name": "at most 2 medium effects; small and medium caps are separate",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "hat", "sender": "a" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "hat", "sender": "b" }, "returns": 2 },
+        { "atMs": 0, "play": { "gift": "hat", "sender": "c" }, "returns": 3 },
+        { "atMs": 0, "play": { "gift": "rose", "sender": "d" }, "returns": 4 },
+        {
+          "expect": {
+            "events": ["enter:1", "enter:2", "notice:1", "enter:4"],
+            "active": [1, 2, 4],
+            "activeTiers": ["medium", "medium", "small"],
+            "noticeOwner": 3
+          }
+        }
+      ]
+    },
+    {
+      "name": "reduced motion: only the notice, at once, for every tier",
+      "options": { "reducedMotion": true },
+      "steps": [
+        { "atMs": 0, "play": { "gift": "dragon", "sender": "ayla" }, "returns": 1 },
+        {
+          "expect": {
+            "events": ["notice:1"],
+            "active": [],
+            "queued": [],
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Dragon",
+              "image": "https://assets.test/dragon/256.webp",
+              "count": 1,
+              "big": true
+            },
+            "noticeVisible": true,
+            "noticeDurationMs": 2800,
+            "noticeOwner": 1
+          }
+        },
+        { "atMs": 100, "play": { "gift": "rose", "sender": "ayla" }, "returns": 2 },
+        {
+          "expect": {
+            "events": ["notice:2"],
+            "active": [],
+            "notice": {
+              "id": 2,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false
+            },
+            "noticeDurationMs": 2400
+          }
+        },
+        { "cancel": 2 },
+        { "expect": { "events": ["noticeHide"], "noticeVisible": false } }
+      ]
+    },
+    {
+      "name": "combo count in the notice; the notice id stays while the same sender and gift continue",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "rose", "sender": "ayla" }, "returns": 1 },
+        { "started": 1 },
+        { "atMs": 100, "play": { "gift": "rose", "sender": "ayla" }, "returns": 2 },
+        { "started": 2 },
+        {
+          "expect": {
+            "events": ["enter:1", "notice:1", "enter:2", "notice:1"],
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 2,
+              "big": false
+            }
+          }
+        },
+        { "atMs": 2700, "play": { "gift": "rose", "sender": "ayla" }, "returns": 3 },
+        { "started": 3 },
+        {
+          "expect": {
+            "events": ["enter:3", "notice:1"],
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false
+            }
+          }
+        },
+        { "atMs": 2800, "play": { "gift": "rose", "sender": "mert" }, "returns": 4 },
+        { "started": 4 },
+        {
+          "expect": {
+            "events": ["enter:4", "notice:2"],
+            "notice": {
+              "id": 2,
+              "senderName": "mert",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "interleaved senders: each pair keeps its own notice id and its own combo count",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "rose", "sender": "ayla" }, "returns": 1 },
+        { "started": 1 },
+        { "atMs": 100, "play": { "gift": "rose", "sender": "mert" }, "returns": 2 },
+        { "started": 2 },
+        { "atMs": 200, "play": { "gift": "rose", "sender": "ayla" }, "returns": 3 },
+        { "started": 3 },
+        {
+          "expect": {
+            "events": ["enter:1", "notice:1", "enter:2", "notice:2", "enter:3", "notice:1"],
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 2,
+              "big": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "the combo counts at play() time, not when the effect starts",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "rose", "sender": "ayla" }, "returns": 1 },
+        { "atMs": 100, "play": { "gift": "rose", "sender": "ayla" }, "returns": 2 },
+        { "started": 2 },
+        {
+          "expect": {
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 2,
+              "big": false
+            }
+          }
+        },
+        { "started": 1 },
+        {
+          "expect": {
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "quantity above 1 shows the quantity, but the run still advances",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "rose", "sender": "ayla", "quantity": 5 }, "returns": 1 },
+        { "started": 1 },
+        {
+          "expect": {
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 5,
+              "big": false
+            }
+          }
+        },
+        { "atMs": 100, "play": { "gift": "rose", "sender": "ayla", "quantity": 1 }, "returns": 2 },
+        { "started": 2 },
+        {
+          "expect": {
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 2,
+              "big": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "after the notice expires, the same sender and gift get a new notice id (slide in again)",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "rose", "sender": "ayla" }, "returns": 1 },
+        { "started": 1 },
+        { "noticeExpired": true },
+        { "expect": { "events": ["enter:1", "notice:1", "noticeHide"], "noticeVisible": false } },
+        { "atMs": 1000, "play": { "gift": "rose", "sender": "ayla" }, "returns": 2 },
+        { "started": 2 },
+        {
+          "expect": {
+            "events": ["enter:2", "notice:2"],
+            "noticeVisible": true,
+            "notice": {
+              "id": 2,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 2,
+              "big": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel a playing large gift: it leaves without end, its notice hides, the next one enters",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "dragon", "sender": "ayla" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "lion", "sender": "mert" }, "returns": 2 },
+        { "started": 1 },
+        { "expect": { "events": ["enter:1", "notice:1"] } },
+        { "cancel": 1 },
+        {
+          "expect": {
+            "events": ["exit:1", "enter:2", "noticeHide"],
+            "active": [2],
+            "queued": [],
+            "ended": [],
+            "noticeVisible": false
+          }
+        },
+        { "finished": 1 },
+        { "expect": { "events": [], "ended": [] } }
+      ]
+    },
+    {
+      "name": "cancel a waiting large gift: it never plays",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "dragon" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "lion" }, "returns": 2 },
+        { "cancel": 2 },
+        { "expect": { "events": ["enter:1"], "active": [1], "queued": [] } },
+        { "finished": 1 },
+        { "expect": { "events": ["exit:1", "end:1"], "active": [], "ended": [1] } }
+      ]
+    },
+    {
+      "name": "cancel an effect that has not started yet: no notice was shown, nothing to hide",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "rose", "sender": "ayla" }, "returns": 1 },
+        { "cancel": 1 },
+        { "expect": { "events": ["enter:1", "exit:1"], "active": [], "notice": null } },
+        { "started": 1 },
+        { "expect": { "events": [], "notice": null } }
+      ]
+    },
+    {
+      "name": "cancel hides only the notice its own play() wrote",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "rose", "sender": "mert" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "hat", "sender": "zeynep" }, "returns": 2 },
+        { "started": 1 },
+        { "started": 2 },
+        {
+          "expect": { "events": ["enter:1", "enter:2", "notice:1", "notice:2"], "noticeOwner": 2 }
+        },
+        { "cancel": 1 },
+        { "expect": { "events": ["exit:1"], "noticeVisible": true, "active": [2] } },
+        { "cancel": 2 },
+        { "expect": { "events": ["exit:2", "noticeHide"], "noticeVisible": false, "active": [] } }
+      ]
+    },
+    {
+      "name": "cancel of a notice-only play (over the cap) hides that notice",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "hat", "sender": "a" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "hat", "sender": "b" }, "returns": 2 },
+        { "atMs": 0, "play": { "gift": "hat", "sender": "c" }, "returns": 3 },
+        { "cancel": 3 },
+        {
+          "expect": { "events": ["enter:1", "enter:2", "notice:1", "noticeHide"], "active": [1, 2] }
+        }
+      ]
+    },
+    {
+      "name": "clear removes everything, ignores late callbacks and resets the combo",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "dragon", "sender": "ayla" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "lion", "sender": "ayla" }, "returns": 2 },
+        { "atMs": 0, "play": { "gift": "rose", "sender": "ayla" }, "returns": 3 },
+        { "started": 1 },
+        { "clear": true },
+        {
+          "expect": {
+            "events": ["enter:1", "enter:3", "notice:1", "clear", "noticeHide"],
+            "active": [],
+            "queued": [],
+            "noticeVisible": false
+          }
+        },
+        { "finished": 1 },
+        { "started": 3 },
+        { "expect": { "events": [], "ended": [] } },
+        { "atMs": 100, "play": { "gift": "rose", "sender": "ayla" }, "returns": 4 },
+        { "started": 4 },
+        {
+          "expect": {
+            "events": ["enter:4", "notice:2"],
+            "notice": {
+              "id": 2,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "notice picture: icon, else image, else null; a missing sender is Someone",
+      "steps": [
+        { "atMs": 0, "play": { "gift": "star" }, "returns": 1 },
+        { "started": 1 },
+        {
+          "expect": {
+            "notice": {
+              "id": 1,
+              "senderName": "Someone",
+              "giftName": "Star",
+              "image": "https://assets.test/star/512.webp",
+              "count": 1,
+              "big": false
+            }
+          }
+        },
+        { "atMs": 0, "play": { "gift": "moon" }, "returns": 2 },
+        { "started": 2 },
+        {
+          "expect": {
+            "notice": {
+              "id": 2,
+              "senderName": "Someone",
+              "giftName": "Moon",
+              "image": "https://assets.test/moon/512.webp",
+              "count": 1,
+              "big": false
+            }
+          }
+        },
+        { "atMs": 0, "play": { "gift": "dot" }, "returns": 3 },
+        { "started": 3 },
+        {
+          "expect": {
+            "notice": {
+              "id": 3,
+              "senderName": "Someone",
+              "giftName": "Dot",
+              "image": null,
+              "count": 1,
+              "big": false
+            }
+          }
+        },
+        { "atMs": 10, "play": { "gift": "dot", "sender": "Someone" }, "returns": 4 },
+        { "started": 4 },
+        {
+          "expect": {
+            "notice": {
+              "id": 3,
+              "senderName": "Someone",
+              "giftName": "Dot",
+              "image": null,
+              "count": 2,
+              "big": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "low quality changes nothing in the scheduling",
+      "options": { "quality": "low" },
+      "steps": [
+        { "atMs": 0, "play": { "gift": "dragon" }, "returns": 1 },
+        { "atMs": 0, "play": { "gift": "lion" }, "returns": 2 },
+        { "started": 1 },
+        {
+          "expect": {
+            "active": [1],
+            "activeTiers": ["large"],
+            "queued": [2],
+            "noticeDurationMs": 2800,
+            "notice": {
+              "id": 1,
+              "senderName": "Someone",
+              "giftName": "Dragon",
+              "image": "https://assets.test/dragon/256.webp",
+              "count": 1,
+              "big": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "started() and finished() for unknown ids do nothing",
+      "steps": [
+        { "started": 42 },
+        { "finished": 42 },
+        { "cancel": 42 },
+        { "expect": { "events": [], "active": [], "queued": [], "notice": null, "ended": [] } }
+      ]
+    }
+  ],
+  "pictureGate": {
+    "description": "When an entered effect calls started(): after its picture loads or fails, or after pictureWaitMs, whichever is first. No picture, or pictureWaitMs <= 0: at once. Times are ms after the effect entered. A start may lag the load or error by up to toleranceMs (one frame: decoding, the next render), never come before startsAtMs.",
+    "toleranceMs": 16,
+    "cases": [
+      {
+        "name": "no picture",
+        "image": false,
+        "pictureWaitMs": 300,
+        "loadAtMs": null,
+        "errorAtMs": null,
+        "startsAtMs": 0
+      },
+      {
+        "name": "wait 0",
+        "image": true,
+        "pictureWaitMs": 0,
+        "loadAtMs": null,
+        "errorAtMs": null,
+        "startsAtMs": 0
+      },
+      {
+        "name": "negative wait",
+        "image": true,
+        "pictureWaitMs": -1,
+        "loadAtMs": null,
+        "errorAtMs": null,
+        "startsAtMs": 0
+      },
+      {
+        "name": "never loads",
+        "image": true,
+        "pictureWaitMs": 300,
+        "loadAtMs": null,
+        "errorAtMs": null,
+        "startsAtMs": 300
+      },
+      {
+        "name": "loads early",
+        "image": true,
+        "pictureWaitMs": 300,
+        "loadAtMs": 120,
+        "errorAtMs": null,
+        "startsAtMs": 120
+      },
+      {
+        "name": "fails early",
+        "image": true,
+        "pictureWaitMs": 300,
+        "loadAtMs": null,
+        "errorAtMs": 50,
+        "startsAtMs": 50
+      },
+      {
+        "name": "loads late",
+        "image": true,
+        "pictureWaitMs": 300,
+        "loadAtMs": 500,
+        "errorAtMs": null,
+        "startsAtMs": 300
+      },
+      {
+        "name": "longer custom wait",
+        "image": true,
+        "pictureWaitMs": 1000,
+        "loadAtMs": 700,
+        "errorAtMs": null,
+        "startsAtMs": 700
+      }
+    ]
+  }
+}

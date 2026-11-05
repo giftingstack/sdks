@@ -1,0 +1,16 @@
+# Not part of the published package (.pubignore replaces .gitignore, so the build output is listed too).
+.dart_tool/
+build/
+pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+*.iml
+docs/
+TESTFLIGHT.md
+tool/
+example/.dart_tool/
+example/build/
+example/pubspec.lock
+example/*.iml
+example/ios/ExportOptions.plist

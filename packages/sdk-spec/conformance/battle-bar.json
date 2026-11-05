@@ -1,0 +1,452 @@
+{
+  "description": "The battle bar's model (SPEC 18.7): `score`, `clock`, `model` (battleView -> battleBarModel), `gains` and `colors`. Run by every SDK. `pct` is compared within 1e-6. Keys of `expect` that are missing are not checked.",
+  "score": [
+    { "units": 0, "expect": "0" },
+    { "units": 9999, "expect": "9,999" },
+    { "units": 10000, "expect": "10K" },
+    { "units": 135484, "expect": "135K" },
+    { "units": 1200000, "expect": "1.2M" },
+    { "units": 135484, "labels": { "thousand": "B" }, "expect": "135B" }
+  ],
+  "clock": [
+    { "remainingMs": 61000, "expect": "1:01" },
+    { "remainingMs": 59100, "expect": "1:00" },
+    { "remainingMs": 9200, "expect": "0:10" },
+    { "remainingMs": 1, "expect": "0:01" },
+    { "remainingMs": 0, "expect": "0:00" },
+    { "remainingMs": -5, "expect": "0:00" }
+  ],
+  "model": [
+    {
+      "name": "open round, clear leader, names resolved",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 300, "gifts": 3 },
+          { "id": "mateo", "units": 100, "gifts": 2 }
+        ]
+      },
+      "serverNow": 31000,
+      "names": { "ava": "Ava", "mateo": "Mateo" },
+      "expect": {
+        "pct": 75,
+        "clock": "0:30",
+        "urgent": false,
+        "final": false,
+        "winner": null,
+        "banner": "",
+        "spoken": "Ava 300, Mateo 100",
+        "sides": [
+          {
+            "id": "ava",
+            "name": "Ava",
+            "units": 300,
+            "score": "300",
+            "spoken": "Ava 300",
+            "leads": true,
+            "won": false,
+            "lost": false
+          },
+          {
+            "id": "mateo",
+            "name": "Mateo",
+            "units": 100,
+            "score": "100",
+            "spoken": "Mateo 100",
+            "leads": false,
+            "won": false,
+            "lost": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "nobody scored: half and half, no leader, ids as names",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 0, "gifts": 0 },
+          { "id": "mateo", "units": 0, "gifts": 0 }
+        ]
+      },
+      "serverNow": 1000,
+      "expect": {
+        "pct": 50,
+        "clock": "1:00",
+        "urgent": false,
+        "final": false,
+        "winner": null,
+        "banner": "",
+        "spoken": "ava 0, mateo 0",
+        "sides": [
+          {
+            "id": "ava",
+            "name": "ava",
+            "units": 0,
+            "score": "0",
+            "spoken": "ava 0",
+            "leads": false,
+            "won": false,
+            "lost": false
+          },
+          {
+            "id": "mateo",
+            "name": "mateo",
+            "units": 0,
+            "score": "0",
+            "spoken": "mateo 0",
+            "leads": false,
+            "won": false,
+            "lost": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "the boundary stays 6 percent from the edge: first side takes all",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 5, "gifts": 1 },
+          { "id": "mateo", "units": 0, "gifts": 0 }
+        ]
+      },
+      "serverNow": 2000,
+      "expect": {
+        "pct": 94,
+        "clock": "0:59",
+        "urgent": false,
+        "final": false,
+        "winner": null,
+        "banner": "",
+        "spoken": "ava 5, mateo 0"
+      }
+    },
+    {
+      "name": "the boundary stays 6 percent from the edge: second side takes all",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 0, "gifts": 0 },
+          { "id": "mateo", "units": 5, "gifts": 1 }
+        ]
+      },
+      "serverNow": 2000,
+      "expect": {
+        "pct": 6,
+        "clock": "0:59",
+        "urgent": false,
+        "final": false,
+        "winner": null,
+        "banner": "",
+        "spoken": "ava 0, mateo 5"
+      }
+    },
+    {
+      "name": "urgent from 10 seconds (rounded up), inclusive",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 5, "gifts": 1 },
+          { "id": "mateo", "units": 1, "gifts": 1 }
+        ]
+      },
+      "serverNow": 51000,
+      "expect": {
+        "pct": 83.33333333333334,
+        "clock": "0:10",
+        "urgent": true,
+        "final": false,
+        "winner": null,
+        "banner": "",
+        "spoken": "ava 5, mateo 1"
+      }
+    },
+    {
+      "name": "11 seconds left is not urgent yet",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 5, "gifts": 1 },
+          { "id": "mateo", "units": 1, "gifts": 1 }
+        ]
+      },
+      "serverNow": 50000,
+      "expect": {
+        "pct": 83.33333333333334,
+        "clock": "0:11",
+        "urgent": false,
+        "final": false,
+        "winner": null,
+        "banner": "",
+        "spoken": "ava 5, mateo 1"
+      }
+    },
+    {
+      "name": "9.2 seconds left reads 0:10 and is urgent",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 5, "gifts": 1 },
+          { "id": "mateo", "units": 1, "gifts": 1 }
+        ]
+      },
+      "serverNow": 51800,
+      "expect": {
+        "pct": 83.33333333333334,
+        "clock": "0:10",
+        "urgent": true,
+        "final": false,
+        "winner": null,
+        "banner": "",
+        "spoken": "ava 5, mateo 1"
+      }
+    },
+    {
+      "name": "ended: Final, the leader wins, the other side lost",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 5, "gifts": 1 },
+          { "id": "mateo", "units": 1, "gifts": 1 }
+        ]
+      },
+      "serverNow": 61000,
+      "names": { "ava": "Ava", "mateo": "Mateo" },
+      "expect": {
+        "pct": 83.33333333333334,
+        "clock": "Final",
+        "urgent": false,
+        "final": true,
+        "winner": "ava",
+        "banner": "Ava wins the round",
+        "spoken": "Ava 5, Mateo 1",
+        "sides": [
+          { "id": "ava", "leads": true, "won": true, "lost": false },
+          { "id": "mateo", "leads": false, "won": false, "lost": true }
+        ]
+      }
+    },
+    {
+      "name": "ended: the second side wins",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 1, "gifts": 1 },
+          { "id": "mateo", "units": 5, "gifts": 1 }
+        ]
+      },
+      "serverNow": 70000,
+      "names": { "ava": "Ava", "mateo": "Mateo" },
+      "expect": {
+        "pct": 16.666666666666668,
+        "clock": "Final",
+        "urgent": false,
+        "final": true,
+        "winner": "mateo",
+        "banner": "Mateo wins the round",
+        "spoken": "Ava 1, Mateo 5",
+        "sides": [
+          { "id": "ava", "leads": false, "won": false, "lost": true },
+          { "id": "mateo", "leads": true, "won": true, "lost": false }
+        ]
+      }
+    },
+    {
+      "name": "ended level: a draw, nobody won or lost",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 4, "gifts": 1 },
+          { "id": "mateo", "units": 4, "gifts": 1 }
+        ]
+      },
+      "serverNow": 61000,
+      "expect": {
+        "pct": 50,
+        "clock": "Final",
+        "urgent": false,
+        "final": true,
+        "winner": null,
+        "banner": "Draw: nobody wins this round",
+        "spoken": "ava 4, mateo 4",
+        "sides": [
+          { "id": "ava", "leads": false, "won": false, "lost": false },
+          { "id": "mateo", "leads": false, "won": false, "lost": false }
+        ]
+      }
+    },
+    {
+      "name": "short scores on the bar, the spoken score stays whole",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 135484, "gifts": 9 },
+          { "id": "mateo", "units": 9999, "gifts": 9 }
+        ]
+      },
+      "serverNow": 2000,
+      "expect": {
+        "clock": "0:59",
+        "spoken": "ava 135,484, mateo 9,999",
+        "sides": [
+          { "id": "ava", "score": "135K", "spoken": "ava 135,484" },
+          { "id": "mateo", "score": "9,999", "spoken": "mateo 9,999" }
+        ]
+      }
+    },
+    {
+      "name": "labels translate every word",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 4, "gifts": 1 },
+          { "id": "mateo", "units": 1, "gifts": 1 }
+        ]
+      },
+      "serverNow": 61000,
+      "names": { "ava": "Ava", "mateo": "Mateo" },
+      "labels": {
+        "final": "Bitti",
+        "wins": "{name} kazandı",
+        "side": "{name}: {score}",
+        "spoken": "{a} / {b}"
+      },
+      "expect": { "clock": "Bitti", "banner": "Ava kazandı", "spoken": "Ava: 4 / Mateo: 1" }
+    },
+    {
+      "name": "the draw label translates",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 0, "gifts": 0 },
+          { "id": "mateo", "units": 0, "gifts": 0 }
+        ]
+      },
+      "serverNow": 61000,
+      "labels": { "draw": "Berabere" },
+      "expect": { "clock": "Final", "banner": "Berabere" }
+    },
+    {
+      "name": "a third side is ignored: the bar is a versus",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 100, "gifts": 1 },
+          { "id": "mateo", "units": 100, "gifts": 1 },
+          { "id": "noah", "units": 200, "gifts": 1 }
+        ]
+      },
+      "serverNow": 2000,
+      "expect": { "pct": 25, "spoken": "ava 100, mateo 100" }
+    },
+    {
+      "name": "one side only: no bar",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [{ "id": "ava", "units": 100, "gifts": 1 }]
+      },
+      "serverNow": 2000,
+      "expect": null
+    }
+  ],
+  "gains": [
+    { "before": null, "after": [3, 4], "expect": [false, false] },
+    { "before": [3, 4], "after": [3, 9], "expect": [false, true] },
+    { "before": [3, 4], "after": [3, 4], "expect": [false, false] },
+    { "before": [3, 4], "after": [5, 9], "expect": [true, true] },
+    { "before": [3, 4], "after": [2, 4], "expect": [false, false] }
+  ],
+  "colors": [
+    {
+      "name": "dark preset: accent against the coin colour",
+      "theme": "dark",
+      "expect": [
+        { "color": "#6d5cf0", "text": "#ffffff" },
+        { "color": "#ffd27a", "text": "#2a1600" }
+      ]
+    },
+    {
+      "name": "light preset",
+      "theme": "light",
+      "expect": [
+        { "color": "#6a54e8", "text": "#ffffff" },
+        { "color": "#9a6300", "text": "#ffffff" }
+      ]
+    },
+    {
+      "name": "default theme",
+      "theme": "default",
+      "expect": [
+        { "color": "#8b7bff", "text": "#ffffff" },
+        { "color": "#ffd27a", "text": "#2a1600" }
+      ]
+    },
+    {
+      "name": "override: text by contrast",
+      "theme": "dark",
+      "override": ["#000000", "#ffffff"],
+      "expect": [
+        { "color": "#000000", "text": "#ffffff" },
+        { "color": "#ffffff", "text": "#000000" }
+      ]
+    },
+    {
+      "name": "override: a light colour gets black text",
+      "theme": "dark",
+      "override": ["#ffd27a", "#abc"],
+      "expect": [
+        { "color": "#ffd27a", "text": "#000000" },
+        { "color": "#abc", "text": "#000000" }
+      ]
+    },
+    {
+      "name": "override: a mid grey picks the higher contrast",
+      "theme": "dark",
+      "override": ["#808080", "#6d5cf0"],
+      "expect": [
+        { "color": "#808080", "text": "#000000" },
+        { "color": "#6d5cf0", "text": "#ffffff" }
+      ]
+    },
+    {
+      "name": "override: not a hex colour reads white",
+      "theme": "dark",
+      "override": ["red", "blue"],
+      "expect": [
+        { "color": "red", "text": "#ffffff" },
+        { "color": "blue", "text": "#ffffff" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GiftingStack SDK demo</title>
+    <style>
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        background: #09090f;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        font-family: system-ui, sans-serif;
+        color: #f4f2ff;
+      }
+      .demos {
+        position: fixed;
+        top: 0;
+        left: 0;
+        display: flex;
+        gap: 12px;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+      .demos a {
+        color: #a3a1c2;
+      }
+      .demos a[aria-current] {
+        color: #f4f2ff;
+        font-weight: 700;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="demos" aria-label="Demos">
+      <a href="/" aria-current="page">React Native (web)</a>
+      <a href="/web.html">Web: Pixel</a>
+    </nav>
+    <div id="root"></div>
+    <!-- react-native-web's pre-bundled Animated reads the Node name "global". -->
+    <script>
+      window.global = window;
+    </script>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

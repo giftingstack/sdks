@@ -1,0 +1,228 @@
+{
+  "description": "The gift inbox (SPEC section 19): the client call getInbox, inboxTimeLabel(createdAtMs, nowMs), inboxRows(items, nowMs, names) and inboxUnread(items, lastSeenMs). Format: conformance/README.md.",
+  "client": [
+    {
+      "name": "getInbox without a query: no query string",
+      "call": { "method": "getInbox", "args": {} },
+      "tokens": [{ "forceRefresh": false, "returns": "tok_1" }],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me/inbox",
+            "headers": { "Authorization": "Bearer tok_1" },
+            "absentHeaders": ["Content-Type"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "user": "user_123",
+              "since": "2026-11-01T10:00:00.000Z",
+              "until": "2026-11-02T10:00:00.000Z",
+              "data": [],
+              "has_more": false,
+              "next_cursor": null
+            }
+          }
+        }
+      ],
+      "result": {
+        "user": "user_123",
+        "since": "2026-11-01T10:00:00.000Z",
+        "until": "2026-11-02T10:00:00.000Z",
+        "data": [],
+        "has_more": false,
+        "next_cursor": null
+      }
+    },
+    {
+      "name": "getInbox with cursor and limit: cursor first, values encoded like encodeURIComponent",
+      "call": { "method": "getInbox", "args": { "query": { "cursor": "ib1.MTcy+/=", "limit": 50 } } },
+      "tokens": [{ "forceRefresh": false, "returns": "tok_1" }],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me/inbox?cursor=ib1.MTcy%2B%2F%3D&limit=50",
+            "headers": { "Authorization": "Bearer tok_1" },
+            "absentHeaders": [],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "user": "user_123",
+              "since": "2026-11-01T10:00:00.000Z",
+              "until": "2026-11-02T10:00:00.000Z",
+              "data": [
+                {
+                  "id": "gtx_01JB0000000000000000000002",
+                  "created_at": "2026-11-02T09:58:00.000Z",
+                  "sender": "ayla",
+                  "gift": {
+                    "id": "rose",
+                    "name": "Rose",
+                    "price": 10,
+                    "icon_url": "https://assets.test/rose/256.webp",
+                    "animation_url": "https://assets.test/rose/512.webp"
+                  },
+                  "quantity": 3,
+                  "units": 30,
+                  "status": "completed"
+                },
+                {
+                  "id": "gtx_01JB0000000000000000000001",
+                  "created_at": "2026-11-02T07:00:00.000Z",
+                  "sender": null,
+                  "gift": {
+                    "id": "crown",
+                    "name": "Crown",
+                    "price": 5000,
+                    "icon_url": null,
+                    "animation_url": null
+                  },
+                  "quantity": 1,
+                  "units": 5000,
+                  "status": "reversed"
+                }
+              ],
+              "has_more": true,
+              "next_cursor": "ib1.NEXT"
+            }
+          }
+        }
+      ],
+      "result": {
+        "user": "user_123",
+        "since": "2026-11-01T10:00:00.000Z",
+        "until": "2026-11-02T10:00:00.000Z",
+        "data": [
+          {
+            "id": "gtx_01JB0000000000000000000002",
+            "created_at": "2026-11-02T09:58:00.000Z",
+            "sender": "ayla",
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp",
+              "animation_url": "https://assets.test/rose/512.webp"
+            },
+            "quantity": 3,
+            "units": 30,
+            "status": "completed"
+          },
+          {
+            "id": "gtx_01JB0000000000000000000001",
+            "created_at": "2026-11-02T07:00:00.000Z",
+            "sender": null,
+            "gift": {
+              "id": "crown",
+              "name": "Crown",
+              "price": 5000,
+              "icon_url": null,
+              "animation_url": null
+            },
+            "quantity": 1,
+            "units": 5000,
+            "status": "reversed"
+          }
+        ],
+        "has_more": true,
+        "next_cursor": "ib1.NEXT"
+      }
+    }
+  ],
+  "time": [
+    { "name": "under a minute is now", "createdAtMs": 1000000, "nowMs": 1059999, "label": "now" },
+    { "name": "a clock that went back is now", "createdAtMs": 1000000, "nowMs": 900000, "label": "now" },
+    { "name": "one minute", "createdAtMs": 1000000, "nowMs": 1060000, "label": "1m" },
+    { "name": "59 minutes", "createdAtMs": 0, "nowMs": 3599999, "label": "59m" },
+    { "name": "one hour", "createdAtMs": 0, "nowMs": 3600000, "label": "1h" },
+    { "name": "23 hours", "createdAtMs": 0, "nowMs": 86399999, "label": "23h" },
+    { "name": "a day or more stays in days", "createdAtMs": 0, "nowMs": 86400000, "label": "1d" }
+  ],
+  "rows": [
+    {
+      "name": "reversed gifts are hidden; a deleted sender is Someone; names come from the map, else the id",
+      "nowMs": 1793613600000,
+      "names": { "ayla": "Ayla K." },
+      "items": [
+        {
+          "id": "g3",
+          "created_at": "2026-11-02T09:59:30.000Z",
+          "sender": "ayla",
+          "gift": { "id": "rose", "name": "Rose", "price": 10, "icon_url": "https://assets.test/rose/256.webp", "animation_url": null },
+          "quantity": 3,
+          "units": 30,
+          "status": "completed"
+        },
+        {
+          "id": "g2",
+          "created_at": "2026-11-02T09:00:00.000Z",
+          "sender": "mert",
+          "gift": { "id": "crown", "name": "Crown", "price": 5000, "icon_url": null, "animation_url": null },
+          "quantity": 1,
+          "units": 5000,
+          "status": "reversed"
+        },
+        {
+          "id": "g1",
+          "created_at": "2026-11-02T07:00:00.000Z",
+          "sender": null,
+          "gift": { "id": "hat", "name": "Hat", "price": 350, "icon_url": null, "animation_url": null },
+          "quantity": 1,
+          "units": 350,
+          "status": "completed"
+        }
+      ],
+      "expect": [
+        { "id": "g3", "senderName": "Ayla K.", "giftName": "Rose", "quantity": 3, "time": "now" },
+        { "id": "g1", "senderName": "Someone", "giftName": "Hat", "quantity": 1, "time": "3h" }
+      ]
+    },
+    {
+      "name": "an unknown sender id shows as the id",
+      "nowMs": 1793613600000,
+      "names": {},
+      "items": [
+        {
+          "id": "g1",
+          "created_at": "2026-11-02T09:30:00.000Z",
+          "sender": "user_42",
+          "gift": { "id": "rose", "name": "Rose", "price": 10, "icon_url": null, "animation_url": null },
+          "quantity": 1,
+          "units": 10,
+          "status": "completed"
+        }
+      ],
+      "expect": [{ "id": "g1", "senderName": "user_42", "giftName": "Rose", "quantity": 1, "time": "30m" }]
+    }
+  ],
+  "unread": [
+    {
+      "name": "counts completed gifts newer than the last seen time; reversed ones never count",
+      "lastSeenMs": 1793610000000,
+      "items": [
+        { "created_at": "2026-11-02T09:59:30.000Z", "status": "completed", "quantity": 3 },
+        { "created_at": "2026-11-02T09:30:00.000Z", "status": "reversed", "quantity": 1 },
+        { "created_at": "2026-11-02T09:00:00.001Z", "status": "completed", "quantity": 1 },
+        { "created_at": "2026-11-02T09:00:00.000Z", "status": "completed", "quantity": 1 },
+        { "created_at": "2026-11-02T08:00:00.000Z", "status": "completed", "quantity": 1 }
+      ],
+      "count": 2
+    },
+    {
+      "name": "never seen (null): every completed gift counts",
+      "lastSeenMs": null,
+      "items": [
+        { "created_at": "2026-11-02T09:59:30.000Z", "status": "completed", "quantity": 3 },
+        { "created_at": "2026-11-02T08:00:00.000Z", "status": "reversed", "quantity": 1 }
+      ],
+      "count": 1
+    }
+  ]
+}

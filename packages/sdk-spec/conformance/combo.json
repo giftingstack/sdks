@@ -1,0 +1,93 @@
+{
+  "description": "createComboTracker(windowMs?). Each step calls hit(sender, giftId, atMs) and checks the returned count, or calls reset(). Every (sender, giftId) pair keeps its own run (the tracker drops a run that paused for the window and remembers at most 64 runs).",
+  "scenarios": [
+    {
+      "name": "same sender and gift inside the default window counts up",
+      "steps": [
+        { "hit": ["ayla", "rose", 0], "count": 1 },
+        { "hit": ["ayla", "rose", 500], "count": 2 },
+        { "hit": ["ayla", "rose", 2400], "count": 3 }
+      ]
+    },
+    {
+      "name": "window is measured from the previous hit, not the first",
+      "steps": [
+        { "hit": ["ayla", "rose", 0], "count": 1 },
+        { "hit": ["ayla", "rose", 2000], "count": 2 },
+        { "hit": ["ayla", "rose", 4000], "count": 3 },
+        { "hit": ["ayla", "rose", 6000], "count": 4 }
+      ]
+    },
+    {
+      "name": "a gap of 2499 ms continues the run",
+      "steps": [
+        { "hit": ["ayla", "rose", 1000], "count": 1 },
+        { "hit": ["ayla", "rose", 3499], "count": 2 }
+      ]
+    },
+    {
+      "name": "a gap of exactly 2500 ms starts over (the window is exclusive)",
+      "steps": [
+        { "hit": ["ayla", "rose", 1000], "count": 1 },
+        { "hit": ["ayla", "rose", 3500], "count": 1 },
+        { "hit": ["ayla", "rose", 3501], "count": 2 }
+      ]
+    },
+    {
+      "name": "another gift or another sender starts over",
+      "steps": [
+        { "hit": ["ayla", "rose", 0], "count": 1 },
+        { "hit": ["ayla", "rose", 100], "count": 2 },
+        { "hit": ["ayla", "crown", 200], "count": 1 },
+        { "hit": ["mert", "crown", 300], "count": 1 },
+        { "hit": ["mert", "crown", 400], "count": 2 }
+      ]
+    },
+    {
+      "name": "interleaved pairs each keep their own run, and each run ends on its own",
+      "steps": [
+        { "hit": ["ayla", "rose", 0], "count": 1 },
+        { "hit": ["mert", "rose", 100], "count": 1 },
+        { "hit": ["ayla", "rose", 200], "count": 2 },
+        { "hit": ["mert", "rose", 300], "count": 2 },
+        { "hit": ["ayla", "rose", 2600], "count": 3 },
+        { "hit": ["mert", "rose", 2800], "count": 1 }
+      ]
+    },
+    {
+      "name": "ids that contain separators stay apart",
+      "steps": [
+        { "hit": ["a:b", "c", 0], "count": 1 },
+        { "hit": ["a", "b:c", 1], "count": 1 },
+        { "hit": ["a|b", "c", 2], "count": 1 },
+        { "hit": ["a", "b|c", 3], "count": 1 },
+        { "hit": ["a", "b|c", 4], "count": 2 }
+      ]
+    },
+    {
+      "name": "reset forgets the run",
+      "steps": [
+        { "hit": ["a", "b", 0], "count": 1 },
+        { "hit": ["a", "b", 1], "count": 2 },
+        { "reset": true },
+        { "hit": ["a", "b", 2], "count": 1 }
+      ]
+    },
+    {
+      "name": "custom window of 2000 ms",
+      "windowMs": 2000,
+      "steps": [
+        { "hit": ["ayla", "rose", 0], "count": 1 },
+        { "hit": ["ayla", "rose", 1999], "count": 2 },
+        { "hit": ["ayla", "rose", 3999], "count": 1 }
+      ]
+    },
+    {
+      "name": "a clock that goes back still counts (negative gap is inside the window)",
+      "steps": [
+        { "hit": ["ayla", "rose", 5000], "count": 1 },
+        { "hit": ["ayla", "rose", 1000], "count": 2 }
+      ]
+    }
+  ]
+}

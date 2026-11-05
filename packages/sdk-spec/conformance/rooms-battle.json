@@ -1,0 +1,231 @@
+{
+  "description": "Battle scores (SPEC 17.8 wire, 18.6 client): `parse` (frame -> parsed frame or null) and `view` (battleView of a round at a server time). Run by every SDK.",
+  "parse": [
+    {
+      "name": "scores: a round, unknown fields dropped",
+      "frame": {
+        "t": "scores",
+        "x": 1,
+        "battle": {
+          "round": "match_42_r1",
+          "started": 1000,
+          "ends": 301000,
+          "extra": true,
+          "scores": [
+            { "id": "ava", "units": 1250, "gifts": 9, "color": "red" },
+            { "id": "mateo", "units": 0, "gifts": 0 }
+          ]
+        }
+      },
+      "expect": {
+        "t": "scores",
+        "battle": {
+          "round": "match_42_r1",
+          "started": 1000,
+          "ends": 301000,
+          "scores": [
+            { "id": "ava", "units": 1250, "gifts": 9 },
+            { "id": "mateo", "units": 0, "gifts": 0 }
+          ]
+        }
+      }
+    },
+    {
+      "name": "scores: battle null = the round was removed",
+      "frame": { "t": "scores", "battle": null },
+      "expect": { "t": "scores", "battle": null }
+    },
+    {
+      "name": "scores: invalid entries are dropped alone",
+      "frame": {
+        "t": "scores",
+        "battle": {
+          "round": "r1",
+          "started": 1,
+          "ends": 2,
+          "scores": [
+            { "id": "ava", "units": -1, "gifts": 0 },
+            { "id": "mateo", "units": 5, "gifts": 1.5 },
+            { "units": 5, "gifts": 1 },
+            "noah",
+            { "id": "zoe", "units": 5, "gifts": 1 }
+          ]
+        }
+      },
+      "expect": {
+        "t": "scores",
+        "battle": {
+          "round": "r1",
+          "started": 1,
+          "ends": 2,
+          "scores": [{ "id": "zoe", "units": 5, "gifts": 1 }]
+        }
+      }
+    },
+    {
+      "name": "scores: missing battle is ignored",
+      "frame": { "t": "scores" },
+      "expect": null
+    },
+    {
+      "name": "scores: empty round id is ignored",
+      "frame": { "t": "scores", "battle": { "round": "", "started": 1, "ends": 2, "scores": [] } },
+      "expect": null
+    },
+    {
+      "name": "scores: scores not a list is ignored",
+      "frame": { "t": "scores", "battle": { "round": "r", "started": 1, "ends": 2, "scores": {} } },
+      "expect": null
+    },
+    {
+      "name": "welcome: carries the round",
+      "frame": {
+        "t": "welcome",
+        "v": 1,
+        "viewers": 3,
+        "gap": false,
+        "replay": [],
+        "ttl": 60,
+        "now": 5000,
+        "battle": {
+          "round": "r1",
+          "started": 1000,
+          "ends": 9000,
+          "scores": [{ "id": "ava", "units": 50, "gifts": 1 }]
+        }
+      },
+      "expect": {
+        "t": "welcome",
+        "viewers": 3,
+        "gap": false,
+        "replay": [],
+        "ttl": 60,
+        "now": 5000,
+        "battle": {
+          "round": "r1",
+          "started": 1000,
+          "ends": 9000,
+          "scores": [{ "id": "ava", "units": 50, "gifts": 1 }]
+        }
+      }
+    },
+    {
+      "name": "welcome: a malformed battle is left out, the welcome stays",
+      "frame": {
+        "t": "welcome",
+        "viewers": 3,
+        "gap": false,
+        "replay": [],
+        "ttl": 60,
+        "now": 5000,
+        "battle": { "round": "r1", "started": "soon", "ends": 9000, "scores": [] }
+      },
+      "expect": { "t": "welcome", "viewers": 3, "gap": false, "replay": [], "ttl": 60, "now": 5000 }
+    }
+  ],
+  "view": [
+    {
+      "name": "open round, a clear leader, shares of the total",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 300, "gifts": 3 },
+          { "id": "mateo", "units": 100, "gifts": 2 }
+        ]
+      },
+      "serverNow": 31000,
+      "expect": {
+        "round": "r1",
+        "open": true,
+        "remainingMs": 30000,
+        "total": 400,
+        "sides": [
+          { "id": "ava", "units": 300, "gifts": 3, "share": 0.75 },
+          { "id": "mateo", "units": 100, "gifts": 2, "share": 0.25 }
+        ],
+        "leader": "ava"
+      }
+    },
+    {
+      "name": "nobody scored yet: equal split, no leader",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          { "id": "ava", "units": 0, "gifts": 0 },
+          { "id": "mateo", "units": 0, "gifts": 0 }
+        ]
+      },
+      "serverNow": 1000,
+      "expect": {
+        "round": "r1",
+        "open": true,
+        "remainingMs": 60000,
+        "total": 0,
+        "sides": [
+          { "id": "ava", "units": 0, "gifts": 0, "share": 0.5 },
+          { "id": "mateo", "units": 0, "gifts": 0, "share": 0.5 }
+        ],
+        "leader": null
+      }
+    },
+    {
+      "name": "a tie at the top: no leader",
+      "battle": {
+        "round": "r1",
+        "started": 0,
+        "ends": 10,
+        "scores": [
+          { "id": "ava", "units": 50, "gifts": 1 },
+          { "id": "mateo", "units": 50, "gifts": 5 }
+        ]
+      },
+      "serverNow": 5,
+      "expect": {
+        "round": "r1",
+        "open": true,
+        "remainingMs": 5,
+        "total": 100,
+        "sides": [
+          { "id": "ava", "units": 50, "gifts": 1, "share": 0.5 },
+          { "id": "mateo", "units": 50, "gifts": 5, "share": 0.5 }
+        ],
+        "leader": null
+      }
+    },
+    {
+      "name": "ended: not open, nothing left",
+      "battle": {
+        "round": "r1",
+        "started": 0,
+        "ends": 10,
+        "scores": [{ "id": "ava", "units": 8, "gifts": 1 }]
+      },
+      "serverNow": 10,
+      "expect": {
+        "round": "r1",
+        "open": false,
+        "remainingMs": 0,
+        "total": 8,
+        "sides": [{ "id": "ava", "units": 8, "gifts": 1, "share": 1 }],
+        "leader": "ava"
+      }
+    },
+    {
+      "name": "no server time yet: read as the round's start",
+      "battle": { "round": "r1", "started": 100, "ends": 400, "scores": [] },
+      "serverNow": null,
+      "expect": {
+        "round": "r1",
+        "open": true,
+        "remainingMs": 300,
+        "total": 0,
+        "sides": [],
+        "leader": null
+      }
+    }
+  ]
+}

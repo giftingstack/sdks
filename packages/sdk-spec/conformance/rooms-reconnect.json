@@ -1,0 +1,328 @@
+{
+  "description": "Gift rooms reconnect policy (SPEC 18.3): roomRetryDecision(code, reason, attempt, limited, random). Format: conformance/README.md.",
+  "cases": [
+    {
+      "name": "1006 first drop: 0.5 s + random over the rest of 5 s",
+      "code": 1006,
+      "reason": "",
+      "attempt": 0,
+      "limited": 0,
+      "random": 0.5,
+      "expect": { "retry": true, "delayMs": 2750, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "1012 server restart, first attempt: random 0.9999 stays under 5 s",
+      "code": 1012,
+      "reason": "",
+      "attempt": 0,
+      "limited": 0,
+      "random": 0.9999,
+      "expect": { "retry": true, "delayMs": 4999, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "1006 second attempt: cap 1 s, floor 0.5 s",
+      "code": 1006,
+      "reason": "",
+      "attempt": 1,
+      "limited": 0,
+      "random": 0.5,
+      "expect": { "retry": true, "delayMs": 750, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "1011 first attempt: the cap is the floor, 0.5 s",
+      "code": 1011,
+      "reason": "send_failed",
+      "attempt": 0,
+      "limited": 0,
+      "random": 0.5,
+      "expect": { "retry": true, "delayMs": 500, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "1011 attempt 5: cap 16 s",
+      "code": 1011,
+      "reason": "",
+      "attempt": 5,
+      "limited": 0,
+      "random": 0.25,
+      "expect": { "retry": true, "delayMs": 4375, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "attempt 6: cap reaches 30 s (not 32 s)",
+      "code": 1006,
+      "reason": "",
+      "attempt": 6,
+      "limited": 0,
+      "random": 0.5,
+      "expect": { "retry": true, "delayMs": 15250, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "attempt 11 (the last retry): cap 30 s",
+      "code": 1006,
+      "reason": "",
+      "attempt": 11,
+      "limited": 0,
+      "random": 0.1,
+      "expect": { "retry": true, "delayMs": 3450, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "random 0: the 0.5 s floor, never a tight loop",
+      "code": 1000,
+      "reason": "",
+      "attempt": 2,
+      "limited": 0,
+      "random": 0,
+      "expect": { "retry": true, "delayMs": 500, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "unknown 4xxx code (for example a future 4302 redirect): backoff",
+      "code": 4302,
+      "reason": "{\"shard\":3}",
+      "attempt": 0,
+      "limited": 0,
+      "random": 0.5,
+      "expect": { "retry": true, "delayMs": 500, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "4001 token expired: fresh token, reconnect now (no random)",
+      "code": 4001,
+      "reason": "token_expired",
+      "attempt": 0,
+      "limited": 0,
+      "expect": { "retry": true, "delayMs": 0, "refreshToken": true, "limited": false }
+    },
+    {
+      "name": "4001 again right after a refresh: fresh token, with backoff",
+      "code": 4001,
+      "reason": "token_expired",
+      "attempt": 1,
+      "limited": 0,
+      "random": 0.5,
+      "expect": { "retry": true, "delayMs": 750, "refreshToken": true, "limited": false }
+    },
+    {
+      "name": "4003 forbidden: closed",
+      "code": 4003,
+      "reason": "room_forbidden",
+      "attempt": 0,
+      "limited": 0,
+      "expect": { "retry": false }
+    },
+    {
+      "name": "4004 bad room id: closed",
+      "code": 4004,
+      "reason": "bad_room_id",
+      "attempt": 3,
+      "limited": 0,
+      "expect": { "retry": false }
+    },
+    {
+      "name": "4010 plan: closed",
+      "code": 4010,
+      "reason": "rooms_disabled",
+      "attempt": 0,
+      "limited": 0,
+      "expect": { "retry": false }
+    },
+    {
+      "name": "4400 protocol error: closed",
+      "code": 4400,
+      "reason": "protocol_error",
+      "attempt": 0,
+      "limited": 0,
+      "expect": { "retry": false }
+    },
+    {
+      "name": "4009 replaced: closed (a newer socket of the same user took over)",
+      "code": 4009,
+      "reason": "replaced",
+      "attempt": 0,
+      "limited": 0,
+      "expect": { "retry": false }
+    },
+    {
+      "name": "4009 room full: retry_after 30 -> 30 s, no random",
+      "code": 4009,
+      "reason": "{\"retry_after\":30}",
+      "attempt": 0,
+      "limited": 0,
+      "expect": { "retry": true, "delayMs": 30000, "refreshToken": false, "limited": true }
+    },
+    {
+      "name": "4008 retry_after 1, one wait in a row: 30 s doubled, random 0",
+      "code": 4008,
+      "reason": "{\"retry_after\":1}",
+      "attempt": 2,
+      "limited": 1,
+      "random": 0,
+      "expect": { "retry": true, "delayMs": 60000, "refreshToken": false, "limited": true }
+    },
+    {
+      "name": "4008 retry_after 90 after 4 waits: capped at 5 minutes",
+      "code": 4008,
+      "reason": "{\"retry_after\":90}",
+      "attempt": 0,
+      "limited": 4,
+      "random": 0.5,
+      "expect": { "retry": true, "delayMs": 300000, "refreshToken": false, "limited": true }
+    },
+    {
+      "name": "4008 reason not JSON: 30 s",
+      "code": 4008,
+      "reason": "slow down",
+      "attempt": 0,
+      "limited": 0,
+      "expect": { "retry": true, "delayMs": 30000, "refreshToken": false, "limited": true }
+    },
+    {
+      "name": "4008 with retry_after never gives up: 5 waits in a row, capped at 5 minutes",
+      "code": 4008,
+      "reason": "{\"retry_after\":10}",
+      "attempt": 0,
+      "limited": 5,
+      "random": 0.9,
+      "expect": { "retry": true, "delayMs": 300000, "refreshToken": false, "limited": true }
+    },
+    {
+      "name": "4009 full after 5 limited waits: closed",
+      "code": 4009,
+      "reason": "{\"retry_after\":30}",
+      "attempt": 0,
+      "limited": 5,
+      "expect": { "retry": false, "resumable": true }
+    },
+    {
+      "name": "1006 first drop, random 0: the floor",
+      "code": 1006,
+      "reason": "",
+      "attempt": 0,
+      "limited": 0,
+      "random": 0,
+      "expect": { "retry": true, "delayMs": 500, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "1006 attempt 1, random 0: the floor",
+      "code": 1006,
+      "reason": "",
+      "attempt": 1,
+      "limited": 0,
+      "random": 0,
+      "expect": { "retry": true, "delayMs": 500, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "1006 attempt 3: cap 4 s, random 0.9999",
+      "code": 1006,
+      "reason": "",
+      "attempt": 3,
+      "limited": 0,
+      "random": 0.9999,
+      "expect": { "retry": true, "delayMs": 3999, "refreshToken": false, "limited": false }
+    },
+    {
+      "name": "4001 right after a stable socket (attempt 0): no wait even with a floor",
+      "code": 4001,
+      "reason": "token_expired",
+      "attempt": 0,
+      "limited": 0,
+      "expect": { "retry": true, "delayMs": 0, "refreshToken": true, "limited": false }
+    },
+    {
+      "name": "4008 retry_after 60, first wait: 60 s + 25 % jitter",
+      "code": 4008,
+      "reason": "{\"retry_after\":60}",
+      "attempt": 0,
+      "limited": 0,
+      "random": 0.5,
+      "expect": { "retry": true, "delayMs": 67500, "refreshToken": false, "limited": true }
+    },
+    {
+      "name": "4008 retry_after 60, third wait: 240 s",
+      "code": 4008,
+      "reason": "{\"retry_after\":60}",
+      "attempt": 3,
+      "limited": 2,
+      "random": 0,
+      "expect": { "retry": true, "delayMs": 240000, "refreshToken": false, "limited": true }
+    },
+    {
+      "name": "4008 retry_after 60 at attempt 50: no attempt ceiling for a platform limit",
+      "code": 4008,
+      "reason": "{\"retry_after\":60}",
+      "attempt": 50,
+      "limited": 7,
+      "random": 0,
+      "expect": { "retry": true, "delayMs": 300000, "refreshToken": false, "limited": true }
+    },
+    {
+      "name": "4008 reason not JSON after 5 limited waits: closed, can be restarted",
+      "code": 4008,
+      "reason": "slow down",
+      "attempt": 0,
+      "limited": 5,
+      "expect": { "retry": false, "resumable": true }
+    },
+    {
+      "name": "4011 project suspended: closed, can be restarted",
+      "code": 4011,
+      "reason": "project_suspended",
+      "attempt": 0,
+      "limited": 0,
+      "expect": { "retry": false, "resumable": true }
+    },
+    {
+      "name": "4011 at any attempt: still closed, can be restarted",
+      "code": 4011,
+      "reason": "project_suspended",
+      "attempt": 12,
+      "limited": 0,
+      "expect": { "retry": false, "resumable": true }
+    },
+    {
+      "name": "attempt 12 after 1006: exhausted (the ceiling is 12 retries)",
+      "code": 1006,
+      "reason": "",
+      "attempt": 12,
+      "limited": 0,
+      "expect": { "retry": false, "resumable": true, "exhausted": true }
+    },
+    {
+      "name": "attempt 12 after 1012: exhausted",
+      "code": 1012,
+      "reason": "",
+      "attempt": 12,
+      "limited": 0,
+      "expect": { "retry": false, "resumable": true, "exhausted": true }
+    },
+    {
+      "name": "attempt 12 after 4001: exhausted (token_expired loops end too)",
+      "code": 4001,
+      "reason": "token_expired",
+      "attempt": 12,
+      "limited": 0,
+      "expect": { "retry": false, "resumable": true, "exhausted": true }
+    },
+    {
+      "name": "attempt 12 after an unknown code: exhausted",
+      "code": 4302,
+      "reason": "{\"shard\":3}",
+      "attempt": 12,
+      "limited": 0,
+      "expect": { "retry": false, "resumable": true, "exhausted": true }
+    },
+    {
+      "name": "attempt 99 after 1000: exhausted",
+      "code": 1000,
+      "reason": "",
+      "attempt": 99,
+      "limited": 0,
+      "expect": { "retry": false, "resumable": true, "exhausted": true }
+    },
+    {
+      "name": "4003 at attempt 12: final (not resumable)",
+      "code": 4003,
+      "reason": "key_invalid",
+      "attempt": 12,
+      "limited": 0,
+      "expect": { "retry": false }
+    }
+  ]
+}

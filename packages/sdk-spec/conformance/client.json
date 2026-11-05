@@ -1,0 +1,2250 @@
+{
+  "description": "Scripted HTTP scenarios for GiftingClient. Format and matching rules: conformance/README.md.",
+  "scenarios": [
+    {
+      "name": "getGifts returns data[] and ignores has_more",
+      "call": {
+        "method": "getGifts"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "data": [
+                {
+                  "id": "rose",
+                  "name": "Rose",
+                  "description": null,
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp",
+                  "animation_url": "https://assets.test/rose/512.webp",
+                  "sort_order": 1
+                },
+                {
+                  "id": "hat",
+                  "name": "Hat",
+                  "description": "A tall hat",
+                  "price": 350,
+                  "icon_url": "https://assets.test/hat/256.webp",
+                  "animation_url": null,
+                  "sort_order": 2
+                }
+              ],
+              "has_more": false
+            }
+          }
+        }
+      ],
+      "result": [
+        {
+          "id": "rose",
+          "name": "Rose",
+          "description": null,
+          "price": 10,
+          "icon_url": "https://assets.test/rose/256.webp",
+          "animation_url": "https://assets.test/rose/512.webp",
+          "sort_order": 1
+        },
+        {
+          "id": "hat",
+          "name": "Hat",
+          "description": "A tall hat",
+          "price": 350,
+          "icon_url": "https://assets.test/hat/256.webp",
+          "animation_url": null,
+          "sort_order": 2
+        }
+      ]
+    },
+    {
+      "name": "getMe returns the body",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "user": "alice",
+              "balance": 1000
+            }
+          }
+        }
+      ],
+      "result": {
+        "user": "alice",
+        "balance": 1000
+      }
+    },
+    {
+      "name": "getReceivedGifts encodes the user id like encodeURIComponent",
+      "call": {
+        "method": "getReceivedGifts",
+        "args": {
+          "user": "a/b c:d"
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/users/a%2Fb%20c%3Ad/received-gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "data": [
+                {
+                  "gift": {
+                    "id": "rose",
+                    "name": "Rose",
+                    "icon_url": null
+                  },
+                  "count": 3
+                }
+              ],
+              "has_more": false
+            }
+          }
+        }
+      ],
+      "result": [
+        {
+          "gift": {
+            "id": "rose",
+            "name": "Rose",
+            "icon_url": null
+          },
+          "count": 3
+        }
+      ]
+    },
+    {
+      "name": "getReceivedGifts: UTF-8 percent-encoding, and -_.!~*'() stay as they are",
+      "call": {
+        "method": "getReceivedGifts",
+        "args": {
+          "user": "ü-_.!~*'()"
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/users/%C3%BC-_.!~*'()/received-gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "data": [],
+              "has_more": false
+            }
+          }
+        }
+      ],
+      "result": []
+    },
+    {
+      "name": "sendGift with every field maps them to the wire names",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose",
+            "quantity": 3,
+            "message": "hi",
+            "reference": "post_1"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose",
+              "quantity": 3,
+              "message": "hi",
+              "reference": "post_1"
+            }
+          },
+          "response": {
+            "status": 201,
+            "headers": {},
+            "body": {
+              "id": "gtx_01J0000000000000000000000",
+              "sender": "alice",
+              "receiver": "bob",
+              "gift": {
+                "id": "rose",
+                "name": "Rose",
+                "icon_url": "https://assets.test/rose/256.webp"
+              },
+              "quantity": 1,
+              "unit_price": 10,
+              "total": 10,
+              "message": null,
+              "reference": null,
+              "status": "completed",
+              "created_at": "2026-10-10T00:00:00.000Z",
+              "sender_balance_after": 990
+            }
+          }
+        }
+      ],
+      "result": {
+        "id": "gtx_01J0000000000000000000000",
+        "sender": "alice",
+        "receiver": "bob",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 1,
+        "unit_price": 10,
+        "total": 10,
+        "message": null,
+        "reference": null,
+        "status": "completed",
+        "created_at": "2026-10-10T00:00:00.000Z",
+        "sender_balance_after": 990
+      }
+    },
+    {
+      "name": "sendGift omits fields that were not given",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 201,
+            "headers": {},
+            "body": {
+              "id": "gtx_01J0000000000000000000000",
+              "sender": "alice",
+              "receiver": "bob",
+              "gift": {
+                "id": "rose",
+                "name": "Rose",
+                "icon_url": "https://assets.test/rose/256.webp"
+              },
+              "quantity": 1,
+              "unit_price": 10,
+              "total": 10,
+              "message": null,
+              "reference": null,
+              "status": "completed",
+              "created_at": "2026-10-10T00:00:00.000Z",
+              "sender_balance_after": 990
+            }
+          }
+        }
+      ],
+      "result": {
+        "id": "gtx_01J0000000000000000000000",
+        "sender": "alice",
+        "receiver": "bob",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 1,
+        "unit_price": 10,
+        "total": 10,
+        "message": null,
+        "reference": null,
+        "status": "completed",
+        "created_at": "2026-10-10T00:00:00.000Z",
+        "sender_balance_after": 990
+      }
+    },
+    {
+      "name": "sendGift uses the caller's idempotency key verbatim and never puts it in the body",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose",
+            "idempotencyKey": "my-own-key-1"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "my-own-key-1"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 201,
+            "headers": {},
+            "body": {
+              "id": "gtx_01J0000000000000000000000",
+              "sender": "alice",
+              "receiver": "bob",
+              "gift": {
+                "id": "rose",
+                "name": "Rose",
+                "icon_url": "https://assets.test/rose/256.webp"
+              },
+              "quantity": 1,
+              "unit_price": 10,
+              "total": 10,
+              "message": null,
+              "reference": null,
+              "status": "completed",
+              "created_at": "2026-10-10T00:00:00.000Z",
+              "sender_balance_after": 990
+            }
+          }
+        }
+      ],
+      "result": {
+        "id": "gtx_01J0000000000000000000000",
+        "sender": "alice",
+        "receiver": "bob",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 1,
+        "unit_price": 10,
+        "total": 10,
+        "message": null,
+        "reference": null,
+        "status": "completed",
+        "created_at": "2026-10-10T00:00:00.000Z",
+        "sender_balance_after": 990
+      }
+    },
+    {
+      "name": "baseUrl: trailing slashes are removed",
+      "baseUrl": "https://api.example.test///",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.example.test/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "user": "alice",
+              "balance": 1000
+            }
+          }
+        }
+      ],
+      "result": {
+        "user": "alice",
+        "balance": 1000
+      }
+    },
+    {
+      "name": "baseUrl with a path keeps the path",
+      "baseUrl": "http://localhost:8787/proxy/",
+      "call": {
+        "method": "getGifts"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8787/proxy/v1/client/gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "data": [],
+              "has_more": false
+            }
+          }
+        }
+      ],
+      "result": []
+    },
+    {
+      "name": "401 then success: one fresh token (forceRefresh true) and one repeat",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_old"
+        },
+        {
+          "forceRefresh": true,
+          "returns": "tok_new"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_old"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 401,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "invalid_client_token",
+                "message": "Client token expired.",
+                "request_id": "req_1",
+                "retryable": false
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_new"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "user": "alice",
+              "balance": 1000
+            }
+          }
+        }
+      ],
+      "result": {
+        "user": "alice",
+        "balance": 1000
+      }
+    },
+    {
+      "name": "401 twice: gives up after one refresh",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_old"
+        },
+        {
+          "forceRefresh": true,
+          "returns": "tok_new"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_old"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 401,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "invalid_client_token",
+                "message": "Client token expired.",
+                "request_id": "req_1",
+                "retryable": false
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_new"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 401,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "invalid_client_token",
+                "message": "Client token expired.",
+                "request_id": "req_2",
+                "retryable": false
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 401,
+        "type": "invalid_client_token",
+        "message": "Client token expired.",
+        "requestId": "req_2",
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "401 on a send: the repeat carries the SAME idempotency key",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_old"
+        },
+        {
+          "forceRefresh": true,
+          "returns": "tok_new"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_old",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 401,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "invalid_client_token",
+                "message": "Client token expired.",
+                "request_id": "req_1",
+                "retryable": false
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_new",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 201,
+            "headers": {},
+            "body": {
+              "id": "gtx_01J0000000000000000000000",
+              "sender": "alice",
+              "receiver": "bob",
+              "gift": {
+                "id": "rose",
+                "name": "Rose",
+                "icon_url": "https://assets.test/rose/256.webp"
+              },
+              "quantity": 1,
+              "unit_price": 10,
+              "total": 10,
+              "message": null,
+              "reference": null,
+              "status": "completed",
+              "created_at": "2026-10-10T00:00:00.000Z",
+              "sender_balance_after": 990
+            }
+          }
+        }
+      ],
+      "result": {
+        "id": "gtx_01J0000000000000000000000",
+        "sender": "alice",
+        "receiver": "bob",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 1,
+        "unit_price": 10,
+        "total": 10,
+        "message": null,
+        "reference": null,
+        "status": "completed",
+        "created_at": "2026-10-10T00:00:00.000Z",
+        "sender_balance_after": 990
+      }
+    },
+    {
+      "name": "500 then success: one quiet retry with the SAME idempotency key and the same token",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 500,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "internal_error",
+                "message": "Something went wrong.",
+                "request_id": "req_1",
+                "retryable": true
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 201,
+            "headers": {},
+            "body": {
+              "id": "gtx_01J0000000000000000000000",
+              "sender": "alice",
+              "receiver": "bob",
+              "gift": {
+                "id": "rose",
+                "name": "Rose",
+                "icon_url": "https://assets.test/rose/256.webp"
+              },
+              "quantity": 1,
+              "unit_price": 10,
+              "total": 10,
+              "message": null,
+              "reference": null,
+              "status": "completed",
+              "created_at": "2026-10-10T00:00:00.000Z",
+              "sender_balance_after": 990
+            }
+          }
+        }
+      ],
+      "result": {
+        "id": "gtx_01J0000000000000000000000",
+        "sender": "alice",
+        "receiver": "bob",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 1,
+        "unit_price": 10,
+        "total": 10,
+        "message": null,
+        "reference": null,
+        "status": "completed",
+        "created_at": "2026-10-10T00:00:00.000Z",
+        "sender_balance_after": 990
+      }
+    },
+    {
+      "name": "503 twice: one retry only, then the error",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 503,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "temporarily_unavailable",
+                "message": "Try again.",
+                "request_id": "req_1",
+                "retryable": true
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 503,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "temporarily_unavailable",
+                "message": "Try again.",
+                "request_id": "req_2",
+                "retryable": true
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 503,
+        "type": "temporarily_unavailable",
+        "message": "Try again.",
+        "requestId": "req_2",
+        "retryable": true,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "500 on a read is retried too",
+      "call": {
+        "method": "getGifts"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 500,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "internal_error",
+                "message": "Oops.",
+                "request_id": "req_1",
+                "retryable": true
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "data": [
+                {
+                  "id": "rose",
+                  "name": "Rose",
+                  "description": null,
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp",
+                  "animation_url": "https://assets.test/rose/512.webp",
+                  "sort_order": 1
+                }
+              ],
+              "has_more": false
+            }
+          }
+        }
+      ],
+      "result": [
+        {
+          "id": "rose",
+          "name": "Rose",
+          "description": null,
+          "price": 10,
+          "icon_url": "https://assets.test/rose/256.webp",
+          "animation_url": "https://assets.test/rose/512.webp",
+          "sort_order": 1
+        }
+      ]
+    },
+    {
+      "name": "401, refresh, then 500, then retry: three requests, all with the same key",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_old"
+        },
+        {
+          "forceRefresh": true,
+          "returns": "tok_new"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_old",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 401,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "invalid_client_token",
+                "message": "Client token expired.",
+                "request_id": "req_1",
+                "retryable": false
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_new",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 502,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "internal_error",
+                "message": "Bad gateway.",
+                "request_id": "req_2",
+                "retryable": true
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_new",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 201,
+            "headers": {},
+            "body": {
+              "id": "gtx_01J0000000000000000000000",
+              "sender": "alice",
+              "receiver": "bob",
+              "gift": {
+                "id": "rose",
+                "name": "Rose",
+                "icon_url": "https://assets.test/rose/256.webp"
+              },
+              "quantity": 1,
+              "unit_price": 10,
+              "total": 10,
+              "message": null,
+              "reference": null,
+              "status": "completed",
+              "created_at": "2026-10-10T00:00:00.000Z",
+              "sender_balance_after": 990
+            }
+          }
+        }
+      ],
+      "result": {
+        "id": "gtx_01J0000000000000000000000",
+        "sender": "alice",
+        "receiver": "bob",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 1,
+        "unit_price": 10,
+        "total": 10,
+        "message": null,
+        "reference": null,
+        "status": "completed",
+        "created_at": "2026-10-10T00:00:00.000Z",
+        "sender_balance_after": 990
+      }
+    },
+    {
+      "name": "500 then 401: the 401 after a retry is NOT refreshed",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 500,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "internal_error",
+                "message": "Oops.",
+                "request_id": "req_1",
+                "retryable": true
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 401,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "invalid_client_token",
+                "message": "Client token expired.",
+                "request_id": "req_2",
+                "retryable": false
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 401,
+        "type": "invalid_client_token",
+        "message": "Client token expired.",
+        "requestId": "req_2",
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "429 is retryable but never retried by the client",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 429,
+            "headers": {
+              "Retry-After": "3"
+            },
+            "body": {
+              "error": {
+                "type": "rate_limited",
+                "message": "Too many requests.",
+                "request_id": "req_1",
+                "retryable": true
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 429,
+        "type": "rate_limited",
+        "message": "Too many requests.",
+        "requestId": "req_1",
+        "retryable": true,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "422 insufficient_balance: not retried, insufficientBalance true",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 422,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "insufficient_balance",
+                "message": "Not enough balance.",
+                "request_id": "req_1",
+                "retryable": false
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 422,
+        "type": "insufficient_balance",
+        "message": "Not enough balance.",
+        "requestId": "req_1",
+        "retryable": false,
+        "insufficientBalance": true
+      }
+    },
+    {
+      "name": "network failure: status 0, network_error, retryable, not retried",
+      "call": {
+        "method": "getGifts"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "networkError": true
+        }
+      ],
+      "error": {
+        "status": 0,
+        "type": "network_error",
+        "message": "Could not reach GiftingStack. Check your connection.",
+        "requestId": null,
+        "retryable": true,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "network failure on the retry after a 500: repeated once more, then a network error",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 500,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "internal_error",
+                "message": "Oops.",
+                "request_id": "req_1",
+                "retryable": true
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "networkError": true
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "networkError": true
+        }
+      ],
+      "error": {
+        "status": 0,
+        "type": "network_error",
+        "message": "Could not reach GiftingStack. Check your connection.",
+        "requestId": null,
+        "retryable": true,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "sendGift: a lost connection is repeated once with the same key, the second answer is the result",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "networkError": true
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 201,
+            "headers": {},
+            "body": {
+              "id": "gtx_1",
+              "sender": "ayla",
+              "receiver": "bob",
+              "gift": {
+                "id": "rose",
+                "name": "Rose",
+                "icon_url": null
+              },
+              "quantity": 1,
+              "unit_price": 10,
+              "total": 10,
+              "message": null,
+              "reference": null,
+              "status": "completed",
+              "created_at": "2026-11-03T00:00:00.000Z",
+              "sender_balance_after": 990
+            }
+          }
+        }
+      ],
+      "result": {
+        "id": "gtx_1",
+        "sender": "ayla",
+        "receiver": "bob",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "icon_url": null
+        },
+        "quantity": 1,
+        "unit_price": 10,
+        "total": 10,
+        "message": null,
+        "reference": null,
+        "status": "completed",
+        "created_at": "2026-11-03T00:00:00.000Z",
+        "sender_balance_after": 990
+      }
+    },
+    {
+      "name": "sendGift: two lost connections in a row end the call after 2 requests (network_error)",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "networkError": true
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "networkError": true
+        }
+      ],
+      "error": {
+        "status": 0,
+        "type": "network_error",
+        "message": "Could not reach GiftingStack. Check your connection.",
+        "requestId": null,
+        "retryable": true,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "sendGift: a given idempotency key is kept for the repeat after a lost connection",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose",
+            "idempotencyKey": "my-key-1"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "my-key-1"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "networkError": true
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "my-key-1"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 201,
+            "headers": {},
+            "body": {
+              "id": "gtx_1",
+              "sender": "ayla",
+              "receiver": "bob",
+              "gift": {
+                "id": "rose",
+                "name": "Rose",
+                "icon_url": null
+              },
+              "quantity": 1,
+              "unit_price": 10,
+              "total": 10,
+              "message": null,
+              "reference": null,
+              "status": "completed",
+              "created_at": "2026-11-03T00:00:00.000Z",
+              "sender_balance_after": 990
+            }
+          }
+        }
+      ],
+      "result": {
+        "id": "gtx_1",
+        "sender": "ayla",
+        "receiver": "bob",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "icon_url": null
+        },
+        "quantity": 1,
+        "unit_price": 10,
+        "total": 10,
+        "message": null,
+        "reference": null,
+        "status": "completed",
+        "created_at": "2026-11-03T00:00:00.000Z",
+        "sender_balance_after": 990
+      }
+    },
+    {
+      "name": "sendGift: only one repeat per call: a lost connection, a 500 and a lost connection end it (3 requests)",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "rose"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "networkError": true
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "response": {
+            "status": 500,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "internal_error",
+                "message": "Oops.",
+                "request_id": "req_1",
+                "retryable": true
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<same-as-request:1>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "rose"
+            }
+          },
+          "networkError": true
+        }
+      ],
+      "error": {
+        "status": 0,
+        "type": "network_error",
+        "message": "Could not reach GiftingStack. Check your connection.",
+        "requestId": null,
+        "retryable": true,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "error body that is not JSON: unknown_error and a generic message",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 404,
+            "headers": {
+              "Content-Type": "text/plain"
+            },
+            "bodyText": "Not Found"
+          }
+        }
+      ],
+      "error": {
+        "status": 404,
+        "type": "unknown_error",
+        "message": "Request failed (404).",
+        "requestId": null,
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "empty error body",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 403,
+            "headers": {},
+            "bodyText": ""
+          }
+        }
+      ],
+      "error": {
+        "status": 403,
+        "type": "unknown_error",
+        "message": "Request failed (403).",
+        "requestId": null,
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "non-JSON 502 twice: the request id comes from the X-Request-Id header of the last response",
+      "call": {
+        "method": "getGifts"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 502,
+            "headers": {
+              "X-Request-Id": "req_h1"
+            },
+            "bodyText": "<html>Bad gateway</html>"
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 502,
+            "headers": {
+              "X-Request-Id": "req_h2"
+            },
+            "bodyText": "<html>Bad gateway</html>"
+          }
+        }
+      ],
+      "error": {
+        "status": 502,
+        "type": "unknown_error",
+        "message": "Request failed (502).",
+        "requestId": "req_h2",
+        "retryable": true,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "JSON body without an error object",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 400,
+            "headers": {},
+            "body": {
+              "ok": false
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 400,
+        "type": "unknown_error",
+        "message": "Request failed (400).",
+        "requestId": null,
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "error with a type but no message keeps the type",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 400,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "invalid_request"
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 400,
+        "type": "invalid_request",
+        "message": "Request failed (400).",
+        "requestId": null,
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "request id: the header is used when the body has none",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 400,
+            "headers": {
+              "X-Request-Id": "req_header"
+            },
+            "body": {
+              "error": {
+                "type": "invalid_request",
+                "message": "Bad."
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 400,
+        "type": "invalid_request",
+        "message": "Bad.",
+        "requestId": "req_header",
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "request id: the body wins over the header",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 400,
+            "headers": {
+              "X-Request-Id": "req_header"
+            },
+            "body": {
+              "error": {
+                "type": "invalid_request",
+                "message": "Bad.",
+                "request_id": "req_body",
+                "retryable": false
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 400,
+        "type": "invalid_request",
+        "message": "Bad.",
+        "requestId": "req_body",
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "404 gift not found on a send",
+      "call": {
+        "method": "sendGift",
+        "args": {
+          "input": {
+            "receiver": "bob",
+            "giftId": "nope"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-transactions",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json",
+              "Idempotency-Key": "<any-uuid-like>"
+            },
+            "absentHeaders": [],
+            "body": {
+              "receiver": "bob",
+              "gift_id": "nope"
+            }
+          },
+          "response": {
+            "status": 404,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "not_found",
+                "message": "Gift not found.",
+                "request_id": "req_1",
+                "retryable": false
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 404,
+        "type": "not_found",
+        "message": "Gift not found.",
+        "requestId": "req_1",
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "2xx that is not JSON: invalid_response, no body text, not retried",
+      "call": {
+        "method": "getMe"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "text/html"
+            },
+            "bodyText": "<html>Captive portal login</html>"
+          }
+        }
+      ],
+      "error": {
+        "status": 200,
+        "type": "invalid_response",
+        "message": "Invalid response (200).",
+        "requestId": null,
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "2xx with a cut-off JSON body: invalid_response, request id from the header",
+      "call": {
+        "method": "getGifts"
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "X-Request-Id": "req_cut"
+            },
+            "bodyText": "{\"data\":[{\"id\":\"rose\""
+          }
+        }
+      ],
+      "error": {
+        "status": 200,
+        "type": "invalid_response",
+        "message": "Invalid response (200).",
+        "requestId": "req_cut",
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    }
+  ]
+}

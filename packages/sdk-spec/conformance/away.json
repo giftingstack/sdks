@@ -1,0 +1,2828 @@
+{
+  "description": "While you were away (SPEC section 15): planAwayReplay, awaySenderLabel, the AwayController with a fake clock, a scripted client and a stub effect player, and the client calls. Format: conformance/README.md.",
+  "gifts": {
+    "dragon": {
+      "id": "dragon",
+      "name": "Dragon",
+      "price": 40000,
+      "icon_url": "https://assets.test/dragon/256.webp",
+      "animation_url": "https://assets.test/dragon/512.webp"
+    },
+    "lion": {
+      "id": "lion",
+      "name": "Lion",
+      "price": 20000,
+      "icon_url": "https://assets.test/lion/256.webp",
+      "animation_url": "https://assets.test/lion/512.webp"
+    },
+    "crown": {
+      "id": "crown",
+      "name": "Crown",
+      "price": 5000,
+      "icon_url": "https://assets.test/crown/256.webp",
+      "animation_url": "https://assets.test/crown/512.webp"
+    },
+    "hat": {
+      "id": "hat",
+      "name": "Hat",
+      "price": 350,
+      "icon_url": "https://assets.test/hat/256.webp",
+      "animation_url": "https://assets.test/hat/512.webp"
+    },
+    "cake": {
+      "id": "cake",
+      "name": "Cake",
+      "price": 100,
+      "icon_url": "https://assets.test/cake/256.webp",
+      "animation_url": null
+    },
+    "rose": {
+      "id": "rose",
+      "name": "Rose",
+      "price": 10,
+      "icon_url": "https://assets.test/rose/256.webp",
+      "animation_url": "https://assets.test/rose/512.webp"
+    },
+    "heart": {
+      "id": "heart",
+      "name": "Heart",
+      "price": 10,
+      "icon_url": "https://assets.test/heart/256.webp",
+      "animation_url": "https://assets.test/heart/512.webp"
+    },
+    "star": {
+      "id": "star",
+      "name": "Star",
+      "price": 5,
+      "icon_url": "https://assets.test/star/256.webp",
+      "animation_url": null
+    },
+    "kiss": {
+      "id": "kiss",
+      "name": "Kiss",
+      "price": 5,
+      "icon_url": null,
+      "animation_url": null
+    },
+    "pin": {
+      "id": "pin",
+      "name": "Pin",
+      "price": 1,
+      "icon_url": "https://assets.test/pin/256.webp",
+      "animation_url": null
+    }
+  },
+  "plan": [
+    {
+      "name": "worked example: build-up by units ascending, the large one last (design doc A.3)",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "hat",
+          "count": 20,
+          "units": 7000,
+          "sender_count": 6,
+          "senders": [
+            {
+              "user": "mert",
+              "count": 9
+            },
+            {
+              "user": null,
+              "count": 4
+            },
+            {
+              "user": "ece",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "gift": "rose",
+          "count": 50,
+          "units": 500,
+          "sender_count": 2,
+          "senders": [
+            {
+              "user": "ece",
+              "count": 30
+            },
+            {
+              "user": "mert",
+              "count": 20
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": null,
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "names": {
+        "ayla": "Ayla"
+      },
+      "expect": {
+        "items": [
+          {
+            "gift": "star",
+            "atMs": 0,
+            "durationMs": 1600,
+            "tier": "small",
+            "quantity": 3,
+            "sender": "Someone",
+            "image": "https://assets.test/star/256.webp",
+            "icon": "https://assets.test/star/256.webp"
+          },
+          {
+            "gift": "rose",
+            "atMs": 450,
+            "durationMs": 1600,
+            "tier": "small",
+            "quantity": 50,
+            "sender": "ece and mert",
+            "image": "https://assets.test/rose/512.webp",
+            "icon": "https://assets.test/rose/256.webp"
+          },
+          {
+            "gift": "hat",
+            "atMs": 900,
+            "durationMs": 2100,
+            "tier": "medium",
+            "quantity": 20,
+            "sender": "mert and 5 others"
+          },
+          {
+            "gift": "dragon",
+            "atMs": 3300,
+            "durationMs": 3850,
+            "tier": "large",
+            "quantity": 1,
+            "sender": "Ayla",
+            "image": "https://assets.test/dragon/512.webp",
+            "icon": "https://assets.test/dragon/256.webp",
+            "price": 40000,
+            "name": "Dragon"
+          }
+        ],
+        "endMs": 7150
+      }
+    },
+    {
+      "name": "budget 7000: the lowest-units non-large item goes first",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "hat",
+          "count": 20,
+          "units": 7000,
+          "sender_count": 6,
+          "senders": [
+            {
+              "user": "mert",
+              "count": 9
+            },
+            {
+              "user": null,
+              "count": 4
+            },
+            {
+              "user": "ece",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "gift": "rose",
+          "count": 50,
+          "units": 500,
+          "sender_count": 2,
+          "senders": [
+            {
+              "user": "ece",
+              "count": 30
+            },
+            {
+              "user": "mert",
+              "count": 20
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": null,
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "options": {
+        "budgetMs": 7000
+      },
+      "expect": {
+        "items": [
+          {
+            "gift": "rose",
+            "atMs": 0,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "hat",
+            "atMs": 450,
+            "durationMs": 2100,
+            "tier": "medium"
+          },
+          {
+            "gift": "dragon",
+            "atMs": 2850,
+            "durationMs": 3850,
+            "tier": "large"
+          }
+        ],
+        "endMs": 6700
+      }
+    },
+    {
+      "name": "budget 6000: items keep going, lowest units first, until the plan fits",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "hat",
+          "count": 20,
+          "units": 7000,
+          "sender_count": 6,
+          "senders": [
+            {
+              "user": "mert",
+              "count": 9
+            },
+            {
+              "user": null,
+              "count": 4
+            },
+            {
+              "user": "ece",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "gift": "rose",
+          "count": 50,
+          "units": 500,
+          "sender_count": 2,
+          "senders": [
+            {
+              "user": "ece",
+              "count": 30
+            },
+            {
+              "user": "mert",
+              "count": 20
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": null,
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "options": {
+        "budgetMs": 6000
+      },
+      "expect": {
+        "items": [
+          {
+            "gift": "dragon",
+            "atMs": 0,
+            "durationMs": 3850,
+            "tier": "large"
+          }
+        ],
+        "endMs": 3850
+      }
+    },
+    {
+      "name": "an end exactly at the budget fits",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "hat",
+          "count": 20,
+          "units": 7000,
+          "sender_count": 6,
+          "senders": [
+            {
+              "user": "mert",
+              "count": 9
+            },
+            {
+              "user": null,
+              "count": 4
+            },
+            {
+              "user": "ece",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "gift": "rose",
+          "count": 50,
+          "units": 500,
+          "sender_count": 2,
+          "senders": [
+            {
+              "user": "ece",
+              "count": 30
+            },
+            {
+              "user": "mert",
+              "count": 20
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": null,
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "options": {
+        "budgetMs": 7150
+      },
+      "expect": {
+        "items": [
+          {
+            "gift": "star",
+            "atMs": 0,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "rose",
+            "atMs": 450,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "hat",
+            "atMs": 900,
+            "durationMs": 2100,
+            "tier": "medium"
+          },
+          {
+            "gift": "dragon",
+            "atMs": 3300,
+            "durationMs": 3850,
+            "tier": "large"
+          }
+        ],
+        "endMs": 7150
+      }
+    },
+    {
+      "name": "two large groups: only the first (highest units) plays",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "lion",
+          "count": 1,
+          "units": 20000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "mert",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "hat",
+          "count": 20,
+          "units": 7000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ece",
+              "count": 20
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "items": [
+          {
+            "gift": "hat",
+            "atMs": 0,
+            "durationMs": 2100,
+            "tier": "medium"
+          },
+          {
+            "gift": "dragon",
+            "atMs": 2400,
+            "durationMs": 3850,
+            "tier": "large"
+          }
+        ],
+        "endMs": 6250
+      }
+    },
+    {
+      "name": "all small: 450 ms apart, units ascending, equal units by gift id",
+      "groups": [
+        {
+          "gift": "rose",
+          "count": 50,
+          "units": 500,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 50
+            }
+          ]
+        },
+        {
+          "gift": "heart",
+          "count": 30,
+          "units": 300,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 30
+            }
+          ]
+        },
+        {
+          "gift": "kiss",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "items": [
+          {
+            "gift": "kiss",
+            "atMs": 0,
+            "durationMs": 1600,
+            "tier": "small",
+            "image": null,
+            "icon": null
+          },
+          {
+            "gift": "star",
+            "atMs": 450,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "heart",
+            "atMs": 900,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "rose",
+            "atMs": 1350,
+            "durationMs": 1600,
+            "tier": "small"
+          }
+        ],
+        "endMs": 2950
+      }
+    },
+    {
+      "name": "medium items start 1100 ms apart",
+      "groups": [
+        {
+          "gift": "crown",
+          "count": 2,
+          "units": 10000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "gift": "cake",
+          "count": 3,
+          "units": 300,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "items": [
+          {
+            "gift": "cake",
+            "atMs": 0,
+            "durationMs": 2100,
+            "tier": "medium"
+          },
+          {
+            "gift": "crown",
+            "atMs": 1100,
+            "durationMs": 2100,
+            "tier": "medium"
+          }
+        ],
+        "endMs": 3200
+      }
+    },
+    {
+      "name": "maxEffects: only the first N groups in server order are considered",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "hat",
+          "count": 20,
+          "units": 7000,
+          "sender_count": 6,
+          "senders": [
+            {
+              "user": "mert",
+              "count": 9
+            },
+            {
+              "user": null,
+              "count": 4
+            },
+            {
+              "user": "ece",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "gift": "rose",
+          "count": 50,
+          "units": 500,
+          "sender_count": 2,
+          "senders": [
+            {
+              "user": "ece",
+              "count": 30
+            },
+            {
+              "user": "mert",
+              "count": 20
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": null,
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "options": {
+        "maxEffects": 2
+      },
+      "expect": {
+        "items": [
+          {
+            "gift": "hat",
+            "atMs": 0,
+            "durationMs": 2100,
+            "tier": "medium"
+          },
+          {
+            "gift": "dragon",
+            "atMs": 2400,
+            "durationMs": 3850,
+            "tier": "large"
+          }
+        ],
+        "endMs": 6250
+      }
+    },
+    {
+      "name": "default maxEffects is 5: a sixth group is never planned",
+      "groups": [
+        {
+          "gift": "rose",
+          "count": 60,
+          "units": 600,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 60
+            }
+          ]
+        },
+        {
+          "gift": "heart",
+          "count": 50,
+          "units": 500,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 50
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 9,
+          "units": 45,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 9
+            }
+          ]
+        },
+        {
+          "gift": "kiss",
+          "count": 8,
+          "units": 40,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 8
+            }
+          ]
+        },
+        {
+          "gift": "pin",
+          "count": 7,
+          "units": 7,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "a",
+              "count": 7
+            }
+          ]
+        },
+        {
+          "gift": "cake",
+          "count": 0,
+          "units": 0,
+          "sender_count": 0,
+          "senders": []
+        }
+      ],
+      "expect": {
+        "items": [
+          {
+            "gift": "pin",
+            "atMs": 0,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "kiss",
+            "atMs": 450,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "star",
+            "atMs": 900,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "heart",
+            "atMs": 1350,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "rose",
+            "atMs": 1800,
+            "durationMs": 1600,
+            "tier": "small"
+          }
+        ],
+        "endMs": 3400
+      }
+    },
+    {
+      "name": "reduced motion: an empty plan (only the card shows)",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "hat",
+          "count": 20,
+          "units": 7000,
+          "sender_count": 6,
+          "senders": [
+            {
+              "user": "mert",
+              "count": 9
+            },
+            {
+              "user": null,
+              "count": 4
+            },
+            {
+              "user": "ece",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "gift": "rose",
+          "count": 50,
+          "units": 500,
+          "sender_count": 2,
+          "senders": [
+            {
+              "user": "ece",
+              "count": 30
+            },
+            {
+              "user": "mert",
+              "count": 20
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": null,
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "options": {
+        "reducedMotion": true
+      },
+      "expect": {
+        "items": [],
+        "endMs": 0
+      }
+    },
+    {
+      "name": "low quality: the large effect lasts 3050 ms",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "hat",
+          "count": 20,
+          "units": 7000,
+          "sender_count": 6,
+          "senders": [
+            {
+              "user": "mert",
+              "count": 9
+            },
+            {
+              "user": null,
+              "count": 4
+            },
+            {
+              "user": "ece",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "gift": "rose",
+          "count": 50,
+          "units": 500,
+          "sender_count": 2,
+          "senders": [
+            {
+              "user": "ece",
+              "count": 30
+            },
+            {
+              "user": "mert",
+              "count": 20
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": null,
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "options": {
+        "quality": "low"
+      },
+      "expect": {
+        "items": [
+          {
+            "gift": "star",
+            "atMs": 0,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "rose",
+            "atMs": 450,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "hat",
+            "atMs": 900,
+            "durationMs": 2100,
+            "tier": "medium"
+          },
+          {
+            "gift": "dragon",
+            "atMs": 3300,
+            "durationMs": 3050,
+            "tier": "large"
+          }
+        ],
+        "endMs": 6350
+      }
+    },
+    {
+      "name": "custom thresholds change the tiers",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "hat",
+          "count": 20,
+          "units": 7000,
+          "sender_count": 6,
+          "senders": [
+            {
+              "user": "mert",
+              "count": 9
+            },
+            {
+              "user": null,
+              "count": 4
+            },
+            {
+              "user": "ece",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "gift": "rose",
+          "count": 50,
+          "units": 500,
+          "sender_count": 2,
+          "senders": [
+            {
+              "user": "ece",
+              "count": 30
+            },
+            {
+              "user": "mert",
+              "count": 20
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": null,
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "options": {
+        "thresholds": {
+          "mediumFrom": 1000,
+          "largeFrom": 100000
+        }
+      },
+      "expect": {
+        "items": [
+          {
+            "gift": "star",
+            "atMs": 0,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "rose",
+            "atMs": 450,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "hat",
+            "atMs": 900,
+            "durationMs": 1600,
+            "tier": "small"
+          },
+          {
+            "gift": "dragon",
+            "atMs": 1350,
+            "durationMs": 2100,
+            "tier": "medium"
+          }
+        ],
+        "endMs": 3450
+      }
+    },
+    {
+      "name": "a large group alone starts at 0",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 2,
+          "units": 80000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 2
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "items": [
+          {
+            "gift": "dragon",
+            "atMs": 0,
+            "durationMs": 3850,
+            "tier": "large",
+            "quantity": 2
+          }
+        ],
+        "endMs": 3850
+      }
+    },
+    {
+      "name": "a lone large item longer than the budget goes too: empty plan",
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        }
+      ],
+      "options": {
+        "budgetMs": 3000
+      },
+      "expect": {
+        "items": [],
+        "endMs": 0
+      }
+    },
+    {
+      "name": "no groups: empty plan",
+      "groups": [],
+      "expect": {
+        "items": [],
+        "endMs": 0
+      }
+    },
+    {
+      "name": "labels: a deleted sender uses labels.someone",
+      "groups": [
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": null,
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "options": {
+        "labels": {
+          "someone": "Biri"
+        }
+      },
+      "expect": {
+        "items": [
+          {
+            "gift": "star",
+            "atMs": 0,
+            "durationMs": 1600,
+            "tier": "small",
+            "sender": "Biri"
+          }
+        ],
+        "endMs": 1600
+      }
+    }
+  ],
+  "senderLabel": [
+    {
+      "names": ["ayla"],
+      "senderCount": 1,
+      "expect": "ayla"
+    },
+    {
+      "names": ["ayla", "mert"],
+      "senderCount": 2,
+      "expect": "ayla and mert"
+    },
+    {
+      "names": ["ayla", "mert", "ece"],
+      "senderCount": 3,
+      "expect": "ayla and 2 others"
+    },
+    {
+      "names": ["ayla", "mert", "ece"],
+      "senderCount": 5,
+      "expect": "ayla and 4 others"
+    },
+    {
+      "names": ["ayla"],
+      "senderCount": 2,
+      "expect": "ayla and 1 other"
+    },
+    {
+      "names": [],
+      "senderCount": 0,
+      "expect": "Someone"
+    },
+    {
+      "names": [],
+      "senderCount": 0,
+      "labels": {
+        "someone": "Biri"
+      },
+      "expect": "Biri"
+    },
+    {
+      "names": ["a", "b"],
+      "senderCount": 2,
+      "labels": {
+        "pair": "{a} & {b}"
+      },
+      "expect": "a & b"
+    },
+    {
+      "names": ["a"],
+      "senderCount": 5,
+      "labels": {
+        "others": "{a} +{n}"
+      },
+      "expect": "a +4"
+    },
+    {
+      "names": ["a"],
+      "senderCount": 2,
+      "labels": {
+        "oneOther": "{a} +1"
+      },
+      "expect": "a +1"
+    }
+  ],
+  "summaries": {
+    "full": {
+      "user": "user_123",
+      "since": "2026-10-08T09:12:44.120Z",
+      "until": "2026-10-11T07:30:02.511Z",
+      "cursor": "aw1.AAA",
+      "truncated": false,
+      "total_gifts": 74,
+      "total_units": 47515,
+      "sender_count": 9,
+      "groups": [
+        {
+          "gift": "dragon",
+          "count": 1,
+          "units": 40000,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": "ayla",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "gift": "hat",
+          "count": 20,
+          "units": 7000,
+          "sender_count": 6,
+          "senders": [
+            {
+              "user": "mert",
+              "count": 9
+            },
+            {
+              "user": null,
+              "count": 4
+            },
+            {
+              "user": "ece",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "gift": "rose",
+          "count": 50,
+          "units": 500,
+          "sender_count": 2,
+          "senders": [
+            {
+              "user": "ece",
+              "count": 30
+            },
+            {
+              "user": "mert",
+              "count": 20
+            }
+          ]
+        },
+        {
+          "gift": "star",
+          "count": 3,
+          "units": 15,
+          "sender_count": 1,
+          "senders": [
+            {
+              "user": null,
+              "count": 3
+            }
+          ]
+        }
+      ],
+      "top_senders": [
+        {
+          "user": "ayla",
+          "count": 1,
+          "units": 40000
+        }
+      ]
+    },
+    "empty": {
+      "user": "user_123",
+      "since": "2026-10-08T09:12:44.120Z",
+      "until": "2026-10-11T07:30:02.511Z",
+      "cursor": "aw1.OLD",
+      "truncated": false,
+      "total_gifts": 0,
+      "total_units": 0,
+      "sender_count": 0,
+      "groups": [],
+      "top_senders": []
+    }
+  },
+  "controller": [
+    {
+      "name": "ackOn shown (default): idle -> loading -> ready -> playing -> done; one ack when the card appears; plays at the planned times; the card goes at planEnd + 1500",
+      "steps": [
+        {
+          "expect": {
+            "status": "idle",
+            "summaryCursor": null,
+            "calls": []
+          }
+        },
+        {
+          "check": true
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ],
+            "pending": ["getAway"]
+          }
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "summaryCursor": "aw1.AAA",
+            "shown": 0,
+            "played": []
+          }
+        },
+        {
+          "advance": 1000
+        },
+        {
+          "start": true
+        },
+        {
+          "expect": {
+            "status": "playing",
+            "planEndMs": 7150,
+            "shown": 1,
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              }
+            ],
+            "played": [
+              {
+                "atMs": 1000,
+                "gift": "star",
+                "quantity": 3,
+                "sender": "Someone"
+              }
+            ]
+          }
+        },
+        {
+          "resolve": {
+            "method": "ackAway",
+            "value": null
+          }
+        },
+        {
+          "advance": 450
+        },
+        {
+          "expect": {
+            "played": [
+              {
+                "atMs": 1000,
+                "gift": "star",
+                "quantity": 3,
+                "sender": "Someone"
+              },
+              {
+                "atMs": 1450,
+                "gift": "rose",
+                "quantity": 50,
+                "sender": "ece and mert"
+              }
+            ]
+          }
+        },
+        {
+          "advance": 2850
+        },
+        {
+          "expect": {
+            "played": [
+              {
+                "atMs": 1000,
+                "gift": "star",
+                "quantity": 3,
+                "sender": "Someone"
+              },
+              {
+                "atMs": 1450,
+                "gift": "rose",
+                "quantity": 50,
+                "sender": "ece and mert"
+              },
+              {
+                "atMs": 1900,
+                "gift": "hat",
+                "quantity": 20,
+                "sender": "mert and 5 others"
+              },
+              {
+                "atMs": 4300,
+                "gift": "dragon",
+                "quantity": 1,
+                "sender": "ayla"
+              }
+            ]
+          }
+        },
+        {
+          "advance": 5349
+        },
+        {
+          "expect": {
+            "status": "playing",
+            "done": 0
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "status": "done",
+            "done": 1,
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              }
+            ],
+            "summaryCursor": "aw1.AAA"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ackOn finished: the ack goes on dismiss (tap); plays not started yet are dropped",
+      "options": {
+        "ackOn": "finished"
+      },
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "start": true
+        },
+        {
+          "expect": {
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ],
+            "played": [
+              {
+                "atMs": 0,
+                "gift": "star",
+                "quantity": 3,
+                "sender": "Someone"
+              }
+            ]
+          }
+        },
+        {
+          "advance": 500
+        },
+        {
+          "dismiss": true
+        },
+        {
+          "expect": {
+            "status": "done",
+            "done": 1,
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "advance": 10000
+        },
+        {
+          "expect": {
+            "played": [
+              {
+                "atMs": 0,
+                "gift": "star",
+                "quantity": 3,
+                "sender": "Someone"
+              },
+              {
+                "atMs": 450,
+                "gift": "rose",
+                "quantity": 50,
+                "sender": "ece and mert"
+              }
+            ],
+            "done": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "ackOn finished: the automatic dismissal acknowledges too",
+      "options": {
+        "ackOn": "finished"
+      },
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "start": true
+        },
+        {
+          "advance": 8649
+        },
+        {
+          "expect": {
+            "status": "playing",
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "status": "done",
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "ackOn manual: nothing until ack(); a second ack() for the same summary sends nothing",
+      "options": {
+        "ackOn": "manual"
+      },
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "start": true
+        },
+        {
+          "advance": 8650
+        },
+        {
+          "expect": {
+            "status": "done",
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        },
+        {
+          "ack": true
+        },
+        {
+          "expect": {
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "resolve": {
+            "method": "ackAway",
+            "value": null
+          }
+        },
+        {
+          "ack": true
+        },
+        {
+          "expect": {
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a failed ack is reported, retried once before the next check's read, then dropped",
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "start": true
+        },
+        {
+          "reject": {
+            "method": "ackAway",
+            "error": {
+              "status": 500,
+              "type": "internal_error",
+              "message": "Boom."
+            }
+          }
+        },
+        {
+          "expect": {
+            "errors": ["internal_error"]
+          }
+        },
+        {
+          "dismiss": true
+        },
+        {
+          "expect": {
+            "status": "done",
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "check": true
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "pending": ["ackAway"],
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "reject": {
+            "method": "ackAway",
+            "error": {
+              "status": 500,
+              "type": "internal_error",
+              "message": "Boom."
+            }
+          }
+        },
+        {
+          "expect": {
+            "errors": ["internal_error", "internal_error"],
+            "pending": ["getAway"]
+          }
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "empty"
+          }
+        },
+        {
+          "expect": {
+            "status": "empty"
+          }
+        },
+        {
+          "check": true
+        },
+        {
+          "expect": {
+            "pending": ["getAway"],
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              },
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a retried ack that succeeds is not sent a third time",
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "start": true
+        },
+        {
+          "reject": {
+            "method": "ackAway",
+            "error": {
+              "status": 500,
+              "type": "internal_error",
+              "message": "Boom."
+            }
+          }
+        },
+        {
+          "dismiss": true
+        },
+        {
+          "check": true
+        },
+        {
+          "resolve": {
+            "method": "ackAway",
+            "value": null
+          }
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "empty"
+          }
+        },
+        {
+          "check": true
+        },
+        {
+          "expect": {
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              },
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "nothing new: empty, no card, no ack; start() is ignored",
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "empty"
+          }
+        },
+        {
+          "expect": {
+            "status": "empty",
+            "summaryCursor": null
+          }
+        },
+        {
+          "start": true
+        },
+        {
+          "dismiss": true
+        },
+        {
+          "advance": 10000
+        },
+        {
+          "expect": {
+            "status": "empty",
+            "shown": 0,
+            "done": 0,
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "check() is ignored while loading, ready or playing; it runs again from empty or done",
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "check": true
+        },
+        {
+          "expect": {
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "check": true
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        },
+        {
+          "start": true
+        },
+        {
+          "check": true
+        },
+        {
+          "expect": {
+            "status": "playing",
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "resolve": {
+            "method": "ackAway",
+            "value": null
+          }
+        },
+        {
+          "dismiss": true
+        },
+        {
+          "check": true
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "summaryCursor": null,
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              },
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a failed read goes back to idle silently (onError only); the next check tries again",
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "reject": {
+            "method": "getAway",
+            "error": {
+              "status": 0,
+              "type": "network_error",
+              "message": "Could not reach GiftingStack. Check your connection."
+            }
+          }
+        },
+        {
+          "expect": {
+            "status": "idle",
+            "errors": ["network_error"],
+            "shown": 0
+          }
+        },
+        {
+          "check": true
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "foreground() checks at most once per 60,000 ms (60,000 itself checks)",
+      "steps": [
+        {
+          "foreground": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "empty"
+          }
+        },
+        {
+          "advance": 59999
+        },
+        {
+          "foreground": true
+        },
+        {
+          "expect": {
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "foreground": true
+        },
+        {
+          "expect": {
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "getAway",
+                "args": {}
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "no effect layer: card only, dismissed after 4000 ms",
+      "options": {
+        "effects": false
+      },
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "start": true
+        },
+        {
+          "expect": {
+            "status": "playing",
+            "planEndMs": 0,
+            "played": []
+          }
+        },
+        {
+          "advance": 3999
+        },
+        {
+          "expect": {
+            "status": "playing"
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "status": "done",
+            "played": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "reduced motion: card only, dismissed after 4000 ms",
+      "options": {
+        "reducedMotion": true
+      },
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "start": true
+        },
+        {
+          "advance": 4000
+        },
+        {
+          "expect": {
+            "status": "done",
+            "played": [],
+            "planEndMs": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "maxGroups is passed to the read; maxEffects and budgetMs shape the replay",
+      "options": {
+        "maxGroups": 3,
+        "maxEffects": 2,
+        "budgetMs": 8000
+      },
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "expect": {
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {
+                  "maxGroups": 3
+                }
+              }
+            ]
+          }
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "start": true
+        },
+        {
+          "advance": 6250
+        },
+        {
+          "expect": {
+            "planEndMs": 6250,
+            "played": [
+              {
+                "atMs": 0,
+                "gift": "hat",
+                "quantity": 20,
+                "sender": "mert and 5 others"
+              },
+              {
+                "atMs": 2400,
+                "gift": "dragon",
+                "quantity": 1,
+                "sender": "ayla"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "dismiss() before start(): done, acknowledged, nothing played",
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "dismiss": true
+        },
+        {
+          "advance": 10000
+        },
+        {
+          "expect": {
+            "status": "done",
+            "done": 1,
+            "shown": 0,
+            "played": [],
+            "calls": [
+              {
+                "method": "getAway",
+                "args": {}
+              },
+              {
+                "method": "ackAway",
+                "args": {
+                  "cursor": "aw1.AAA"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "dispose() during the read: the late answer changes nothing",
+      "steps": [
+        {
+          "check": true
+        },
+        {
+          "dispose": true
+        },
+        {
+          "resolve": {
+            "method": "getAway",
+            "value": "full"
+          }
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "shown": 0
+          }
+        }
+      ]
+    }
+  ],
+  "client": [
+    {
+      "name": "getAway without a query: no query string",
+      "call": {
+        "method": "getAway",
+        "args": {}
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me/away",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "user": "user_123",
+              "since": "2026-10-08T09:12:44.120Z",
+              "until": "2026-10-11T07:30:02.511Z",
+              "cursor": "aw1.OLD",
+              "truncated": false,
+              "total_gifts": 0,
+              "total_units": 0,
+              "sender_count": 0,
+              "groups": [],
+              "top_senders": []
+            }
+          }
+        }
+      ],
+      "result": {
+        "user": "user_123",
+        "since": "2026-10-08T09:12:44.120Z",
+        "until": "2026-10-11T07:30:02.511Z",
+        "cursor": "aw1.OLD",
+        "truncated": false,
+        "total_gifts": 0,
+        "total_units": 0,
+        "sender_count": 0,
+        "groups": [],
+        "top_senders": []
+      }
+    },
+    {
+      "name": "getAway with since and maxGroups: since first, values encoded like encodeURIComponent",
+      "call": {
+        "method": "getAway",
+        "args": {
+          "query": {
+            "since": "aw1.MTcy+/=",
+            "maxGroups": 3
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/me/away?since=aw1.MTcy%2B%2F%3D&max_groups=3",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": [],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "user": "user_123",
+              "since": "2026-10-08T09:12:44.120Z",
+              "until": "2026-10-11T07:30:02.511Z",
+              "cursor": "aw1.AAA",
+              "truncated": false,
+              "total_gifts": 74,
+              "total_units": 47515,
+              "sender_count": 9,
+              "groups": [
+                {
+                  "gift": {
+                    "id": "dragon",
+                    "name": "Dragon",
+                    "price": 40000,
+                    "icon_url": "https://assets.test/dragon/256.webp",
+                    "animation_url": "https://assets.test/dragon/512.webp"
+                  },
+                  "count": 1,
+                  "units": 40000,
+                  "sender_count": 1,
+                  "senders": [
+                    {
+                      "user": "ayla",
+                      "count": 1
+                    }
+                  ]
+                },
+                {
+                  "gift": {
+                    "id": "hat",
+                    "name": "Hat",
+                    "price": 350,
+                    "icon_url": "https://assets.test/hat/256.webp",
+                    "animation_url": "https://assets.test/hat/512.webp"
+                  },
+                  "count": 20,
+                  "units": 7000,
+                  "sender_count": 6,
+                  "senders": [
+                    {
+                      "user": "mert",
+                      "count": 9
+                    },
+                    {
+                      "user": null,
+                      "count": 4
+                    },
+                    {
+                      "user": "ece",
+                      "count": 3
+                    }
+                  ]
+                },
+                {
+                  "gift": {
+                    "id": "rose",
+                    "name": "Rose",
+                    "price": 10,
+                    "icon_url": "https://assets.test/rose/256.webp",
+                    "animation_url": "https://assets.test/rose/512.webp"
+                  },
+                  "count": 50,
+                  "units": 500,
+                  "sender_count": 2,
+                  "senders": [
+                    {
+                      "user": "ece",
+                      "count": 30
+                    },
+                    {
+                      "user": "mert",
+                      "count": 20
+                    }
+                  ]
+                },
+                {
+                  "gift": {
+                    "id": "star",
+                    "name": "Star",
+                    "price": 5,
+                    "icon_url": "https://assets.test/star/256.webp",
+                    "animation_url": null
+                  },
+                  "count": 3,
+                  "units": 15,
+                  "sender_count": 1,
+                  "senders": [
+                    {
+                      "user": null,
+                      "count": 3
+                    }
+                  ]
+                }
+              ],
+              "top_senders": [
+                {
+                  "user": "ayla",
+                  "count": 1,
+                  "units": 40000
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "user": "user_123",
+        "since": "2026-10-08T09:12:44.120Z",
+        "until": "2026-10-11T07:30:02.511Z",
+        "cursor": "aw1.AAA",
+        "truncated": false,
+        "total_gifts": 74,
+        "total_units": 47515,
+        "sender_count": 9,
+        "groups": [
+          {
+            "gift": {
+              "id": "dragon",
+              "name": "Dragon",
+              "price": 40000,
+              "icon_url": "https://assets.test/dragon/256.webp",
+              "animation_url": "https://assets.test/dragon/512.webp"
+            },
+            "count": 1,
+            "units": 40000,
+            "sender_count": 1,
+            "senders": [
+              {
+                "user": "ayla",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "gift": {
+              "id": "hat",
+              "name": "Hat",
+              "price": 350,
+              "icon_url": "https://assets.test/hat/256.webp",
+              "animation_url": "https://assets.test/hat/512.webp"
+            },
+            "count": 20,
+            "units": 7000,
+            "sender_count": 6,
+            "senders": [
+              {
+                "user": "mert",
+                "count": 9
+              },
+              {
+                "user": null,
+                "count": 4
+              },
+              {
+                "user": "ece",
+                "count": 3
+              }
+            ]
+          },
+          {
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp",
+              "animation_url": "https://assets.test/rose/512.webp"
+            },
+            "count": 50,
+            "units": 500,
+            "sender_count": 2,
+            "senders": [
+              {
+                "user": "ece",
+                "count": 30
+              },
+              {
+                "user": "mert",
+                "count": 20
+              }
+            ]
+          },
+          {
+            "gift": {
+              "id": "star",
+              "name": "Star",
+              "price": 5,
+              "icon_url": "https://assets.test/star/256.webp",
+              "animation_url": null
+            },
+            "count": 3,
+            "units": 15,
+            "sender_count": 1,
+            "senders": [
+              {
+                "user": null,
+                "count": 3
+              }
+            ]
+          }
+        ],
+        "top_senders": [
+          {
+            "user": "ayla",
+            "count": 1,
+            "units": 40000
+          }
+        ]
+      }
+    },
+    {
+      "name": "ackAway: PUT with the cursor, no Idempotency-Key; 204 is success with nothing parsed",
+      "call": {
+        "method": "ackAway",
+        "args": {
+          "cursor": "aw1.AAA"
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "PUT",
+            "url": "https://api.giftingstack.com/v1/client/me/away/cursor",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json"
+            },
+            "absentHeaders": ["Idempotency-Key"],
+            "body": {
+              "cursor": "aw1.AAA"
+            }
+          },
+          "response": {
+            "status": 204,
+            "headers": {},
+            "bodyText": ""
+          }
+        }
+      ],
+      "result": null
+    },
+    {
+      "name": "ackAway: 500 then 204, one quiet retry like every call",
+      "call": {
+        "method": "ackAway",
+        "args": {
+          "cursor": "aw1.AAA"
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "PUT",
+            "url": "https://api.giftingstack.com/v1/client/me/away/cursor",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": [],
+            "body": {
+              "cursor": "aw1.AAA"
+            }
+          },
+          "response": {
+            "status": 500,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "internal_error",
+                "message": "Boom.",
+                "request_id": "req_1"
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "PUT",
+            "url": "https://api.giftingstack.com/v1/client/me/away/cursor",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": [],
+            "body": {
+              "cursor": "aw1.AAA"
+            }
+          },
+          "response": {
+            "status": 204,
+            "headers": {},
+            "bodyText": ""
+          }
+        }
+      ],
+      "result": null
+    },
+    {
+      "name": "ackAway: a bad cursor is a 400, not retried",
+      "call": {
+        "method": "ackAway",
+        "args": {
+          "cursor": "nope"
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "PUT",
+            "url": "https://api.giftingstack.com/v1/client/me/away/cursor",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": [],
+            "body": {
+              "cursor": "nope"
+            }
+          },
+          "response": {
+            "status": 400,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "invalid_request",
+                "message": "Bad cursor.",
+                "request_id": "req_2"
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 400,
+        "type": "invalid_request",
+        "message": "Bad cursor.",
+        "requestId": "req_2",
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    }
+  ]
+}

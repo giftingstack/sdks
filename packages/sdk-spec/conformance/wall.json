@@ -1,0 +1,1731 @@
+{
+  "description": "Gift wall (SPEC section 14): wallChips, formatCount, the GiftWallLoader with a fake clock and a scripted batch call, and the client calls. Format: conformance/README.md.",
+  "gifts": {
+    "rose": {
+      "id": "rose",
+      "name": "Rose",
+      "icon_url": "https://assets.test/rose/256.webp"
+    },
+    "heart": {
+      "id": "heart",
+      "name": "Heart",
+      "icon_url": "https://assets.test/heart/256.webp"
+    },
+    "dragon": {
+      "id": "dragon",
+      "name": "Dragon",
+      "icon_url": "https://assets.test/dragon/256.webp"
+    },
+    "star": {
+      "id": "star",
+      "name": "Star",
+      "icon_url": "https://assets.test/star/256.webp"
+    },
+    "hat": {
+      "id": "hat",
+      "name": "Hat",
+      "icon_url": "https://assets.test/hat/256.webp"
+    },
+    "cake": {
+      "id": "cake",
+      "name": "Cake",
+      "icon_url": "https://assets.test/cake/256.webp"
+    },
+    "lion": {
+      "id": "lion",
+      "name": "Lion",
+      "icon_url": "https://assets.test/lion/256.webp"
+    },
+    "car": {
+      "id": "car",
+      "name": "Car",
+      "icon_url": "https://assets.test/car/256.webp"
+    }
+  },
+  "chips": [
+    {
+      "name": "count order: most first; equal counts keep the catalog (input) order",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 3
+        },
+        {
+          "gift": "heart",
+          "count": 12
+        },
+        {
+          "gift": "dragon",
+          "count": 3
+        },
+        {
+          "gift": "star",
+          "count": 7
+        }
+      ],
+      "expect": [
+        {
+          "gift": "heart",
+          "count": 12
+        },
+        {
+          "gift": "star",
+          "count": 7
+        },
+        {
+          "gift": "rose",
+          "count": 3
+        },
+        {
+          "gift": "dragon",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "name": "catalog order keeps the server's order",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 3
+        },
+        {
+          "gift": "heart",
+          "count": 12
+        },
+        {
+          "gift": "dragon",
+          "count": 3
+        },
+        {
+          "gift": "star",
+          "count": 7
+        }
+      ],
+      "options": {
+        "order": "catalog"
+      },
+      "expect": [
+        {
+          "gift": "rose",
+          "count": 3
+        },
+        {
+          "gift": "heart",
+          "count": 12
+        },
+        {
+          "gift": "dragon",
+          "count": 3
+        },
+        {
+          "gift": "star",
+          "count": 7
+        }
+      ]
+    },
+    {
+      "name": "counts of 0 or less are dropped",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 0
+        },
+        {
+          "gift": "heart",
+          "count": 2
+        },
+        {
+          "gift": "star",
+          "count": -1
+        }
+      ],
+      "expect": [
+        {
+          "gift": "heart",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "name": "no gifts: no chips",
+      "items": [],
+      "expect": []
+    },
+    {
+      "name": "exactly max gifts: every gift, no overflow chip",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 1
+        },
+        {
+          "gift": "heart",
+          "count": 2
+        },
+        {
+          "gift": "dragon",
+          "count": 3
+        },
+        {
+          "gift": "star",
+          "count": 4
+        },
+        {
+          "gift": "hat",
+          "count": 5
+        },
+        {
+          "gift": "cake",
+          "count": 6
+        }
+      ],
+      "options": {
+        "max": 6
+      },
+      "expect": [
+        {
+          "gift": "cake",
+          "count": 6
+        },
+        {
+          "gift": "hat",
+          "count": 5
+        },
+        {
+          "gift": "star",
+          "count": 4
+        },
+        {
+          "gift": "dragon",
+          "count": 3
+        },
+        {
+          "gift": "heart",
+          "count": 2
+        },
+        {
+          "gift": "rose",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "more than max: max - 1 chips and an overflow chip with the SUM of the hidden counts",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 12
+        },
+        {
+          "gift": "heart",
+          "count": 3
+        },
+        {
+          "gift": "dragon",
+          "count": 1
+        },
+        {
+          "gift": "star",
+          "count": 20
+        },
+        {
+          "gift": "hat",
+          "count": 5
+        },
+        {
+          "gift": "cake",
+          "count": 9
+        },
+        {
+          "gift": "lion",
+          "count": 2
+        }
+      ],
+      "options": {
+        "max": 4
+      },
+      "expect": [
+        {
+          "gift": "star",
+          "count": 20
+        },
+        {
+          "gift": "rose",
+          "count": 12
+        },
+        {
+          "gift": "cake",
+          "count": 9
+        },
+        {
+          "overflow": 11,
+          "hidden": 4
+        }
+      ]
+    },
+    {
+      "name": "default max is 6 (5 chips + overflow for 8 gifts)",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 8
+        },
+        {
+          "gift": "heart",
+          "count": 7
+        },
+        {
+          "gift": "dragon",
+          "count": 6
+        },
+        {
+          "gift": "star",
+          "count": 5
+        },
+        {
+          "gift": "hat",
+          "count": 4
+        },
+        {
+          "gift": "cake",
+          "count": 3
+        },
+        {
+          "gift": "lion",
+          "count": 2
+        },
+        {
+          "gift": "car",
+          "count": 1
+        }
+      ],
+      "expect": [
+        {
+          "gift": "rose",
+          "count": 8
+        },
+        {
+          "gift": "heart",
+          "count": 7
+        },
+        {
+          "gift": "dragon",
+          "count": 6
+        },
+        {
+          "gift": "star",
+          "count": 5
+        },
+        {
+          "gift": "hat",
+          "count": 4
+        },
+        {
+          "overflow": 6,
+          "hidden": 3
+        }
+      ]
+    },
+    {
+      "name": "max 1 with two gifts: only the overflow chip, carrying every count",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 2
+        },
+        {
+          "gift": "heart",
+          "count": 5
+        }
+      ],
+      "options": {
+        "max": 1
+      },
+      "expect": [
+        {
+          "overflow": 7,
+          "hidden": 2
+        }
+      ]
+    },
+    {
+      "name": "max 1 with one gift: the gift itself",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 2
+        }
+      ],
+      "options": {
+        "max": 1
+      },
+      "expect": [
+        {
+          "gift": "rose",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "name": "max below 1 counts as 1",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 2
+        },
+        {
+          "gift": "heart",
+          "count": 5
+        }
+      ],
+      "options": {
+        "max": 0
+      },
+      "expect": [
+        {
+          "overflow": 7,
+          "hidden": 2
+        }
+      ]
+    },
+    {
+      "name": "catalog order with overflow: the hidden gifts are the last in catalog order",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 1
+        },
+        {
+          "gift": "heart",
+          "count": 50
+        },
+        {
+          "gift": "dragon",
+          "count": 2
+        },
+        {
+          "gift": "star",
+          "count": 3
+        }
+      ],
+      "options": {
+        "max": 3,
+        "order": "catalog"
+      },
+      "expect": [
+        {
+          "gift": "rose",
+          "count": 1
+        },
+        {
+          "gift": "heart",
+          "count": 50
+        },
+        {
+          "overflow": 5,
+          "hidden": 2
+        }
+      ]
+    },
+    {
+      "name": "zero counts are dropped before max is applied: no overflow chip for them",
+      "items": [
+        {
+          "gift": "rose",
+          "count": 4
+        },
+        {
+          "gift": "heart",
+          "count": 0
+        },
+        {
+          "gift": "dragon",
+          "count": 3
+        },
+        {
+          "gift": "star",
+          "count": 0
+        }
+      ],
+      "options": {
+        "max": 2
+      },
+      "expect": [
+        {
+          "gift": "rose",
+          "count": 4
+        },
+        {
+          "gift": "dragon",
+          "count": 3
+        }
+      ]
+    }
+  ],
+  "formatCount": [
+    {
+      "n": 0,
+      "expect": "0"
+    },
+    {
+      "n": 7,
+      "expect": "7"
+    },
+    {
+      "n": 999,
+      "expect": "999"
+    },
+    {
+      "n": 1000,
+      "expect": "1K"
+    },
+    {
+      "n": 1001,
+      "expect": "1K"
+    },
+    {
+      "n": 1099,
+      "expect": "1K"
+    },
+    {
+      "n": 1100,
+      "expect": "1.1K"
+    },
+    {
+      "n": 1999,
+      "expect": "1.9K"
+    },
+    {
+      "n": 9999,
+      "expect": "9.9K"
+    },
+    {
+      "n": 10000,
+      "expect": "10K"
+    },
+    {
+      "n": 10999,
+      "expect": "10K"
+    },
+    {
+      "n": 999999,
+      "expect": "999K"
+    },
+    {
+      "n": 1000000,
+      "expect": "1M"
+    },
+    {
+      "n": 1099999,
+      "expect": "1M"
+    },
+    {
+      "n": 1250000,
+      "expect": "1.2M"
+    },
+    {
+      "n": 1999999,
+      "expect": "1.9M"
+    },
+    {
+      "n": 9999999,
+      "expect": "9.9M"
+    },
+    {
+      "n": 10000000,
+      "expect": "10M"
+    },
+    {
+      "n": 12345678,
+      "expect": "12M"
+    },
+    {
+      "n": 1500,
+      "labels": {
+        "thousand": "k",
+        "decimal": ","
+      },
+      "expect": "1,5k"
+    },
+    {
+      "n": 2500000,
+      "labels": {
+        "million": " Mn"
+      },
+      "expect": "2.5 Mn"
+    },
+    {
+      "n": 1000,
+      "labels": {
+        "thousand": " B"
+      },
+      "expect": "1 B"
+    }
+  ],
+  "loader": [
+    {
+      "name": "requests within 50 ms share one batch, sent when the window closes, in the order asked",
+      "steps": [
+        {
+          "load": ["u1"],
+          "id": "a"
+        },
+        {
+          "advance": 30
+        },
+        {
+          "load": ["u2", "post_1"],
+          "id": "b"
+        },
+        {
+          "advance": 19
+        },
+        {
+          "load": ["u3"],
+          "id": "c"
+        },
+        {
+          "expect": {
+            "batches": [],
+            "waiting": ["a", "b", "c"]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "batches": [
+              [
+                {
+                  "receiver": "u1"
+                },
+                {
+                  "receiver": "u2",
+                  "reference": "post_1"
+                },
+                {
+                  "receiver": "u3"
+                }
+              ]
+            ],
+            "waiting": ["a", "b", "c"]
+          }
+        },
+        {
+          "respond": {
+            "batch": 1,
+            "walls": [
+              [
+                {
+                  "gift": "rose",
+                  "count": 2
+                }
+              ],
+              [],
+              [
+                {
+                  "gift": "heart",
+                  "count": 1
+                },
+                {
+                  "gift": "rose",
+                  "count": 4
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "expect": {
+            "resolved": {
+              "a": [
+                {
+                  "gift": "rose",
+                  "count": 2
+                }
+              ],
+              "b": [],
+              "c": [
+                {
+                  "gift": "heart",
+                  "count": 1
+                },
+                {
+                  "gift": "rose",
+                  "count": 4
+                }
+              ]
+            },
+            "waiting": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "a request at exactly 50 ms starts the next batch (the window is exclusive)",
+      "steps": [
+        {
+          "load": ["u1"],
+          "id": "a"
+        },
+        {
+          "advance": 50
+        },
+        {
+          "load": ["u2"],
+          "id": "b"
+        },
+        {
+          "expect": {
+            "batches": [
+              [
+                {
+                  "receiver": "u1"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "advance": 49
+        },
+        {
+          "expect": {
+            "batches": [
+              [
+                {
+                  "receiver": "u1"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "batches": [
+              [
+                {
+                  "receiver": "u1"
+                }
+              ],
+              [
+                {
+                  "receiver": "u2"
+                }
+              ]
+            ],
+            "waiting": ["a", "b"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "26 walls make two calls of 25 and 1; each answer reaches its own wall",
+      "steps": [
+        {
+          "load": ["u01"],
+          "id": "u01"
+        },
+        {
+          "load": ["u02"],
+          "id": "u02"
+        },
+        {
+          "load": ["u03"],
+          "id": "u03"
+        },
+        {
+          "load": ["u04"],
+          "id": "u04"
+        },
+        {
+          "load": ["u05"],
+          "id": "u05"
+        },
+        {
+          "load": ["u06"],
+          "id": "u06"
+        },
+        {
+          "load": ["u07"],
+          "id": "u07"
+        },
+        {
+          "load": ["u08"],
+          "id": "u08"
+        },
+        {
+          "load": ["u09"],
+          "id": "u09"
+        },
+        {
+          "load": ["u10"],
+          "id": "u10"
+        },
+        {
+          "load": ["u11"],
+          "id": "u11"
+        },
+        {
+          "load": ["u12"],
+          "id": "u12"
+        },
+        {
+          "load": ["u13"],
+          "id": "u13"
+        },
+        {
+          "load": ["u14"],
+          "id": "u14"
+        },
+        {
+          "load": ["u15"],
+          "id": "u15"
+        },
+        {
+          "load": ["u16"],
+          "id": "u16"
+        },
+        {
+          "load": ["u17"],
+          "id": "u17"
+        },
+        {
+          "load": ["u18"],
+          "id": "u18"
+        },
+        {
+          "load": ["u19"],
+          "id": "u19"
+        },
+        {
+          "load": ["u20"],
+          "id": "u20"
+        },
+        {
+          "load": ["u21"],
+          "id": "u21"
+        },
+        {
+          "load": ["u22"],
+          "id": "u22"
+        },
+        {
+          "load": ["u23"],
+          "id": "u23"
+        },
+        {
+          "load": ["u24"],
+          "id": "u24"
+        },
+        {
+          "load": ["u25"],
+          "id": "u25"
+        },
+        {
+          "load": ["u26"],
+          "id": "u26"
+        },
+        {
+          "advance": 50
+        },
+        {
+          "expect": {
+            "batches": [
+              [
+                {
+                  "receiver": "u01"
+                },
+                {
+                  "receiver": "u02"
+                },
+                {
+                  "receiver": "u03"
+                },
+                {
+                  "receiver": "u04"
+                },
+                {
+                  "receiver": "u05"
+                },
+                {
+                  "receiver": "u06"
+                },
+                {
+                  "receiver": "u07"
+                },
+                {
+                  "receiver": "u08"
+                },
+                {
+                  "receiver": "u09"
+                },
+                {
+                  "receiver": "u10"
+                },
+                {
+                  "receiver": "u11"
+                },
+                {
+                  "receiver": "u12"
+                },
+                {
+                  "receiver": "u13"
+                },
+                {
+                  "receiver": "u14"
+                },
+                {
+                  "receiver": "u15"
+                },
+                {
+                  "receiver": "u16"
+                },
+                {
+                  "receiver": "u17"
+                },
+                {
+                  "receiver": "u18"
+                },
+                {
+                  "receiver": "u19"
+                },
+                {
+                  "receiver": "u20"
+                },
+                {
+                  "receiver": "u21"
+                },
+                {
+                  "receiver": "u22"
+                },
+                {
+                  "receiver": "u23"
+                },
+                {
+                  "receiver": "u24"
+                },
+                {
+                  "receiver": "u25"
+                }
+              ],
+              [
+                {
+                  "receiver": "u26"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "respond": {
+            "batch": 2,
+            "walls": [
+              [
+                {
+                  "gift": "car",
+                  "count": 26
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "expect": {
+            "resolved": {
+              "u26": [
+                {
+                  "gift": "car",
+                  "count": 26
+                }
+              ]
+            },
+            "waiting": [
+              "u01",
+              "u02",
+              "u03",
+              "u04",
+              "u05",
+              "u06",
+              "u07",
+              "u08",
+              "u09",
+              "u10",
+              "u11",
+              "u12",
+              "u13",
+              "u14",
+              "u15",
+              "u16",
+              "u17",
+              "u18",
+              "u19",
+              "u20",
+              "u21",
+              "u22",
+              "u23",
+              "u24",
+              "u25"
+            ]
+          }
+        },
+        {
+          "respond": {
+            "batch": 1,
+            "walls": [
+              [
+                {
+                  "gift": "rose",
+                  "count": 1
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 2
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 3
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 4
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 5
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 6
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 7
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 8
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 9
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 10
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 11
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 12
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 13
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 14
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 15
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 16
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 17
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 18
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 19
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 20
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 21
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 22
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 23
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 24
+                }
+              ],
+              [
+                {
+                  "gift": "rose",
+                  "count": 25
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "expect": {
+            "resolved": {
+              "u01": [
+                {
+                  "gift": "rose",
+                  "count": 1
+                }
+              ],
+              "u25": [
+                {
+                  "gift": "rose",
+                  "count": 25
+                }
+              ]
+            },
+            "waiting": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "the same wall asked again while queued or in flight is asked once and shares the answer",
+      "steps": [
+        {
+          "load": ["u1"],
+          "id": "a"
+        },
+        {
+          "load": ["u1"],
+          "id": "b"
+        },
+        {
+          "advance": 50
+        },
+        {
+          "load": ["u1"],
+          "id": "c"
+        },
+        {
+          "advance": 100
+        },
+        {
+          "expect": {
+            "batches": [
+              [
+                {
+                  "receiver": "u1"
+                }
+              ]
+            ],
+            "waiting": ["a", "b", "c"]
+          }
+        },
+        {
+          "respond": {
+            "batch": 1,
+            "walls": [
+              [
+                {
+                  "gift": "star",
+                  "count": 3
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "expect": {
+            "resolved": {
+              "a": [
+                {
+                  "gift": "star",
+                  "count": 3
+                }
+              ],
+              "b": [
+                {
+                  "gift": "star",
+                  "count": 3
+                }
+              ],
+              "c": [
+                {
+                  "gift": "star",
+                  "count": 3
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a profile wall and a post wall of the same user are different walls",
+      "steps": [
+        {
+          "load": ["u1"],
+          "id": "a"
+        },
+        {
+          "load": ["u1", "post_1"],
+          "id": "b"
+        },
+        {
+          "advance": 50
+        },
+        {
+          "expect": {
+            "batches": [
+              [
+                {
+                  "receiver": "u1"
+                },
+                {
+                  "receiver": "u1",
+                  "reference": "post_1"
+                }
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "an answer is reused for 60,000 ms from its arrival, then asked again",
+      "steps": [
+        {
+          "load": ["u1"],
+          "id": "a"
+        },
+        {
+          "advance": 50
+        },
+        {
+          "respond": {
+            "batch": 1,
+            "walls": [
+              [
+                {
+                  "gift": "rose",
+                  "count": 1
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "advance": 59999
+        },
+        {
+          "load": ["u1"],
+          "id": "b"
+        },
+        {
+          "expect": {
+            "resolved": {
+              "b": [
+                {
+                  "gift": "rose",
+                  "count": 1
+                }
+              ]
+            },
+            "waiting": []
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "load": ["u1"],
+          "id": "c"
+        },
+        {
+          "expect": {
+            "waiting": ["c"]
+          }
+        },
+        {
+          "advance": 50
+        },
+        {
+          "expect": {
+            "batches": [
+              [
+                {
+                  "receiver": "u1"
+                }
+              ],
+              [
+                {
+                  "receiver": "u1"
+                }
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a failure rejects every wall of its batch and is not cached",
+      "steps": [
+        {
+          "load": ["u1"],
+          "id": "a"
+        },
+        {
+          "load": ["u2"],
+          "id": "b"
+        },
+        {
+          "advance": 50
+        },
+        {
+          "fail": {
+            "batch": 1,
+            "error": {
+              "status": 500,
+              "type": "internal_error",
+              "message": "Boom."
+            }
+          }
+        },
+        {
+          "expect": {
+            "rejected": {
+              "a": "internal_error",
+              "b": "internal_error"
+            },
+            "waiting": []
+          }
+        },
+        {
+          "load": ["u1"],
+          "id": "c"
+        },
+        {
+          "advance": 50
+        },
+        {
+          "expect": {
+            "batches": [
+              [
+                {
+                  "receiver": "u1"
+                },
+                {
+                  "receiver": "u2"
+                }
+              ],
+              [
+                {
+                  "receiver": "u1"
+                }
+              ]
+            ],
+            "waiting": ["c"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "invalidate: the next load asks again; an older request in flight still answers its callers but is not cached",
+      "steps": [
+        {
+          "load": ["u1"],
+          "id": "a"
+        },
+        {
+          "advance": 50
+        },
+        {
+          "invalidate": ["u1"]
+        },
+        {
+          "load": ["u1"],
+          "id": "b"
+        },
+        {
+          "advance": 50
+        },
+        {
+          "expect": {
+            "batches": [
+              [
+                {
+                  "receiver": "u1"
+                }
+              ],
+              [
+                {
+                  "receiver": "u1"
+                }
+              ]
+            ],
+            "waiting": ["a", "b"]
+          }
+        },
+        {
+          "respond": {
+            "batch": 2,
+            "walls": [
+              [
+                {
+                  "gift": "rose",
+                  "count": 2
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "respond": {
+            "batch": 1,
+            "walls": [
+              [
+                {
+                  "gift": "rose",
+                  "count": 1
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "expect": {
+            "resolved": {
+              "a": [
+                {
+                  "gift": "rose",
+                  "count": 1
+                }
+              ],
+              "b": [
+                {
+                  "gift": "rose",
+                  "count": 2
+                }
+              ]
+            },
+            "waiting": []
+          }
+        },
+        {
+          "load": ["u1"],
+          "id": "c"
+        },
+        {
+          "expect": {
+            "resolved": {
+              "c": [
+                {
+                  "gift": "rose",
+                  "count": 2
+                }
+              ]
+            },
+            "waiting": [],
+            "batches": [
+              [
+                {
+                  "receiver": "u1"
+                }
+              ],
+              [
+                {
+                  "receiver": "u1"
+                }
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "client": [
+    {
+      "name": "getReceivedGifts with a reference: ?reference= encoded like encodeURIComponent",
+      "call": {
+        "method": "getReceivedGifts",
+        "args": {
+          "user": "a b",
+          "reference": "post/9:x%"
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/users/a%20b/received-gifts?reference=post%2F9%3Ax%25",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "data": [
+                {
+                  "gift": {
+                    "id": "rose",
+                    "name": "Rose",
+                    "icon_url": "https://assets.test/rose/256.webp"
+                  },
+                  "count": 3
+                }
+              ],
+              "has_more": false
+            }
+          }
+        }
+      ],
+      "result": [
+        {
+          "gift": {
+            "id": "rose",
+            "name": "Rose",
+            "icon_url": "https://assets.test/rose/256.webp"
+          },
+          "count": 3
+        }
+      ]
+    },
+    {
+      "name": "getReceivedGifts without a reference sends no query string",
+      "call": {
+        "method": "getReceivedGifts",
+        "args": {
+          "user": "mert"
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/users/mert/received-gifts",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": [],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "data": [],
+              "has_more": false
+            }
+          }
+        }
+      ],
+      "result": []
+    },
+    {
+      "name": "queryGiftWalls: a POST with the items; a missing or null reference is left out; no Idempotency-Key",
+      "call": {
+        "method": "queryGiftWalls",
+        "args": {
+          "items": [
+            {
+              "receiver": "u1",
+              "reference": "post_1"
+            },
+            {
+              "receiver": "u2"
+            },
+            {
+              "receiver": "u3",
+              "reference": null
+            }
+          ]
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "url": "https://api.giftingstack.com/v1/client/gift-walls/query",
+            "headers": {
+              "Authorization": "Bearer tok_1",
+              "Content-Type": "application/json"
+            },
+            "absentHeaders": ["Idempotency-Key"],
+            "body": {
+              "items": [
+                {
+                  "receiver": "u1",
+                  "reference": "post_1"
+                },
+                {
+                  "receiver": "u2"
+                },
+                {
+                  "receiver": "u3"
+                }
+              ]
+            }
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "data": [
+                {
+                  "receiver": "u1",
+                  "reference": "post_1",
+                  "gifts": [
+                    {
+                      "gift": {
+                        "id": "heart",
+                        "name": "Heart",
+                        "icon_url": "https://assets.test/heart/256.webp"
+                      },
+                      "count": 2
+                    }
+                  ]
+                },
+                {
+                  "receiver": "u2",
+                  "reference": null,
+                  "gifts": []
+                },
+                {
+                  "receiver": "u3",
+                  "reference": null,
+                  "gifts": []
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": [
+        {
+          "receiver": "u1",
+          "reference": "post_1",
+          "gifts": [
+            {
+              "gift": {
+                "id": "heart",
+                "name": "Heart",
+                "icon_url": "https://assets.test/heart/256.webp"
+              },
+              "count": 2
+            }
+          ]
+        },
+        {
+          "receiver": "u2",
+          "reference": null,
+          "gifts": []
+        },
+        {
+          "receiver": "u3",
+          "reference": null,
+          "gifts": []
+        }
+      ]
+    },
+    {
+      "name": "queryGiftWalls with no items makes no request and returns an empty list",
+      "call": {
+        "method": "queryGiftWalls",
+        "args": {
+          "items": []
+        }
+      },
+      "tokens": [],
+      "exchanges": [],
+      "result": []
+    }
+  ]
+}

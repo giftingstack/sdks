@@ -1,0 +1,282 @@
+{
+  "description": "Gift rooms event filter (SPEC 18.2): RoomEventFilter with the resume point, dedup of 256 tx, staleness against the server clock, own gifts, minTier. Format: conformance/README.md.",
+  "events": {
+    "old": {
+      "t": "gift",
+      "id": 100,
+      "at": 10000,
+      "tx": "gtx_old",
+      "gift": { "id": "rose", "name": "Rose", "price": 10, "icon_url": null },
+      "quantity": 1,
+      "sender": { "id": "ayla", "name": "Ayla" },
+      "receiver": { "id": "host" }
+    },
+    "a": {
+      "t": "gift",
+      "id": 101,
+      "at": 10001,
+      "tx": "gtx_a",
+      "gift": { "id": "rose", "name": "Rose", "price": 10, "icon_url": null },
+      "quantity": 1,
+      "sender": { "id": "ayla", "name": "Ayla" },
+      "receiver": { "id": "host" }
+    },
+    "b": {
+      "t": "gift",
+      "id": 102,
+      "at": 15000,
+      "tx": "gtx_b",
+      "gift": { "id": "hat", "name": "Hat", "price": 350, "icon_url": null },
+      "quantity": 2,
+      "sender": { "id": "me" },
+      "receiver": { "id": "host" }
+    },
+    "c": {
+      "t": "gift",
+      "id": 103,
+      "at": 16000,
+      "tx": "gtx_c",
+      "gift": { "id": "dragon", "name": "Dragon", "price": 40000, "icon_url": null },
+      "quantity": 1,
+      "sender": { "id": "mert" },
+      "receiver": { "id": "host" }
+    },
+    "d": {
+      "t": "gift",
+      "id": 104,
+      "at": 17000,
+      "tx": "gtx_d",
+      "gift": { "id": "rose", "name": "Rose", "price": 10, "icon_url": null },
+      "quantity": 5,
+      "sender": { "id": "ece" },
+      "receiver": { "id": "host" }
+    },
+    "e": {
+      "t": "gift",
+      "id": 105,
+      "at": 20500,
+      "tx": "gtx_e",
+      "gift": { "id": "rose", "name": "Rose", "price": 10, "icon_url": null },
+      "quantity": 1,
+      "sender": { "id": "ece" },
+      "receiver": { "id": "host" }
+    }
+  },
+  "scenarios": [
+    {
+      "name": "replay: staleness boundary (age 10,000 dropped, 9,999 kept), own gift skipped, order kept",
+      "options": { "user": "me" },
+      "steps": [
+        {
+          "welcome": {
+            "viewers": 3,
+            "gap": false,
+            "replay": ["old", "a", "b", "c"],
+            "ttl": 3600,
+            "now": 20000
+          },
+          "at": 5000,
+          "expect": { "passed": ["gtx_a", "gtx_c"], "last": 103, "gap": false }
+        },
+        {
+          "live": ["d"],
+          "at": 6000,
+          "expect": { "passed": ["gtx_d"], "last": 104, "gap": false }
+        },
+        {
+          "name": "a duplicate is dropped but still moves the resume point",
+          "live": ["a"],
+          "at": 6100,
+          "expect": { "passed": [], "last": 101 }
+        }
+      ]
+    },
+    {
+      "name": "live gifts are aged with the server clock estimated from the welcome",
+      "options": { "user": "me" },
+      "steps": [
+        {
+          "welcome": { "viewers": 1, "gap": false, "replay": [], "ttl": 3600, "now": 20000 },
+          "at": 100000,
+          "expect": { "passed": [], "last": null, "gap": false }
+        },
+        {
+          "name": "server now = 20000 + (107000 - 100000) = 27000: d is 10,000 old",
+          "live": ["d"],
+          "at": 107000,
+          "expect": { "passed": [], "last": 104 }
+        },
+        {
+          "name": "server now 26999: e is 6,499 old",
+          "live": ["e"],
+          "at": 106999,
+          "expect": { "passed": ["gtx_e"], "last": 105 }
+        }
+      ]
+    },
+    {
+      "name": "gap is reported; the fresh part of the replay still plays",
+      "options": { "user": "me" },
+      "steps": [
+        {
+          "welcome": { "viewers": 9, "gap": true, "replay": ["d"], "ttl": 3600, "now": 20000 },
+          "at": 0,
+          "expect": { "passed": ["gtx_d"], "last": 104, "gap": true }
+        }
+      ]
+    },
+    {
+      "name": "skipOwn false plays the user's own gifts",
+      "options": { "user": "me", "skipOwn": false },
+      "steps": [
+        {
+          "welcome": { "viewers": 1, "gap": false, "replay": ["b"], "ttl": 60, "now": 20000 },
+          "at": 0,
+          "expect": { "passed": ["gtx_b"], "last": 102 }
+        }
+      ]
+    },
+    {
+      "name": "no user known: nothing counts as own",
+      "options": {},
+      "steps": [
+        {
+          "welcome": { "viewers": 1, "gap": false, "replay": ["b"], "ttl": 60, "now": 20000 },
+          "at": 0,
+          "expect": { "passed": ["gtx_b"] }
+        }
+      ]
+    },
+    {
+      "name": "minTier medium drops small gifts",
+      "options": { "user": "me", "skipOwn": false, "minTier": "medium" },
+      "steps": [
+        {
+          "welcome": {
+            "viewers": 1,
+            "gap": false,
+            "replay": ["a", "b", "c"],
+            "ttl": 60,
+            "now": 20000
+          },
+          "at": 0,
+          "expect": { "passed": ["gtx_b", "gtx_c"], "last": 103 }
+        }
+      ]
+    },
+    {
+      "name": "minTier large with custom thresholds",
+      "options": { "minTier": "large", "thresholds": { "largeFrom": 300 } },
+      "steps": [
+        {
+          "welcome": {
+            "viewers": 1,
+            "gap": false,
+            "replay": ["a", "b", "c"],
+            "ttl": 60,
+            "now": 20000
+          },
+          "at": 0,
+          "expect": { "passed": ["gtx_b", "gtx_c"] }
+        }
+      ]
+    },
+    {
+      "name": "maxReplayAgeMs 3000: exactly 3,000 old is dropped",
+      "options": { "user": "me", "maxReplayAgeMs": 3000 },
+      "steps": [
+        {
+          "welcome": {
+            "viewers": 1,
+            "gap": false,
+            "replay": ["a", "b", "c", "d"],
+            "ttl": 60,
+            "now": 20000
+          },
+          "at": 0,
+          "expect": { "passed": [], "last": 104 }
+        },
+        {
+          "live": ["e"],
+          "at": 1000,
+          "expect": { "passed": ["gtx_e"], "last": 105 }
+        }
+      ]
+    },
+    {
+      "name": "dedup survives a reconnect (second welcome)",
+      "options": { "user": "me" },
+      "steps": [
+        {
+          "welcome": { "viewers": 1, "gap": false, "replay": ["a"], "ttl": 60, "now": 20000 },
+          "at": 0,
+          "expect": { "passed": ["gtx_a"], "last": 101 }
+        },
+        {
+          "welcome": { "viewers": 2, "gap": false, "replay": ["a", "d"], "ttl": 60, "now": 20000 },
+          "at": 500,
+          "expect": { "passed": ["gtx_d"], "last": 104, "gap": false }
+        }
+      ]
+    },
+    {
+      "name": "a live gift before any welcome is ignored",
+      "options": { "user": "me" },
+      "steps": [
+        {
+          "live": ["a"],
+          "at": 0,
+          "expect": { "passed": [], "last": null }
+        }
+      ]
+    },
+    {
+      "name": "dedup keeps the last 256 tx",
+      "options": { "user": "me" },
+      "steps": [
+        {
+          "welcome": { "viewers": 1, "gap": false, "replay": ["a"], "ttl": 60, "now": 20000 },
+          "at": 0,
+          "expect": { "passed": ["gtx_a"] }
+        },
+        { "fill": 255, "at": 0, "expect": { "last": 1255 } },
+        {
+          "name": "a is still one of the last 256",
+          "live": ["a"],
+          "at": 0,
+          "expect": { "passed": [] }
+        },
+        { "fill": 1, "at": 0 },
+        {
+          "name": "257 tx seen since a: a was forgotten",
+          "live": ["a"],
+          "at": 0,
+          "expect": { "passed": ["gtx_a"] }
+        }
+      ]
+    },
+    {
+      "name": "batch: each gift in order through the filter, last = the batch's last gift even when dropped",
+      "options": { "user": "me" },
+      "steps": [
+        {
+          "welcome": { "viewers": 1, "gap": false, "replay": [], "ttl": 3600, "now": 20000 },
+          "at": 0,
+          "expect": { "passed": [], "last": null }
+        },
+        {
+          "name": "b is the user's own gift (dropped) with a lower id than d: still the resume point",
+          "batch": ["d", "a", "b"],
+          "at": 0,
+          "expect": { "passed": ["gtx_d", "gtx_a"], "last": 102, "gap": false }
+        },
+        {
+          "name": "a repeated tx in a batch is dropped, last still moves",
+          "batch": ["a", "c"],
+          "at": 0,
+          "expect": { "passed": ["gtx_c"], "last": 103 }
+        }
+      ]
+    }
+  ]
+}

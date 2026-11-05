@@ -1,0 +1,40 @@
+{
+  "description": "tierFor(price, thresholds?). Missing threshold fields take the defaults (mediumFrom 100, largeFrom 10000). A price equal to a threshold is in the higher tier.",
+  "cases": [
+    { "price": 0, "tier": "small" },
+    { "price": 1, "tier": "small" },
+    { "price": 99, "tier": "small" },
+    { "price": 100, "tier": "medium" },
+    { "price": 101, "tier": "medium" },
+    { "price": 9999, "tier": "medium" },
+    { "price": 10000, "tier": "large" },
+    { "price": 1000000, "tier": "large" },
+    { "price": -5, "tier": "small" },
+    { "price": 99.5, "tier": "small" },
+    { "price": 500, "thresholds": { "mediumFrom": 1000 }, "tier": "small" },
+    { "price": 1000, "thresholds": { "mediumFrom": 1000 }, "tier": "medium" },
+    { "price": 500, "thresholds": { "largeFrom": 400 }, "tier": "large" },
+    { "price": 50, "thresholds": { "largeFrom": 400 }, "tier": "small" },
+    { "price": 4, "thresholds": { "mediumFrom": 5, "largeFrom": 50 }, "tier": "small" },
+    { "price": 5, "thresholds": { "mediumFrom": 5, "largeFrom": 50 }, "tier": "medium" },
+    { "price": 49, "thresholds": { "mediumFrom": 5, "largeFrom": 50 }, "tier": "medium" },
+    { "price": 50, "thresholds": { "mediumFrom": 5, "largeFrom": 50 }, "tier": "large" },
+    {
+      "price": 200,
+      "thresholds": { "mediumFrom": 300, "largeFrom": 100 },
+      "tier": "large",
+      "note": "largeFrom is checked first, so it wins when the thresholds are inverted"
+    },
+    { "price": 0, "thresholds": { "mediumFrom": 0 }, "tier": "medium" }
+  ],
+  "recipes": [
+    {
+      "tier": "large",
+      "quality": "low",
+      "expect": { "sparks": 16, "coins": 0, "rays": false, "dim": true, "noticeBig": true }
+    },
+    { "tier": "medium", "quality": "low", "expect": { "sparks": 8, "coins": 0, "rays": false } },
+    { "tier": "small", "quality": "low", "expect": { "sparks": 0, "coins": 0, "rays": false } },
+    { "tier": "large", "quality": "high", "expect": { "sparks": 50, "coins": 34, "rays": true } }
+  ]
+}

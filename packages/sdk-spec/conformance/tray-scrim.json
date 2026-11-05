@@ -1,0 +1,104 @@
+{
+  "description": "The tray's surroundings (SPEC.md section 9.4): when the scrim is drawn, what a tap on it does, its fade time and the open/closed state behind open(), close() and toggle(). Pure functions and TrayOpenState; no rendering, no clock. Format and matching rules: conformance/README.md.",
+  "constants": { "fadeMs": 200, "opacity": 0.4 },
+  "visible": [
+    { "scrim": true, "open": true, "snap": "peek", "placed": true, "expect": false },
+    { "scrim": true, "open": true, "snap": "default", "placed": true, "expect": true },
+    { "scrim": true, "open": true, "snap": "expanded", "placed": true, "expect": true },
+    { "scrim": true, "open": true, "snap": "peek", "placed": false, "expect": false },
+    { "scrim": true, "open": true, "snap": "default", "placed": false, "expect": false },
+    { "scrim": true, "open": true, "snap": "expanded", "placed": false, "expect": false },
+    { "scrim": true, "open": false, "snap": "peek", "placed": true, "expect": false },
+    { "scrim": true, "open": false, "snap": "default", "placed": true, "expect": false },
+    { "scrim": true, "open": false, "snap": "expanded", "placed": true, "expect": false },
+    { "scrim": true, "open": false, "snap": "peek", "placed": false, "expect": false },
+    { "scrim": true, "open": false, "snap": "default", "placed": false, "expect": false },
+    { "scrim": true, "open": false, "snap": "expanded", "placed": false, "expect": false },
+    { "scrim": false, "open": true, "snap": "peek", "placed": true, "expect": false },
+    { "scrim": false, "open": true, "snap": "default", "placed": true, "expect": false },
+    { "scrim": false, "open": true, "snap": "expanded", "placed": true, "expect": false },
+    { "scrim": false, "open": true, "snap": "peek", "placed": false, "expect": false },
+    { "scrim": false, "open": true, "snap": "default", "placed": false, "expect": false },
+    { "scrim": false, "open": true, "snap": "expanded", "placed": false, "expect": false },
+    { "scrim": false, "open": false, "snap": "peek", "placed": true, "expect": false },
+    { "scrim": false, "open": false, "snap": "default", "placed": true, "expect": false },
+    { "scrim": false, "open": false, "snap": "expanded", "placed": true, "expect": false },
+    { "scrim": false, "open": false, "snap": "peek", "placed": false, "expect": false },
+    { "scrim": false, "open": false, "snap": "default", "placed": false, "expect": false },
+    { "scrim": false, "open": false, "snap": "expanded", "placed": false, "expect": false }
+  ],
+  "fade": [
+    { "name": "motion allowed: 200 ms", "reducedMotion": false, "ms": 200 },
+    { "name": "reduced motion: at once", "reducedMotion": true, "ms": 0 }
+  ],
+  "tap": [
+    { "scrim": true, "open": true, "snap": "expanded", "expect": "lower" },
+    { "scrim": true, "open": true, "snap": "default", "expect": "lower" },
+    { "scrim": true, "open": true, "snap": "peek", "expect": "dismiss" },
+    { "scrim": true, "scrimTap": "lower", "open": true, "snap": "expanded", "expect": "lower" },
+    { "scrim": true, "scrimTap": "lower", "open": true, "snap": "default", "expect": "lower" },
+    { "scrim": true, "scrimTap": "lower", "open": true, "snap": "peek", "expect": "dismiss" },
+    { "scrim": true, "scrimTap": "dismiss", "open": true, "snap": "expanded", "expect": "dismiss" },
+    { "scrim": true, "scrimTap": "dismiss", "open": true, "snap": "default", "expect": "dismiss" },
+    { "scrim": true, "scrimTap": "dismiss", "open": true, "snap": "peek", "expect": "dismiss" },
+    { "scrim": true, "open": false, "snap": "default", "expect": "ignored" },
+    { "scrim": true, "scrimTap": "lower", "open": false, "snap": "default", "expect": "ignored" },
+    { "scrim": true, "scrimTap": "dismiss", "open": false, "snap": "default", "expect": "ignored" },
+    { "scrim": false, "open": true, "snap": "default", "expect": "ignored" },
+    { "scrim": false, "scrimTap": "dismiss", "open": true, "snap": "default", "expect": "ignored" }
+  ],
+  "open": [
+    {
+      "name": "a tray that exists is open by default; toggle closes, toggle opens",
+      "steps": [
+        { "expect": { "open": true, "changes": [] } },
+        { "call": "toggle", "returns": false },
+        { "expect": { "open": false, "changes": [false] } },
+        { "call": "toggle", "returns": true },
+        { "expect": { "open": true, "changes": [false, true] } }
+      ]
+    },
+    {
+      "name": "open and close when already there change nothing and notify nothing",
+      "steps": [
+        { "call": "open", "returns": true },
+        { "expect": { "open": true, "changes": [] } },
+        { "call": "close", "returns": false },
+        { "call": "close", "returns": false },
+        { "expect": { "open": false, "changes": [false] } },
+        { "call": "open", "returns": true },
+        { "call": "open", "returns": true },
+        { "expect": { "open": true, "changes": [false, true] } }
+      ]
+    },
+    {
+      "name": "starts closed (open false): the host's Gift button opens it, again closes it",
+      "open": false,
+      "steps": [
+        { "expect": { "open": false, "changes": [] } },
+        { "call": "toggle", "returns": true },
+        { "call": "toggle", "returns": false },
+        { "expect": { "open": false, "changes": [true, false] } }
+      ]
+    },
+    {
+      "name": "closed then close(): still closed, no change",
+      "open": false,
+      "steps": [
+        { "call": "close", "returns": false },
+        { "expect": { "open": false, "changes": [] } }
+      ]
+    },
+    {
+      "name": "five toggles end open, five notifications",
+      "steps": [
+        { "call": "toggle", "returns": false },
+        { "call": "toggle", "returns": true },
+        { "call": "toggle", "returns": false },
+        { "call": "toggle", "returns": true },
+        { "call": "toggle", "returns": false },
+        { "expect": { "open": false, "changes": [false, true, false, true, false] } }
+      ]
+    }
+  ]
+}

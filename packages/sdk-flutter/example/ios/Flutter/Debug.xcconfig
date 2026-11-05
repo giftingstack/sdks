@@ -1,0 +1,7 @@
+#include "Generated.xcconfig"
+
+// Bundle id and team of the Runner app target (project.pbxproj reads these two).
+// Own names, so the TestFlight workflow (.github/workflows/sdk-flutter-ios-testflight.yml) can
+// override them on the xcodebuild command line without reaching the Swift package targets.
+FLUTTER_DEMO_BUNDLE_ID = com.giftingstack.flutterdemo
+FLUTTER_DEMO_TEAM_ID =

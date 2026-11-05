@@ -1,0 +1,817 @@
+{
+  "description": "GiftTrayController (useGiftTray) traces with a scripted client, plus the Send button state. Format and matching rules: conformance/README.md.",
+  "gifts": {
+    "rose": {
+      "id": "rose",
+      "name": "Rose",
+      "description": null,
+      "price": 10,
+      "icon_url": "https://assets.test/rose/256.webp",
+      "animation_url": "https://assets.test/rose/512.webp",
+      "sort_order": 2
+    },
+    "hat": {
+      "id": "hat",
+      "name": "Hat",
+      "description": null,
+      "price": 350,
+      "icon_url": "https://assets.test/hat/256.webp",
+      "animation_url": "https://assets.test/hat/512.webp",
+      "sort_order": 1
+    },
+    "dragon": {
+      "id": "dragon",
+      "name": "Dragon",
+      "description": "Big one",
+      "price": 40000,
+      "icon_url": "https://assets.test/dragon/256.webp",
+      "animation_url": null,
+      "sort_order": 3
+    }
+  },
+  "transactions": {
+    "tx_rose": {
+      "id": "gtx_1",
+      "sender": "ayla",
+      "receiver": "mert",
+      "gift": { "id": "rose", "name": "Rose", "icon_url": "https://assets.test/rose/256.webp" },
+      "quantity": 1,
+      "unit_price": 10,
+      "total": 10,
+      "message": null,
+      "reference": "post_1",
+      "status": "completed",
+      "created_at": "2026-10-10T00:00:00.000Z",
+      "sender_balance_after": 990
+    },
+    "tx_rose_other_sender": {
+      "id": "gtx_2",
+      "sender": "server_name",
+      "receiver": "mert",
+      "gift": { "id": "rose", "name": "Rose", "icon_url": "https://assets.test/rose/256.webp" },
+      "quantity": 1,
+      "unit_price": 10,
+      "total": 10,
+      "message": null,
+      "reference": "post_1",
+      "status": "completed",
+      "created_at": "2026-10-10T00:00:00.000Z",
+      "sender_balance_after": 990
+    }
+  },
+  "scenarios": [
+    {
+      "name": "loads the catalog in sort_order and the balance; prefetches every icon (not the big pictures) in API order",
+      "options": { "receiver": "mert", "reference": "post_1" },
+      "steps": [
+        { "mount": true },
+        {
+          "expect": {
+            "loading": true,
+            "gifts": [],
+            "balance": 0,
+            "user": null,
+            "error": null,
+            "pending": ["getGifts", "getMe"]
+          }
+        },
+        { "resolve": { "method": "getGifts", "value": ["rose", "hat", "dragon"] } },
+        { "expect": { "loading": true, "gifts": [], "pending": ["getMe"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        {
+          "expect": {
+            "loading": false,
+            "gifts": ["hat", "rose", "dragon"],
+            "balance": 1000,
+            "user": "ayla",
+            "error": null,
+            "pending": [],
+            "prefetched": [
+              "https://assets.test/rose/256.webp",
+              "https://assets.test/hat/256.webp",
+              "https://assets.test/dragon/256.webp"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "playOn tap (default): coins and effect at the tap, nothing more on success, then reconcile",
+      "options": { "receiver": "mert", "reference": "post_1" },
+      "steps": [
+        { "mount": true },
+        { "resolve": { "method": "getGifts", "value": ["rose", "hat"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "send": "rose" },
+        {
+          "expect": {
+            "balance": 990,
+            "played": [
+              {
+                "id": 1,
+                "event": {
+                  "gift": {
+                    "id": "rose",
+                    "name": "Rose",
+                    "price": 10,
+                    "image": "https://assets.test/rose/512.webp",
+                    "icon": "https://assets.test/rose/256.webp"
+                  },
+                  "sender": "ayla",
+                  "quantity": 1
+                }
+              }
+            ],
+            "cancelled": [],
+            "sent": [],
+            "pending": ["sendGift"],
+            "lastCall": {
+              "method": "sendGift",
+              "args": { "receiver": "mert", "giftId": "rose", "reference": "post_1" }
+            }
+          }
+        },
+        { "resolve": { "method": "sendGift", "value": "tx_rose" } },
+        {
+          "expect": {
+            "balance": 990,
+            "sent": ["gtx_1"],
+            "errors": [],
+            "error": null,
+            "pending": ["getMe"],
+            "playedCount": 1
+          }
+        },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 985 } } },
+        { "expect": { "balance": 985, "pending": [] } }
+      ]
+    },
+    {
+      "name": "playOn tap: a failed send takes the effect back and gives the coins back",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "resolve": { "method": "getGifts", "value": ["rose", "dragon"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "send": "dragon" },
+        {
+          "expect": {
+            "balance": -39000,
+            "playedCount": 1,
+            "pending": ["sendGift"],
+            "lastCall": { "method": "sendGift", "args": { "receiver": "mert", "giftId": "dragon" } }
+          }
+        },
+        {
+          "reject": {
+            "method": "sendGift",
+            "error": {
+              "status": 422,
+              "type": "insufficient_balance",
+              "message": "Not enough balance.",
+              "requestId": "req_1"
+            }
+          }
+        },
+        {
+          "expect": {
+            "balance": 1000,
+            "played": [
+              {
+                "id": 1,
+                "event": {
+                  "gift": {
+                    "id": "dragon",
+                    "name": "Dragon",
+                    "price": 40000,
+                    "image": "https://assets.test/dragon/256.webp",
+                    "icon": "https://assets.test/dragon/256.webp"
+                  },
+                  "sender": "ayla",
+                  "quantity": 1
+                }
+              }
+            ],
+            "cancelled": [1],
+            "error": {
+              "status": 422,
+              "type": "insufficient_balance",
+              "message": "Not enough balance.",
+              "requestId": "req_1",
+              "retryable": false,
+              "insufficientBalance": true
+            },
+            "errors": ["insufficient_balance"],
+            "sent": [],
+            "pending": ["getMe"]
+          }
+        },
+        {
+          "reject": {
+            "method": "getMe",
+            "error": {
+              "status": 0,
+              "type": "network_error",
+              "message": "offline",
+              "requestId": null
+            }
+          }
+        },
+        {
+          "expect": {
+            "balance": 1000,
+            "error": {
+              "status": 422,
+              "type": "insufficient_balance",
+              "message": "Not enough balance.",
+              "requestId": "req_1",
+              "retryable": false,
+              "insufficientBalance": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "playOn success: the effect plays after the server, with the server's quantity",
+      "options": { "receiver": "mert", "reference": "post_1", "playOn": "success" },
+      "steps": [
+        { "mount": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "send": "rose" },
+        { "expect": { "balance": 990, "played": [], "pending": ["sendGift"] } },
+        { "resolve": { "method": "sendGift", "value": "tx_rose_other_sender" } },
+        {
+          "expect": {
+            "played": [
+              {
+                "id": 1,
+                "event": {
+                  "gift": {
+                    "id": "rose",
+                    "name": "Rose",
+                    "price": 10,
+                    "image": "https://assets.test/rose/512.webp",
+                    "icon": "https://assets.test/rose/256.webp"
+                  },
+                  "sender": "ayla",
+                  "quantity": 1
+                }
+              }
+            ],
+            "cancelled": [],
+            "sent": ["gtx_2"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "playOn success: a failed send shows nothing and cancels nothing",
+      "options": { "receiver": "mert", "playOn": "success" },
+      "steps": [
+        { "mount": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "send": "rose" },
+        {
+          "reject": {
+            "method": "sendGift",
+            "error": {
+              "status": 503,
+              "type": "temporarily_unavailable",
+              "message": "Try again.",
+              "requestId": "req_9"
+            }
+          }
+        },
+        {
+          "expect": {
+            "balance": 1000,
+            "played": [],
+            "cancelled": [],
+            "errors": ["temporarily_unavailable"],
+            "error": {
+              "status": 503,
+              "type": "temporarily_unavailable",
+              "message": "Try again.",
+              "requestId": "req_9",
+              "retryable": true,
+              "insufficientBalance": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "before the user is known: tap mode names the sender You, success mode uses the transaction's sender",
+      "options": { "receiver": "mert", "playOn": "success" },
+      "steps": [
+        { "mount": true },
+        { "send": "rose" },
+        {
+          "expect": { "balance": -10, "played": [], "pending": ["getGifts", "getMe", "sendGift"] }
+        },
+        { "resolve": { "method": "sendGift", "value": "tx_rose_other_sender" } },
+        {
+          "expect": {
+            "played": [
+              {
+                "id": 1,
+                "event": {
+                  "gift": {
+                    "id": "rose",
+                    "name": "Rose",
+                    "price": 10,
+                    "image": "https://assets.test/rose/512.webp",
+                    "icon": "https://assets.test/rose/256.webp"
+                  },
+                  "sender": "server_name",
+                  "quantity": 1
+                }
+              }
+            ],
+            "pending": ["getGifts", "getMe", "getMe"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "before the user is known, tap mode shows the gift as sent by You",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "send": "rose" },
+        {
+          "expect": {
+            "played": [
+              {
+                "id": 1,
+                "event": {
+                  "gift": {
+                    "id": "rose",
+                    "name": "Rose",
+                    "price": 10,
+                    "image": "https://assets.test/rose/512.webp",
+                    "icon": "https://assets.test/rose/256.webp"
+                  },
+                  "sender": "You",
+                  "quantity": 1
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a burst of taps: balance drops per tap, one getMe only after the last send settles",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "send": "rose" },
+        { "send": "rose" },
+        { "send": "rose" },
+        {
+          "expect": {
+            "balance": 970,
+            "playedCount": 3,
+            "pending": ["sendGift", "sendGift", "sendGift"]
+          }
+        },
+        { "resolve": { "method": "sendGift", "value": "tx_rose" } },
+        { "resolve": { "method": "sendGift", "value": "tx_rose" } },
+        { "expect": { "balance": 970, "pending": ["sendGift"] } },
+        {
+          "reject": {
+            "method": "sendGift",
+            "error": {
+              "status": 429,
+              "type": "rate_limited",
+              "message": "Slow down.",
+              "requestId": "req_3"
+            }
+          }
+        },
+        {
+          "expect": {
+            "balance": 980,
+            "cancelled": [3],
+            "sent": ["gtx_1", "gtx_1"],
+            "pending": ["getMe"]
+          }
+        },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 980 } } },
+        {
+          "expect": {
+            "balance": 980,
+            "pending": [],
+            "callCount": { "getMe": 2, "sendGift": 3, "getGifts": 1 }
+          }
+        }
+      ]
+    },
+    {
+      "name": "the reconcile answer is ignored when another send started meanwhile",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "send": "rose" },
+        { "resolve": { "method": "sendGift", "value": "tx_rose" } },
+        { "expect": { "balance": 990, "pending": ["getMe"] } },
+        { "send": "rose" },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 990 } } },
+        { "expect": { "balance": 980, "pending": ["sendGift"] } },
+        { "resolve": { "method": "sendGift", "value": "tx_rose" } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 975 } } },
+        { "expect": { "balance": 975, "pending": [] } }
+      ]
+    },
+    {
+      "name": "without an effect layer a failed send still restores the balance",
+      "options": { "receiver": "mert", "effects": false },
+      "steps": [
+        { "mount": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "send": "rose" },
+        {
+          "reject": {
+            "method": "sendGift",
+            "error": {
+              "status": 0,
+              "type": "network_error",
+              "message": "offline",
+              "requestId": null
+            }
+          }
+        },
+        {
+          "expect": { "balance": 1000, "played": [], "cancelled": [], "errors": ["network_error"] }
+        }
+      ]
+    },
+    {
+      "name": "a load failure is reported; refresh recovers and clears the error",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        {
+          "reject": {
+            "method": "getGifts",
+            "error": {
+              "status": 0,
+              "type": "network_error",
+              "message": "offline",
+              "requestId": null
+            }
+          }
+        },
+        {
+          "expect": {
+            "loading": false,
+            "gifts": [],
+            "balance": 0,
+            "error": {
+              "status": 0,
+              "type": "network_error",
+              "message": "offline",
+              "requestId": null,
+              "retryable": true,
+              "insufficientBalance": false
+            },
+            "pending": ["getMe"]
+          }
+        },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "expect": { "balance": 0, "user": null } },
+        { "refresh": true },
+        { "expect": { "pending": ["getGifts", "getMe"], "loading": false } },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "expect": { "error": null, "gifts": ["rose"], "balance": 1000, "user": "ayla" } }
+      ]
+    },
+    {
+      "name": "a failure that is not a GiftingError becomes status 0 unknown_error with its message",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "send": "rose" },
+        { "reject": { "method": "sendGift", "error": { "plain": "boom" } } },
+        {
+          "expect": {
+            "balance": 1000,
+            "error": {
+              "status": 0,
+              "type": "unknown_error",
+              "message": "boom",
+              "requestId": null,
+              "retryable": true,
+              "insufficientBalance": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "after dispose, late answers change nothing",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "dispose": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "expect": { "loading": true, "gifts": [], "balance": 0, "prefetched": [] } }
+      ]
+    },
+    {
+      "name": "dispose during a send: success calls nothing; failure still cancels the effect and reports, but leaves the balance",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 1000 } } },
+        { "send": "rose" },
+        { "send": "rose" },
+        { "dispose": true },
+        { "resolve": { "method": "sendGift", "value": "tx_rose" } },
+        { "expect": { "sent": [], "balance": 980 } },
+        {
+          "reject": {
+            "method": "sendGift",
+            "error": {
+              "status": 500,
+              "type": "internal_error",
+              "message": "Oops.",
+              "requestId": "req_5"
+            }
+          }
+        },
+        {
+          "expect": {
+            "balance": 980,
+            "cancelled": [2],
+            "errors": ["internal_error"],
+            "error": null,
+            "pending": ["getMe"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "testMode is true when me.livemode is false (a test key)",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "expect": { "testMode": false } },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "expect": { "testMode": false, "loading": true } },
+        {
+          "resolve": {
+            "method": "getMe",
+            "value": { "user": "ayla", "balance": 5, "livemode": false }
+          }
+        },
+        { "expect": { "testMode": true, "loading": false, "balance": 5 } }
+      ]
+    },
+    {
+      "name": "testMode stays false when me.livemode is true",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "expect": { "testMode": false } },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "expect": { "testMode": false, "loading": true } },
+        {
+          "resolve": {
+            "method": "getMe",
+            "value": { "user": "ayla", "balance": 5, "livemode": true }
+          }
+        },
+        { "expect": { "testMode": false, "loading": false, "balance": 5 } }
+      ]
+    },
+    {
+      "name": "testMode stays false when livemode is absent (an older server)",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "expect": { "testMode": false } },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        { "expect": { "testMode": false, "loading": true } },
+        { "resolve": { "method": "getMe", "value": { "user": "ayla", "balance": 5 } } },
+        { "expect": { "testMode": false, "loading": false, "balance": 5 } }
+      ]
+    },
+    {
+      "name": "testMode follows the latest me: a failed refresh keeps it, a later one can switch it off",
+      "options": { "receiver": "mert" },
+      "steps": [
+        { "mount": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        {
+          "resolve": {
+            "method": "getMe",
+            "value": { "user": "ayla", "balance": 5, "livemode": false }
+          }
+        },
+        { "expect": { "testMode": true } },
+        { "refresh": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        {
+          "reject": {
+            "method": "getMe",
+            "error": {
+              "status": 503,
+              "type": "temporarily_unavailable",
+              "message": "later",
+              "requestId": null
+            }
+          }
+        },
+        { "expect": { "testMode": true, "error": { "type": "temporarily_unavailable" } } },
+        { "refresh": true },
+        { "resolve": { "method": "getGifts", "value": ["rose"] } },
+        {
+          "resolve": {
+            "method": "getMe",
+            "value": { "user": "ayla", "balance": 5, "livemode": true }
+          }
+        },
+        { "expect": { "testMode": false, "error": null } }
+      ]
+    }
+  ],
+  "sendButton": {
+    "description": "sendButtonState({ gifts, selectedId, balance, disabled, canTopUp }). The selected gift is the one with selectedId, else the first gift. label is a key: send | getCoins | notEnough.",
+    "cases": [
+      {
+        "name": "empty tray",
+        "input": {
+          "gifts": [],
+          "selectedId": null,
+          "balance": 100,
+          "disabled": false,
+          "canTopUp": true
+        },
+        "expect": {
+          "selectedId": null,
+          "broke": false,
+          "label": "send",
+          "pressable": false,
+          "action": "none"
+        }
+      },
+      {
+        "name": "nothing chosen: the first gift is selected",
+        "input": {
+          "gifts": [
+            { "id": "rose", "price": 10 },
+            { "id": "dragon", "price": 40000 }
+          ],
+          "selectedId": null,
+          "balance": 100,
+          "disabled": false,
+          "canTopUp": false
+        },
+        "expect": {
+          "selectedId": "rose",
+          "broke": false,
+          "label": "send",
+          "pressable": true,
+          "action": "send"
+        }
+      },
+      {
+        "name": "unknown selectedId falls back to the first gift",
+        "input": {
+          "gifts": [{ "id": "rose", "price": 10 }],
+          "selectedId": "gone",
+          "balance": 100,
+          "disabled": false,
+          "canTopUp": false
+        },
+        "expect": {
+          "selectedId": "rose",
+          "broke": false,
+          "label": "send",
+          "pressable": true,
+          "action": "send"
+        }
+      },
+      {
+        "name": "price equal to the balance can be sent",
+        "input": {
+          "gifts": [{ "id": "rose", "price": 100 }],
+          "selectedId": "rose",
+          "balance": 100,
+          "disabled": false,
+          "canTopUp": false
+        },
+        "expect": {
+          "selectedId": "rose",
+          "broke": false,
+          "label": "send",
+          "pressable": true,
+          "action": "send"
+        }
+      },
+      {
+        "name": "too expensive without a store: Not enough coins, off",
+        "input": {
+          "gifts": [
+            { "id": "rose", "price": 10 },
+            { "id": "dragon", "price": 40000 }
+          ],
+          "selectedId": "dragon",
+          "balance": 100,
+          "disabled": false,
+          "canTopUp": false
+        },
+        "expect": {
+          "selectedId": "dragon",
+          "broke": true,
+          "label": "notEnough",
+          "pressable": false,
+          "action": "none"
+        }
+      },
+      {
+        "name": "too expensive with a store: Get coins opens the store",
+        "input": {
+          "gifts": [{ "id": "dragon", "price": 40000 }],
+          "selectedId": "dragon",
+          "balance": 5,
+          "disabled": false,
+          "canTopUp": true
+        },
+        "expect": {
+          "selectedId": "dragon",
+          "broke": true,
+          "label": "getCoins",
+          "pressable": true,
+          "action": "topUp"
+        }
+      },
+      {
+        "name": "disabled and too expensive: still labelled Get coins, but off",
+        "input": {
+          "gifts": [{ "id": "dragon", "price": 40000 }],
+          "selectedId": "dragon",
+          "balance": 5,
+          "disabled": true,
+          "canTopUp": true
+        },
+        "expect": {
+          "selectedId": "dragon",
+          "broke": true,
+          "label": "getCoins",
+          "pressable": false,
+          "action": "none"
+        }
+      },
+      {
+        "name": "disabled and affordable: Send, off",
+        "input": {
+          "gifts": [{ "id": "rose", "price": 10 }],
+          "selectedId": "rose",
+          "balance": 100,
+          "disabled": true,
+          "canTopUp": true
+        },
+        "expect": {
+          "selectedId": "rose",
+          "broke": false,
+          "label": "send",
+          "pressable": false,
+          "action": "none"
+        }
+      },
+      {
+        "name": "a negative balance makes every positive price too expensive",
+        "input": {
+          "gifts": [{ "id": "rose", "price": 10 }],
+          "selectedId": "rose",
+          "balance": -5,
+          "disabled": false,
+          "canTopUp": false
+        },
+        "expect": {
+          "selectedId": "rose",
+          "broke": true,
+          "label": "notEnough",
+          "pressable": false,
+          "action": "none"
+        }
+      }
+    ]
+  }
+}

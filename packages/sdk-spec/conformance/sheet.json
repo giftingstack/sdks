@@ -1,0 +1,409 @@
+{
+  "description": "TraySheetController (the tray as a bottom sheet, SPEC.md section 9.1): snap heights, drag, release with velocity, toggle, keyboard steps, layout changes and the nested-scroll decision. Format and matching rules: conformance/README.md.",
+  "layouts": {
+    "phone": {
+      "containerHeight": 800,
+      "peekMinHeight": 150,
+      "defaultMinHeight": 330,
+      "contentHeight": 900
+    },
+    "short": {
+      "containerHeight": 600,
+      "peekMinHeight": 150,
+      "defaultMinHeight": 330,
+      "contentHeight": 700
+    },
+    "fewGifts": {
+      "containerHeight": 780,
+      "peekMinHeight": 150,
+      "defaultMinHeight": 330,
+      "contentHeight": 300
+    }
+  },
+  "heights": [
+    {
+      "name": "phone (800 high, content 900): peek and default fit their content, expanded is 90 % of the container (0.9 * 800 = 720)",
+      "layout": {
+        "containerHeight": 800,
+        "peekMinHeight": 150,
+        "defaultMinHeight": 330,
+        "contentHeight": 900
+      },
+      "expect": { "peek": 150, "default": 330, "expanded": 720 }
+    },
+    {
+      "name": "no floors and the default fractions (peek 0, default 0, expanded 0.9): peek and default are 0, expanded 90 % (720)",
+      "layout": { "containerHeight": 800 },
+      "expect": { "peek": 0, "default": 0, "expanded": 720 }
+    },
+    {
+      "name": "fractions above the floors win",
+      "layout": {
+        "containerHeight": 1000,
+        "snaps": { "peek": 0.2, "default": 0.5, "expanded": 0.9 },
+        "peekMinHeight": 150,
+        "defaultMinHeight": 330
+      },
+      "expect": { "peek": 200, "default": 500, "expanded": 900 }
+    },
+    {
+      "name": "fractions are clamped to 0..1; expanded is never below default",
+      "layout": {
+        "containerHeight": 600,
+        "snaps": { "peek": -1, "default": 2, "expanded": 0.5 }
+      },
+      "expect": { "peek": 0, "default": 600, "expanded": 600 }
+    },
+    {
+      "name": "the content height caps expanded",
+      "layout": {
+        "containerHeight": 780,
+        "peekMinHeight": 150,
+        "defaultMinHeight": 330,
+        "contentHeight": 400
+      },
+      "expect": { "peek": 150, "default": 330, "expanded": 400 }
+    },
+    {
+      "name": "content just shorter than 90 % of the container caps expanded at the content height (0.9 * 780 = 702 > 700)",
+      "layout": {
+        "containerHeight": 780,
+        "peekMinHeight": 150,
+        "defaultMinHeight": 330,
+        "contentHeight": 700
+      },
+      "expect": { "peek": 150, "default": 330, "expanded": 700 }
+    },
+    {
+      "name": "expanded never goes below default, even when the content is shorter",
+      "layout": {
+        "containerHeight": 780,
+        "peekMinHeight": 150,
+        "defaultMinHeight": 330,
+        "contentHeight": 300
+      },
+      "expect": { "peek": 150, "default": 330, "expanded": 330 }
+    },
+    {
+      "name": "small container: everything is capped at the container height",
+      "layout": { "containerHeight": 240, "peekMinHeight": 150, "defaultMinHeight": 330 },
+      "expect": { "peek": 150, "default": 240, "expanded": 240 }
+    },
+    {
+      "name": "container shorter than the peek content",
+      "layout": { "containerHeight": 100, "peekMinHeight": 150, "defaultMinHeight": 330 },
+      "expect": { "peek": 100, "default": 100, "expanded": 100 }
+    },
+    {
+      "name": "null fraction means the default; negative floors are ignored",
+      "layout": {
+        "containerHeight": 800,
+        "snaps": { "expanded": null },
+        "peekMinHeight": -20,
+        "defaultMinHeight": 300
+      },
+      "expect": { "peek": 0, "default": 300, "expanded": 720 }
+    },
+    {
+      "name": "fraction products are rounded to integers",
+      "layout": {
+        "containerHeight": 700,
+        "snaps": { "peek": 0.1, "default": 0.27, "expanded": 0.33 }
+      },
+      "expect": { "peek": 70, "default": 189, "expanded": 231 }
+    },
+    {
+      "name": "not measured yet: a container of 0 gives 0 everywhere",
+      "layout": { "containerHeight": 0, "peekMinHeight": 150, "defaultMinHeight": 330 },
+      "expect": { "peek": 0, "default": 0, "expanded": 0 }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "starts at default: offset, visible height (the inset for the notice), no grid scroll",
+      "layout": "phone",
+      "steps": [
+        {
+          "expect": {
+            "snap": "default",
+            "offset": 390,
+            "visibleHeight": 330,
+            "dragging": false,
+            "gridScrollable": false,
+            "heights": { "peek": 150, "default": 330, "expanded": 720 },
+            "snapChanges": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialSnap expanded: offset 0 and the grid scrolls",
+      "layout": "phone",
+      "initialSnap": "expanded",
+      "steps": [
+        {
+          "expect": {
+            "snap": "expanded",
+            "offset": 0,
+            "visibleHeight": 720,
+            "gridScrollable": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialSnap peek",
+      "layout": "phone",
+      "initialSnap": "peek",
+      "steps": [{ "expect": { "snap": "peek", "offset": 570, "visibleHeight": 150 } }]
+    },
+    {
+      "name": "the drag follows the finger, is clamped at the top, and stays under the finger after an over-drag",
+      "layout": "phone",
+      "steps": [
+        { "dragStart": true },
+        { "expect": { "dragging": true, "offset": 390, "gridScrollable": false } },
+        { "drag": -100 },
+        { "expect": { "snap": "default", "offset": 290, "visibleHeight": 430, "dragging": true } },
+        { "drag": -435 },
+        { "expect": { "offset": 0, "gridScrollable": false } },
+        { "drag": 100 },
+        { "expect": { "offset": 0 } },
+        { "drag": 95 },
+        { "expect": { "offset": 50 } },
+        { "release": 0, "returns": "expanded" },
+        {
+          "expect": {
+            "snap": "expanded",
+            "offset": 0,
+            "dragging": false,
+            "gridScrollable": true,
+            "snapChanges": ["expanded"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "drag without dragStart starts a drag; the bottom clamp is the peek position",
+      "layout": "phone",
+      "initialSnap": "peek",
+      "steps": [
+        { "drag": 200 },
+        { "expect": { "dragging": true, "offset": 570, "visibleHeight": 150 } },
+        { "release": 0, "returns": "peek" },
+        { "expect": { "snap": "peek", "dragging": false, "snapChanges": [] } }
+      ]
+    },
+    {
+      "name": "a slow release goes to the nearest state; an exact tie goes to the more open one",
+      "layout": "phone",
+      "steps": [
+        { "drag": 90 },
+        { "expect": { "offset": 480 } },
+        { "release": 0, "returns": "default" },
+        { "expect": { "snap": "default", "offset": 390, "snapChanges": [] } },
+        { "drag": 91 },
+        { "release": 0, "returns": "peek" },
+        { "expect": { "snap": "peek", "offset": 570, "snapChanges": ["peek"] } }
+      ]
+    },
+    {
+      "name": "a flick of exactly 600 px/s up moves one state; 599 does not",
+      "layout": "phone",
+      "steps": [
+        { "drag": -10 },
+        { "release": -599, "returns": "default" },
+        { "drag": -10 },
+        { "release": -600, "returns": "expanded" },
+        { "expect": { "snap": "expanded", "offset": 0, "snapChanges": ["expanded"] } }
+      ]
+    },
+    {
+      "name": "a flick down from default after a tiny drag goes to peek",
+      "layout": "phone",
+      "steps": [
+        { "drag": 5 },
+        { "release": 650, "returns": "peek" },
+        { "expect": { "snap": "peek", "visibleHeight": 150 } }
+      ]
+    },
+    {
+      "name": "a fast flick up from peek moves ONE state (default), not two",
+      "layout": "phone",
+      "initialSnap": "peek",
+      "steps": [
+        { "drag": -20 },
+        { "release": -2000, "returns": "default" },
+        { "expect": { "snap": "default", "offset": 390 } }
+      ]
+    },
+    {
+      "name": "the flick counts from where the sheet is: dragged past default, a flick up opens fully",
+      "layout": "phone",
+      "initialSnap": "peek",
+      "steps": [
+        { "drag": -300 },
+        { "expect": { "offset": 270 } },
+        { "release": -700, "returns": "expanded" }
+      ]
+    },
+    {
+      "name": "a flick against the drag direction: the next state in the flick's direction",
+      "layout": "phone",
+      "steps": [
+        { "drag": -200 },
+        { "expect": { "offset": 190 } },
+        { "release": 800, "returns": "default" },
+        { "expect": { "snap": "default", "offset": 390, "snapChanges": [] } }
+      ]
+    },
+    {
+      "name": "a flick with no state beyond it falls back to the nearest state",
+      "layout": "phone",
+      "initialSnap": "peek",
+      "steps": [
+        { "drag": 50 },
+        { "release": 1000, "returns": "peek" },
+        { "snapTo": "expanded" },
+        { "drag": -40 },
+        { "release": -5000, "returns": "expanded" },
+        { "expect": { "snapChanges": ["expanded"] } }
+      ]
+    },
+    {
+      "name": "release without a drag changes nothing and returns the current state",
+      "layout": "phone",
+      "steps": [
+        { "release": 1000, "returns": "default" },
+        { "expect": { "snap": "default", "offset": 390, "dragging": false, "snapChanges": [] } }
+      ]
+    },
+    {
+      "name": "cancel goes back to the state the drag started from",
+      "layout": "phone",
+      "steps": [
+        { "drag": -100 },
+        { "cancel": true },
+        { "expect": { "snap": "default", "offset": 390, "dragging": false, "snapChanges": [] } }
+      ]
+    },
+    {
+      "name": "toggle: default -> peek -> default; expanded -> default",
+      "layout": "phone",
+      "steps": [
+        { "toggle": true, "returns": "peek" },
+        { "expect": { "snap": "peek", "offset": 570 } },
+        { "toggle": true, "returns": "default" },
+        { "snapTo": "expanded" },
+        { "toggle": true, "returns": "default" },
+        {
+          "expect": { "snap": "default", "snapChanges": ["peek", "default", "expanded", "default"] }
+        }
+      ]
+    },
+    {
+      "name": "keyboard steps: +1 opens one state, -1 closes one, both stop at the ends",
+      "layout": "phone",
+      "initialSnap": "peek",
+      "steps": [
+        { "step": 1, "returns": "default" },
+        { "step": 1, "returns": "expanded" },
+        { "step": 1, "returns": "expanded" },
+        { "expect": { "offset": 0, "snapChanges": ["default", "expanded"] } },
+        { "step": -1, "returns": "default" },
+        { "step": -1, "returns": "peek" },
+        { "step": -1, "returns": "peek" },
+        { "expect": { "offset": 570, "snapChanges": ["default", "expanded", "default", "peek"] } }
+      ]
+    },
+    {
+      "name": "snapTo during a drag ends the drag",
+      "layout": "phone",
+      "steps": [
+        { "drag": -30 },
+        { "snapTo": "peek" },
+        { "expect": { "snap": "peek", "offset": 570, "dragging": false, "snapChanges": ["peek"] } },
+        { "release": -900, "returns": "peek" }
+      ]
+    },
+    {
+      "name": "nested scroll: below fully open every grid drag moves the sheet",
+      "layout": "phone",
+      "steps": [
+        { "scrollOwner": { "dy": -5, "gridScrollTop": 0 }, "returns": "sheet" },
+        { "scrollOwner": { "dy": 5, "gridScrollTop": 40 }, "returns": "sheet" },
+        { "snapTo": "peek" },
+        { "scrollOwner": { "dy": -5, "gridScrollTop": 0 }, "returns": "sheet" }
+      ]
+    },
+    {
+      "name": "nested scroll: fully open, the grid scrolls unless it is at the top and the finger moves down",
+      "layout": "phone",
+      "initialSnap": "expanded",
+      "steps": [
+        { "scrollOwner": { "dy": -8, "gridScrollTop": 0 }, "returns": "grid" },
+        { "scrollOwner": { "dy": 8, "gridScrollTop": 0 }, "returns": "sheet" },
+        { "scrollOwner": { "dy": 8, "gridScrollTop": 40 }, "returns": "grid" },
+        { "scrollOwner": { "dy": 8, "gridScrollTop": -3 }, "returns": "sheet" },
+        { "scrollOwner": { "dy": 0, "gridScrollTop": 0 }, "returns": "grid" },
+        { "dragStart": true },
+        { "scrollOwner": { "dy": -8, "gridScrollTop": 40 }, "returns": "sheet" }
+      ]
+    },
+    {
+      "name": "nested scroll: collapsing from fully open by dragging the grid at the top",
+      "layout": "phone",
+      "initialSnap": "expanded",
+      "steps": [
+        { "scrollOwner": { "dy": 12, "gridScrollTop": 0 }, "returns": "sheet" },
+        { "drag": 12 },
+        { "drag": 200 },
+        { "expect": { "offset": 212, "gridScrollable": false } },
+        { "release": 300, "returns": "default" },
+        { "expect": { "snap": "default", "offset": 390 } }
+      ]
+    },
+    {
+      "name": "a new layout keeps the state; during a drag the position is clamped again",
+      "layout": "phone",
+      "steps": [
+        { "layout": "short" },
+        {
+          "expect": {
+            "snap": "default",
+            "heights": { "peek": 150, "default": 330, "expanded": 540 },
+            "offset": 210,
+            "visibleHeight": 330
+          }
+        },
+        { "drag": -50 },
+        { "expect": { "offset": 160 } },
+        { "layout": "phone" },
+        { "expect": { "offset": 160, "dragging": true, "visibleHeight": 560 } },
+        { "drag": -200 },
+        { "expect": { "offset": 0 } },
+        { "release": 0, "returns": "expanded" },
+        { "layout": "short" },
+        { "expect": { "snap": "expanded", "offset": 0, "visibleHeight": 540 } }
+      ]
+    },
+    {
+      "name": "few gifts: expanded equals default; ties go to expanded, keyboard and toggle still reach every state",
+      "layout": "fewGifts",
+      "steps": [
+        {
+          "expect": {
+            "heights": { "peek": 150, "default": 330, "expanded": 330 },
+            "offset": 0,
+            "gridScrollable": true
+          }
+        },
+        { "drag": 10 },
+        { "release": 0, "returns": "expanded" },
+        { "step": -1, "returns": "default" },
+        { "toggle": true, "returns": "peek" },
+        { "expect": { "offset": 180, "snapChanges": ["expanded", "default", "peek"] } }
+      ]
+    }
+  ]
+}

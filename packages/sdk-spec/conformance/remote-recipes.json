@@ -1,0 +1,431 @@
+{
+  "description": "Remote recipes (SPEC.md section 13). parse[]: parseRemoteRecipes(input) with the embedded set of ../recipes.json. merge[]: mergeRecipeSet(embedded, remote, app). urls[]: remoteRecipesUrl(url, version). See README.md.",
+  "parse": [
+    {
+      "name": "the embedded document itself parses to the embedded set",
+      "input": "@embedded",
+      "expect": {}
+    },
+    {
+      "name": "a higher minor and patch of the same major are accepted",
+      "input": { "specVersion": "1.7.3", "comboWindowMs": 3000 },
+      "expect": { "comboWindowMs": 3000 }
+    },
+    {
+      "name": "only specVersion: every field keeps its embedded value",
+      "input": { "specVersion": "1.0.0" },
+      "expect": {}
+    },
+    {
+      "name": "another major is ignored as a whole",
+      "input": { "specVersion": "2.0.0", "comboWindowMs": 3000 },
+      "expect": null
+    },
+    {
+      "name": "major 0 is ignored as a whole",
+      "input": { "specVersion": "0.9.0" },
+      "expect": null
+    },
+    { "name": "missing specVersion: ignored", "input": { "comboWindowMs": 3000 }, "expect": null },
+    {
+      "name": "specVersion that is not x.y.z: ignored",
+      "input": { "specVersion": "1" },
+      "expect": null
+    },
+    {
+      "name": "specVersion with a suffix: ignored",
+      "input": { "specVersion": "1.0.0-beta" },
+      "expect": null
+    },
+    { "name": "specVersion as a number: ignored", "input": { "specVersion": 1 }, "expect": null },
+    { "name": "a JSON array: ignored", "input": [{ "specVersion": "1.0.0" }], "expect": null },
+    { "name": "a JSON string: ignored", "input": "1.0.0", "expect": null },
+    { "name": "JSON null: ignored", "input": null, "expect": null },
+    { "name": "a JSON number: ignored", "input": 1, "expect": null },
+    {
+      "name": "values inside the limits are taken as they are",
+      "input": {
+        "specVersion": "1.0.0",
+        "thresholds": { "mediumFrom": 50, "largeFrom": 5000 },
+        "comboWindowMs": 4000,
+        "recipes": {
+          "high": {
+            "large": {
+              "peakScale": 3.25,
+              "holdMs": 2000,
+              "sparks": 80,
+              "sparkSpread": 300,
+              "coins": 60,
+              "noticeMs": 4000
+            }
+          },
+          "low": { "medium": { "sparks": 4, "flyInMs": 650 } }
+        }
+      },
+      "expect": {
+        "thresholds": { "mediumFrom": 50, "largeFrom": 5000 },
+        "comboWindowMs": 4000,
+        "recipes": {
+          "high": {
+            "large": {
+              "peakScale": 3.25,
+              "holdMs": 2000,
+              "sparks": 80,
+              "sparkSpread": 300,
+              "coins": 60,
+              "noticeMs": 4000
+            }
+          },
+          "low": { "medium": { "sparks": 4, "flyInMs": 650 } }
+        }
+      }
+    },
+    {
+      "name": "numbers above the limits are clamped to the maximum",
+      "input": {
+        "specVersion": "1.0.0",
+        "comboWindowMs": 60000,
+        "recipes": {
+          "high": {
+            "large": {
+              "peakScale": 9,
+              "flyInMs": 20000,
+              "holdMs": 99999,
+              "flyOutMs": 10001,
+              "sparks": 500,
+              "sparkSpread": 1000,
+              "coins": 121,
+              "noticeMs": 9000
+            }
+          }
+        }
+      },
+      "expect": {
+        "comboWindowMs": 10000,
+        "recipes": {
+          "high": {
+            "large": {
+              "peakScale": 4,
+              "flyInMs": 10000,
+              "holdMs": 10000,
+              "flyOutMs": 10000,
+              "sparks": 120,
+              "sparkSpread": 400,
+              "coins": 120,
+              "noticeMs": 8000
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "numbers below the limits are clamped to the minimum",
+      "input": {
+        "specVersion": "1.0.0",
+        "comboWindowMs": 100,
+        "recipes": {
+          "low": {
+            "small": {
+              "peakScale": 0.1,
+              "flyInMs": -5,
+              "holdMs": -1,
+              "flyOutMs": -1000,
+              "sparks": -3,
+              "sparkSpread": -10,
+              "coins": -1,
+              "noticeMs": 0
+            }
+          }
+        }
+      },
+      "expect": {
+        "comboWindowMs": 500,
+        "recipes": {
+          "low": {
+            "small": {
+              "peakScale": 0.5,
+              "flyInMs": 0,
+              "holdMs": 0,
+              "flyOutMs": 0,
+              "sparks": 0,
+              "sparkSpread": 0,
+              "coins": 0,
+              "noticeMs": 500
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "exact limits are kept",
+      "input": {
+        "specVersion": "1.0.0",
+        "comboWindowMs": 500,
+        "recipes": {
+          "high": { "medium": { "peakScale": 0.5, "noticeMs": 8000, "sparks": 120, "holdMs": 0 } }
+        }
+      },
+      "expect": {
+        "comboWindowMs": 500,
+        "recipes": {
+          "high": { "medium": { "peakScale": 0.5, "noticeMs": 8000, "sparks": 120, "holdMs": 0 } }
+        }
+      }
+    },
+    {
+      "name": "integer fields are rounded half up after clamping; peakScale is not rounded",
+      "input": {
+        "specVersion": "1.0.0",
+        "comboWindowMs": 2600.5,
+        "recipes": {
+          "high": {
+            "medium": {
+              "flyInMs": 800.5,
+              "holdMs": 700.49,
+              "sparks": 24.6,
+              "coins": 0.5,
+              "peakScale": 1.55
+            }
+          }
+        }
+      },
+      "expect": {
+        "comboWindowMs": 2601,
+        "recipes": {
+          "high": {
+            "medium": { "flyInMs": 801, "holdMs": 700, "sparks": 25, "coins": 1, "peakScale": 1.55 }
+          }
+        }
+      }
+    },
+    {
+      "name": "a field of the wrong type keeps the embedded value for that field only",
+      "input": {
+        "specVersion": "1.0.0",
+        "comboWindowMs": "3000",
+        "recipes": {
+          "high": {
+            "large": {
+              "sparks": "80",
+              "coins": null,
+              "holdMs": true,
+              "flyInMs": [900],
+              "noticeMs": 3000,
+              "dim": "false",
+              "rays": 0,
+              "noticeBig": null
+            }
+          }
+        }
+      },
+      "expect": { "recipes": { "high": { "large": { "noticeMs": 3000 } } } }
+    },
+    {
+      "name": "booleans must be JSON booleans; real booleans are taken",
+      "input": {
+        "specVersion": "1.0.0",
+        "recipes": {
+          "high": {
+            "medium": { "dim": true, "rays": true, "noticeBig": true },
+            "large": { "dim": 1, "rays": "no" }
+          }
+        }
+      },
+      "expect": {
+        "recipes": { "high": { "medium": { "dim": true, "rays": true, "noticeBig": true } } }
+      }
+    },
+    {
+      "name": "an unknown stage keeps the tier's embedded stage; a known stage is taken",
+      "input": {
+        "specVersion": "1.0.0",
+        "recipes": {
+          "high": {
+            "small": { "stage": "explode" },
+            "medium": { "stage": "float-up" },
+            "large": { "stage": "CENTER" }
+          }
+        }
+      },
+      "expect": { "recipes": { "high": { "medium": { "stage": "float-up" } } } }
+    },
+    {
+      "name": "the tier field is never taken from the document",
+      "input": {
+        "specVersion": "1.0.0",
+        "recipes": { "high": { "small": { "tier": "large", "sparks": 5 } } }
+      },
+      "expect": { "recipes": { "high": { "small": { "sparks": 5 } } } }
+    },
+    {
+      "name": "caps, queue size, sender name and unknown keys are never taken",
+      "input": {
+        "specVersion": "1.0.0",
+        "maxConcurrentEffects": { "small": 50, "medium": 50, "large": 9 },
+        "maxQueuedLarge": 100,
+        "defaultSenderName": "Anon",
+        "somethingNew": { "x": 1 },
+        "recipes": {
+          "high": { "huge": { "sparks": 99 }, "small": { "sparks": 3, "glitter": true } },
+          "ultra": {}
+        }
+      },
+      "expect": { "recipes": { "high": { "small": { "sparks": 3 } } } }
+    },
+    {
+      "name": "a missing quality or tier keeps the embedded one; low is not derived from remote high",
+      "input": { "specVersion": "1.0.0", "recipes": { "high": { "large": { "sparks": 90 } } } },
+      "expect": { "recipes": { "high": { "large": { "sparks": 90 } } } }
+    },
+    {
+      "name": "recipes, a quality or a tier that is not an object is ignored",
+      "input": {
+        "specVersion": "1.0.0",
+        "recipes": { "high": [1, 2], "low": { "small": "fast", "large": { "sparks": 10 } } }
+      },
+      "expect": { "recipes": { "low": { "large": { "sparks": 10 } } } }
+    },
+    {
+      "name": "recipes as a string: every recipe stays embedded",
+      "input": { "specVersion": "1.0.0", "recipes": "none", "comboWindowMs": 2000 },
+      "expect": { "comboWindowMs": 2000 }
+    },
+    {
+      "name": "thresholds are clamped (mediumFrom 1..1e6, largeFrom 2..1e7)",
+      "input": { "specVersion": "1.0.0", "thresholds": { "mediumFrom": 0, "largeFrom": 50000000 } },
+      "expect": { "thresholds": { "mediumFrom": 1, "largeFrom": 10000000 } }
+    },
+    {
+      "name": "thresholds: largeFrom not above mediumFrom drops both (embedded pair)",
+      "input": { "specVersion": "1.0.0", "thresholds": { "mediumFrom": 5000, "largeFrom": 5000 } },
+      "expect": {}
+    },
+    {
+      "name": "thresholds: the order is checked after clamping",
+      "input": {
+        "specVersion": "1.0.0",
+        "thresholds": { "mediumFrom": 2000000, "largeFrom": 1500000 }
+      },
+      "expect": { "thresholds": { "mediumFrom": 1000000, "largeFrom": 1500000 } }
+    },
+    {
+      "name": "thresholds: one field alone combines with the other's embedded value",
+      "input": { "specVersion": "1.0.0", "thresholds": { "largeFrom": 20000 } },
+      "expect": { "thresholds": { "largeFrom": 20000 } }
+    },
+    {
+      "name": "thresholds: one field alone that breaks the order with the embedded other drops both",
+      "input": { "specVersion": "1.0.0", "thresholds": { "mediumFrom": 20000 } },
+      "expect": {}
+    },
+    {
+      "name": "thresholds: a wrong-typed field takes the embedded value, then the order is checked",
+      "input": { "specVersion": "1.0.0", "thresholds": { "mediumFrom": "50", "largeFrom": 500 } },
+      "expect": { "thresholds": { "largeFrom": 500 } }
+    },
+    {
+      "name": "thresholds not an object: embedded pair",
+      "input": { "specVersion": "1.0.0", "thresholds": [100, 200] },
+      "expect": {}
+    }
+  ],
+  "merge": [
+    {
+      "name": "no remote, no app: embedded",
+      "remote": null,
+      "app": {},
+      "expect": {
+        "thresholds": { "mediumFrom": 100, "largeFrom": 10000 },
+        "comboWindowMs": 2500,
+        "recipes": "embedded"
+      }
+    },
+    {
+      "name": "remote beats embedded",
+      "remote": {
+        "specVersion": "1.0.0",
+        "thresholds": { "mediumFrom": 50, "largeFrom": 5000 },
+        "comboWindowMs": 3000,
+        "recipes": { "high": { "large": { "sparks": 99 } } }
+      },
+      "app": {},
+      "expect": {
+        "thresholds": { "mediumFrom": 50, "largeFrom": 5000 },
+        "comboWindowMs": 3000,
+        "recipes": "remote"
+      }
+    },
+    {
+      "name": "app beats remote, field by field",
+      "remote": {
+        "specVersion": "1.0.0",
+        "thresholds": { "mediumFrom": 50, "largeFrom": 5000 },
+        "comboWindowMs": 3000
+      },
+      "app": { "thresholds": { "mediumFrom": 10 }, "comboWindowMs": 1000 },
+      "expect": {
+        "thresholds": { "mediumFrom": 10, "largeFrom": 5000 },
+        "comboWindowMs": 1000,
+        "recipes": "remote"
+      }
+    },
+    {
+      "name": "app values are not clamped (the app owns them)",
+      "remote": { "specVersion": "1.0.0" },
+      "app": { "thresholds": { "mediumFrom": 0, "largeFrom": 0 }, "comboWindowMs": 100 },
+      "expect": {
+        "thresholds": { "mediumFrom": 0, "largeFrom": 0 },
+        "comboWindowMs": 100,
+        "recipes": "embedded"
+      }
+    },
+    {
+      "name": "an ignored remote document (other major) leaves embedded < app",
+      "remote": { "specVersion": "2.0.0", "comboWindowMs": 9000 },
+      "app": { "thresholds": { "largeFrom": 777 } },
+      "expect": {
+        "thresholds": { "mediumFrom": 100, "largeFrom": 777 },
+        "comboWindowMs": 2500,
+        "recipes": "embedded"
+      }
+    }
+  ],
+  "urls": [
+    { "name": "default", "expect": "https://assets.giftingstack.com/recipes.json" },
+    {
+      "name": "pinned",
+      "version": "1.0.0",
+      "expect": "https://assets.giftingstack.com/recipes.1.0.0.json"
+    },
+    {
+      "name": "self-hosted",
+      "url": "https://cdn.example.test/gs/recipes.json",
+      "expect": "https://cdn.example.test/gs/recipes.json"
+    },
+    {
+      "name": "self-hosted and pinned",
+      "url": "https://cdn.example.test/gs/recipes.json",
+      "version": "2026-10-11_a",
+      "expect": "https://cdn.example.test/gs/recipes.2026-10-11_a.json"
+    },
+    {
+      "name": "only the last .json is pinned",
+      "url": "https://x.test/a.json/recipes.json",
+      "version": "7",
+      "expect": "https://x.test/a.json/recipes.7.json"
+    },
+    { "name": "a version with a slash: no network", "version": "1/../../x", "expect": null },
+    { "name": "an empty version: no network", "version": "", "expect": null },
+    {
+      "name": "a version longer than 64 characters: no network",
+      "version": "12345678901234567890123456789012345678901234567890123456789012345",
+      "expect": null
+    },
+    {
+      "name": "a URL without .json cannot be pinned: no network",
+      "url": "https://x.test/recipes",
+      "version": "1.0.0",
+      "expect": null
+    }
+  ]
+}

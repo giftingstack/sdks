@@ -1,0 +1,293 @@
+{
+  "description": "Gift rooms wire protocol, client side (SPEC 17.4 and 18.1): parseRoomFrame, roomHelloFrame, roomUrl, roomTokenUser. Format: conformance/README.md.",
+  "parse": [
+    {
+      "name": "gift: every field, unknown fields dropped",
+      "frame": {
+        "t": "gift",
+        "id": 1760180000123001,
+        "at": 1760180000123,
+        "tx": "gtx_01JA0Q8X2M4N6P8R0T2V4W6Y8Z",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp",
+          "extra": 1
+        },
+        "quantity": 3,
+        "sender": { "id": "user_123", "name": "Ayse", "badge": "vip" },
+        "receiver": { "id": "user_456" },
+        "future_field": true
+      },
+      "expect": {
+        "t": "gift",
+        "id": 1760180000123001,
+        "at": 1760180000123,
+        "tx": "gtx_01JA0Q8X2M4N6P8R0T2V4W6Y8Z",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 3,
+        "sender": { "id": "user_123", "name": "Ayse" },
+        "receiver": { "id": "user_456" }
+      }
+    },
+    {
+      "name": "gift: no name, icon_url null or missing, no receiver",
+      "frame": {
+        "t": "gift",
+        "id": 5,
+        "at": 7,
+        "tx": "gtx_1",
+        "gift": { "id": "kiss", "name": "Kiss", "price": 0 },
+        "quantity": 1,
+        "sender": { "id": "u1" }
+      },
+      "expect": {
+        "t": "gift",
+        "id": 5,
+        "at": 7,
+        "tx": "gtx_1",
+        "gift": { "id": "kiss", "name": "Kiss", "price": 0, "icon_url": null },
+        "quantity": 1,
+        "sender": { "id": "u1" },
+        "receiver": null
+      }
+    },
+    {
+      "name": "gift: an empty or non-string sender name counts as absent",
+      "frame": {
+        "t": "gift",
+        "id": 5,
+        "at": 7,
+        "tx": "gtx_1",
+        "gift": { "id": "kiss", "name": "Kiss", "price": 1, "icon_url": null },
+        "quantity": 2,
+        "sender": { "id": "u1", "name": 42 },
+        "receiver": { "id": "u2" }
+      },
+      "expect": {
+        "t": "gift",
+        "id": 5,
+        "at": 7,
+        "tx": "gtx_1",
+        "gift": { "id": "kiss", "name": "Kiss", "price": 1, "icon_url": null },
+        "quantity": 2,
+        "sender": { "id": "u1" },
+        "receiver": { "id": "u2" }
+      }
+    },
+    {
+      "name": "gift: quantity 0 is invalid",
+      "frame": {
+        "t": "gift",
+        "id": 5,
+        "at": 7,
+        "tx": "gtx_1",
+        "gift": { "id": "kiss", "name": "Kiss", "price": 1 },
+        "quantity": 0,
+        "sender": { "id": "u1" }
+      },
+      "expect": null
+    },
+    {
+      "name": "gift: id not an integer",
+      "frame": {
+        "t": "gift",
+        "id": "5",
+        "at": 7,
+        "tx": "gtx_1",
+        "gift": { "id": "kiss", "name": "Kiss", "price": 1 },
+        "quantity": 1,
+        "sender": { "id": "u1" }
+      },
+      "expect": null
+    },
+    {
+      "name": "gift: negative price",
+      "frame": {
+        "t": "gift",
+        "id": 5,
+        "at": 7,
+        "tx": "gtx_1",
+        "gift": { "id": "kiss", "name": "Kiss", "price": -1 },
+        "quantity": 1,
+        "sender": { "id": "u1" }
+      },
+      "expect": null
+    },
+    {
+      "name": "gift: missing tx",
+      "frame": {
+        "t": "gift",
+        "id": 5,
+        "at": 7,
+        "gift": { "id": "kiss", "name": "Kiss", "price": 1 },
+        "quantity": 1,
+        "sender": { "id": "u1" }
+      },
+      "expect": null
+    },
+    {
+      "name": "gift: missing sender",
+      "frame": {
+        "t": "gift",
+        "id": 5,
+        "at": 7,
+        "tx": "gtx_1",
+        "gift": { "id": "kiss", "name": "Kiss", "price": 1 },
+        "quantity": 1
+      },
+      "expect": null
+    },
+    {
+      "name": "welcome: replay keeps valid gifts only, v and unknown fields ignored",
+      "frame": {
+        "t": "welcome",
+        "v": 1,
+        "viewers": 12,
+        "gap": true,
+        "replay": [
+          {
+            "t": "gift",
+            "id": 1,
+            "at": 2,
+            "tx": "gtx_a",
+            "gift": { "id": "rose", "name": "Rose", "price": 10, "icon_url": null },
+            "quantity": 1,
+            "sender": { "id": "u1" },
+            "receiver": { "id": "u2" }
+          },
+          { "t": "gift", "id": 2 },
+          "junk"
+        ],
+        "ttl": 3599,
+        "now": 1760180000000,
+        "region": "weur"
+      },
+      "expect": {
+        "t": "welcome",
+        "viewers": 12,
+        "gap": true,
+        "replay": [
+          {
+            "t": "gift",
+            "id": 1,
+            "at": 2,
+            "tx": "gtx_a",
+            "gift": { "id": "rose", "name": "Rose", "price": 10, "icon_url": null },
+            "quantity": 1,
+            "sender": { "id": "u1" },
+            "receiver": { "id": "u2" }
+          }
+        ],
+        "ttl": 3599,
+        "now": 1760180000000
+      }
+    },
+    {
+      "name": "welcome: missing replay is an empty replay",
+      "frame": { "t": "welcome", "v": 1, "viewers": 0, "gap": false, "ttl": 0, "now": 1 },
+      "expect": { "t": "welcome", "viewers": 0, "gap": false, "replay": [], "ttl": 0, "now": 1 }
+    },
+    {
+      "name": "welcome: without now it is ignored (staleness needs the server time)",
+      "frame": { "t": "welcome", "v": 1, "viewers": 0, "gap": false, "replay": [], "ttl": 10 },
+      "expect": null
+    },
+    {
+      "name": "welcome: gap not a boolean",
+      "frame": { "t": "welcome", "viewers": 0, "gap": 0, "replay": [], "ttl": 10, "now": 1 },
+      "expect": null
+    },
+    {
+      "name": "viewers",
+      "frame": { "t": "viewers", "n": 3 },
+      "expect": { "t": "viewers", "n": 3 }
+    },
+    {
+      "name": "viewers: negative count",
+      "frame": { "t": "viewers", "n": -1 },
+      "expect": null
+    },
+    {
+      "name": "batch: invalid events dropped alone",
+      "frame": {
+        "t": "batch",
+        "events": [
+          { "t": "gift", "id": 1 },
+          {
+            "t": "gift",
+            "id": 9,
+            "at": 8,
+            "tx": "gtx_b",
+            "gift": { "id": "hat", "name": "Hat", "price": 350, "icon_url": null },
+            "quantity": 4,
+            "sender": { "id": "u3", "name": "Ece" },
+            "receiver": { "id": "u2" }
+          }
+        ]
+      },
+      "expect": {
+        "t": "batch",
+        "events": [
+          {
+            "t": "gift",
+            "id": 9,
+            "at": 8,
+            "tx": "gtx_b",
+            "gift": { "id": "hat", "name": "Hat", "price": 350, "icon_url": null },
+            "quantity": 4,
+            "sender": { "id": "u3", "name": "Ece" },
+            "receiver": { "id": "u2" }
+          }
+        ]
+      }
+    },
+    {
+      "name": "batch: events not a list",
+      "frame": { "t": "batch", "events": {} },
+      "expect": null
+    },
+    {
+      "name": "batch: empty list",
+      "frame": { "t": "batch", "events": [] },
+      "expect": { "t": "batch", "events": [] }
+    },
+    { "name": "pong (literal text)", "text": "pong", "expect": { "t": "pong" } },
+    { "name": "unknown type is ignored", "frame": { "t": "chat", "text": "hi" }, "expect": null },
+    { "name": "no type", "frame": { "n": 1 }, "expect": null },
+    { "name": "not JSON", "text": "{nope", "expect": null },
+    { "name": "a JSON array", "text": "[1,2]", "expect": null },
+    { "name": "a JSON string", "text": "\"gift\"", "expect": null },
+    { "name": "ping text from a server is not a message", "text": "ping", "expect": null }
+  ],
+  "hello": [
+    { "last": null, "expect": { "t": "hello", "v": 1, "last": null } },
+    { "last": 1760180000123001, "expect": { "t": "hello", "v": 1, "last": 1760180000123001 } }
+  ],
+  "url": [
+    { "room": "live_123", "expect": "wss://rt.giftingstack.com/v1/rooms/live_123" },
+    {
+      "room": "match:42.a-b",
+      "baseUrl": "ws://localhost:8788//",
+      "expect": "ws://localhost:8788/v1/rooms/match%3A42.a-b"
+    }
+  ],
+  "tokenUser": [
+    {
+      "token": "gs_ct_eyJwIjoicHJqX3Rlc3QiLCJlIjoidGVzdCIsImsiOiJrZXlfMSIsInUiOiJtZSIsImV4cCI6MTc2MDE4MzYwMCwiciI6WyJsaXZlXyoiXSwibiI6Ik3DqSJ9.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "expect": "me"
+    },
+    {
+      "token": "gs_ct_eyJwIjoicHJqX3Rlc3QiLCJlIjoidGVzdCIsImsiOiJrZXlfMSIsInUiOiJheWxhIiwiZXhwIjoxNzYwMTgzNjAwLCJyIjpbImxpdmVfKiJdLCJuIjoiQXlsYSJ9.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "expect": "ayla"
+    },
+    { "token": "gs_ct_bm90IGpzb24.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "expect": null },
+    { "token": "some-other-token", "expect": null }
+  ]
+}

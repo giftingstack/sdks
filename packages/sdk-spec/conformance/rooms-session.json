@@ -1,0 +1,2441 @@
+{
+  "description": "Gift rooms session (SPEC 18): RoomClient traces with a scripted socket, a scripted token provider, a fake clock and a scripted random source. Format: conformance/README.md.",
+  "scenarios": [
+    {
+      "name": "join: token, socket with gs.v1 + token, hello, welcome, live gifts, viewers, own gift skipped, leave",
+      "options": {
+        "room": "live_1"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "connecting",
+              "attempt": 0
+            },
+            "tokens": [false],
+            "sockets": []
+          }
+        },
+        {
+          "token": "gs_ct_eyJwIjoicHJqX3Rlc3QiLCJlIjoidGVzdCIsImsiOiJrZXlfMSIsInUiOiJtZSIsImV4cCI6MTc2MDE4MzYwMCwiciI6WyJsaXZlXyoiXSwibiI6Ik3DqSJ9.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "url": "wss://rt.giftingstack.com/v1/rooms/live_1",
+                "protocols": [
+                  "gs.v1",
+                  "gs_ct_eyJwIjoicHJqX3Rlc3QiLCJlIjoidGVzdCIsImsiOiJrZXlfMSIsInUiOiJtZSIsImV4cCI6MTc2MDE4MzYwMCwiciI6WyJsaXZlXyoiXSwibiI6Ik3DqSJ9.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                ],
+                "sent": [],
+                "closed": null
+              }
+            ]
+          }
+        },
+        {
+          "open": true
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "sent": [
+                  {
+                    "t": "hello",
+                    "v": 1,
+                    "last": null
+                  }
+                ]
+              }
+            ],
+            "state": {
+              "status": "connecting"
+            }
+          }
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 4,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 1000
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "open",
+              "viewers": 4,
+              "retryInMs": null
+            },
+            "viewers": [4],
+            "events": [],
+            "gaps": 0
+          }
+        },
+        {
+          "receive": {
+            "t": "gift",
+            "id": 101,
+            "at": 1000,
+            "tx": "gtx_a",
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp"
+            },
+            "quantity": 1,
+            "sender": {
+              "id": "ayla",
+              "name": "Ayla"
+            },
+            "receiver": {
+              "id": "host"
+            }
+          }
+        },
+        {
+          "expect": {
+            "events": [
+              {
+                "tx": "gtx_a",
+                "sender": "Ayla",
+                "replayed": false
+              }
+            ]
+          }
+        },
+        {
+          "name": "the token user's own gift (claim u = me) is not played again",
+          "receive": {
+            "t": "gift",
+            "id": 103,
+            "at": 1000,
+            "tx": "gtx_own",
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp"
+            },
+            "quantity": 1,
+            "sender": {
+              "id": "me",
+              "name": "Mé"
+            },
+            "receiver": {
+              "id": "host"
+            }
+          }
+        },
+        {
+          "receive": {
+            "t": "viewers",
+            "n": 5
+          }
+        },
+        {
+          "receive": {
+            "t": "chat",
+            "text": "unknown types are ignored"
+          }
+        },
+        {
+          "receive": "pong"
+        },
+        {
+          "receive": "{not json"
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "open",
+              "viewers": 5
+            },
+            "viewers": [4, 5],
+            "events": [
+              {
+                "tx": "gtx_a",
+                "sender": "Ayla",
+                "replayed": false
+              }
+            ]
+          }
+        },
+        {
+          "leave": true
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "closed",
+              "code": 1000,
+              "reason": "left"
+            },
+            "sockets": [
+              {
+                "closed": {
+                  "code": 1000,
+                  "reason": "client"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "frames and closes of a left socket change nothing",
+          "receive": {
+            "t": "gift",
+            "id": 102,
+            "at": 2500,
+            "tx": "gtx_c",
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp"
+            },
+            "quantity": 1,
+            "sender": {
+              "id": "mert"
+            },
+            "receiver": {
+              "id": "host"
+            }
+          }
+        },
+        {
+          "receive": {
+            "t": "viewers",
+            "n": 9
+          }
+        },
+        {
+          "close": {
+            "code": 1006,
+            "reason": ""
+          }
+        },
+        {
+          "advance": 3600000
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "closed",
+              "code": 1000,
+              "viewers": 5
+            },
+            "viewers": [4, 5],
+            "events": [
+              {
+                "tx": "gtx_a",
+                "sender": "Ayla",
+                "replayed": false
+              }
+            ],
+            "tokens": [false],
+            "sockets": [
+              {
+                "closed": {
+                  "code": 1000,
+                  "reason": "client"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "drop: first retry random 0-5 s, hello with last, replay played once (dedup) and flagged",
+      "options": {
+        "room": "live_1"
+      },
+      "random": [0.2],
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 1000
+          }
+        },
+        {
+          "receive": {
+            "t": "gift",
+            "id": 101,
+            "at": 1000,
+            "tx": "gtx_a",
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp"
+            },
+            "quantity": 1,
+            "sender": {
+              "id": "ayla",
+              "name": "Ayla"
+            },
+            "receiver": {
+              "id": "host"
+            }
+          }
+        },
+        {
+          "close": {
+            "code": 1006,
+            "reason": ""
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "attempt": 1,
+              "retryInMs": 1400,
+              "code": 1006,
+              "reason": ""
+            },
+            "tokens": [false]
+          }
+        },
+        {
+          "advance": 1399
+        },
+        {
+          "expect": {
+            "tokens": [false],
+            "state": {
+              "status": "reconnecting"
+            }
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "tokens": [false, false],
+            "state": {
+              "status": "connecting",
+              "retryInMs": null
+            }
+          }
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "sent": [
+                  {
+                    "t": "hello",
+                    "v": 1,
+                    "last": null
+                  }
+                ],
+                "closed": null
+              },
+              {
+                "url": "wss://rt.giftingstack.com/v1/rooms/live_1",
+                "protocols": ["gs.v1", "tok_1"],
+                "sent": [
+                  {
+                    "t": "hello",
+                    "v": 1,
+                    "last": 101
+                  }
+                ],
+                "closed": null
+              }
+            ]
+          }
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 3,
+            "gap": true,
+            "replay": [
+              {
+                "t": "gift",
+                "id": 101,
+                "at": 1000,
+                "tx": "gtx_a",
+                "gift": {
+                  "id": "rose",
+                  "name": "Rose",
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp"
+                },
+                "quantity": 1,
+                "sender": {
+                  "id": "ayla",
+                  "name": "Ayla"
+                },
+                "receiver": {
+                  "id": "host"
+                }
+              },
+              {
+                "t": "gift",
+                "id": 102,
+                "at": 2500,
+                "tx": "gtx_c",
+                "gift": {
+                  "id": "rose",
+                  "name": "Rose",
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp"
+                },
+                "quantity": 1,
+                "sender": {
+                  "id": "mert"
+                },
+                "receiver": {
+                  "id": "host"
+                }
+              }
+            ],
+            "ttl": 3600,
+            "now": 3000
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "open",
+              "attempt": 1,
+              "viewers": 3
+            },
+            "events": [
+              {
+                "tx": "gtx_a",
+                "sender": "Ayla",
+                "replayed": false
+              },
+              {
+                "tx": "gtx_c",
+                "sender": null,
+                "replayed": true
+              }
+            ],
+            "gaps": 1,
+            "viewers": [1, 3]
+          }
+        }
+      ]
+    },
+    {
+      "name": "backoff grows with failures in a row and resets after 60 s open",
+      "options": {
+        "room": "live_1",
+        "heartbeatMs": 0
+      },
+      "random": [0.5, 0.5, 0.5, 0.5, 0.5],
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "close": {
+            "code": 1006,
+            "reason": ""
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "attempt": 1,
+              "retryInMs": 2750
+            }
+          }
+        },
+        {
+          "advance": 2750
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "close": {
+            "code": 1006,
+            "reason": ""
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "attempt": 2,
+              "retryInMs": 750
+            }
+          }
+        },
+        {
+          "advance": 750
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "close": {
+            "code": 1011,
+            "reason": "send_failed"
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "attempt": 3,
+              "retryInMs": 1250,
+              "code": 1011
+            }
+          }
+        },
+        {
+          "advance": 1250
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 0
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "open",
+              "attempt": 3
+            }
+          }
+        },
+        {
+          "advance": 59999
+        },
+        {
+          "close": {
+            "code": 1006,
+            "reason": ""
+          }
+        },
+        {
+          "name": "open 59,999 ms: not stable, the counter keeps growing",
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "attempt": 4,
+              "retryInMs": 2250
+            }
+          }
+        },
+        {
+          "advance": 2250
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 0
+          }
+        },
+        {
+          "advance": 60000
+        },
+        {
+          "close": {
+            "code": 1006,
+            "reason": ""
+          }
+        },
+        {
+          "name": "open 60 s: the counter restarts (first drop: random 0-5 s)",
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "attempt": 1,
+              "retryInMs": 2750
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4001 token expired: forceRefresh, reconnect at once with last",
+      "options": {
+        "room": "live_1"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 1000
+          }
+        },
+        {
+          "receive": {
+            "t": "gift",
+            "id": 101,
+            "at": 1000,
+            "tx": "gtx_a",
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp"
+            },
+            "quantity": 1,
+            "sender": {
+              "id": "ayla",
+              "name": "Ayla"
+            },
+            "receiver": {
+              "id": "host"
+            }
+          }
+        },
+        {
+          "close": {
+            "code": 4001,
+            "reason": "token_expired"
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "connecting",
+              "attempt": 1,
+              "code": 4001
+            },
+            "tokens": [false, true]
+          }
+        },
+        {
+          "token": "tok_2"
+        },
+        {
+          "open": true
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "closed": null
+              },
+              {
+                "protocols": ["gs.v1", "tok_2"],
+                "sent": [
+                  {
+                    "t": "hello",
+                    "v": 1,
+                    "last": 101
+                  }
+                ],
+                "closed": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4001 right at connect, twice: the second retry backs off",
+      "options": {
+        "room": "live_1"
+      },
+      "random": [0.5],
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_old"
+        },
+        {
+          "close": {
+            "code": 4001,
+            "reason": "token_expired"
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "connecting"
+            },
+            "tokens": [false, true]
+          }
+        },
+        {
+          "token": "tok_still_old"
+        },
+        {
+          "close": {
+            "code": 4001,
+            "reason": "token_expired"
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "attempt": 2,
+              "retryInMs": 750
+            },
+            "tokens": [false, true]
+          }
+        },
+        {
+          "advance": 750
+        },
+        {
+          "expect": {
+            "tokens": [false, true, true]
+          }
+        }
+      ]
+    },
+    {
+      "name": "refresh ahead of welcome.ttl (30 s before), and never later than the 60 minute lifetime",
+      "options": {
+        "room": "live_1",
+        "heartbeatMs": 0
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 120,
+            "now": 0
+          }
+        },
+        {
+          "advance": 89999
+        },
+        {
+          "expect": {
+            "tokens": [false],
+            "sockets": [
+              {
+                "closed": null
+              }
+            ]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "tokens": [false, true],
+            "sockets": [
+              {
+                "closed": {
+                  "code": 1000,
+                  "reason": "client"
+                }
+              }
+            ],
+            "state": {
+              "status": "connecting",
+              "attempt": 0
+            }
+          }
+        },
+        {
+          "token": "tok_2"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 7200,
+            "now": 0
+          }
+        },
+        {
+          "advance": 3569999
+        },
+        {
+          "expect": {
+            "tokens": [false, true]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "tokens": [false, true, true]
+          }
+        }
+      ]
+    },
+    {
+      "name": "ttl of 30 s or less: no early refresh, the server's 4001 does it",
+      "options": {
+        "room": "live_1",
+        "heartbeatMs": 0
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 30,
+            "now": 0
+          }
+        },
+        {
+          "advance": 600000
+        },
+        {
+          "expect": {
+            "tokens": [false],
+            "state": {
+              "status": "open"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "heartbeat: ping after 45 s without frames, any frame counts, no answer in 10 s reconnects",
+      "options": {
+        "room": "live_1"
+      },
+      "random": [0.5],
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 0
+          }
+        },
+        {
+          "advance": 30000
+        },
+        {
+          "receive": {
+            "t": "viewers",
+            "n": 2
+          }
+        },
+        {
+          "advance": 15000
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "sent": [
+                  {
+                    "t": "hello",
+                    "v": 1,
+                    "last": null
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "advance": 30000
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "sent": [
+                  {
+                    "t": "hello",
+                    "v": 1,
+                    "last": null
+                  },
+                  "ping"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "receive": "pong"
+        },
+        {
+          "advance": 44999
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "sent": [
+                  {
+                    "t": "hello",
+                    "v": 1,
+                    "last": null
+                  },
+                  "ping"
+                ],
+                "closed": null
+              }
+            ]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "sent": [
+                  {
+                    "t": "hello",
+                    "v": 1,
+                    "last": null
+                  },
+                  "ping",
+                  "ping"
+                ],
+                "closed": null
+              }
+            ]
+          }
+        },
+        {
+          "advance": 9999
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "open"
+            }
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "closed": {
+                  "code": 1000,
+                  "reason": "timeout"
+                }
+              }
+            ],
+            "state": {
+              "status": "reconnecting",
+              "code": 1006,
+              "reason": "timeout",
+              "attempt": 1,
+              "retryInMs": 2750
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "heartbeatMs 0 (native protocol pings): never sends ping",
+      "options": {
+        "room": "live_1",
+        "heartbeatMs": 0
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 0
+          }
+        },
+        {
+          "advance": 600000
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "sent": [
+                  {
+                    "t": "hello",
+                    "v": 1,
+                    "last": null
+                  }
+                ],
+                "closed": null
+              }
+            ],
+            "state": {
+              "status": "open"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "no welcome within 10 s of opening the socket: reconnect",
+      "options": {
+        "room": "live_1"
+      },
+      "random": [0.5],
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "advance": 9999
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "connecting"
+            }
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "expect": {
+            "sockets": [
+              {
+                "closed": {
+                  "code": 1000,
+                  "reason": "timeout"
+                }
+              }
+            ],
+            "state": {
+              "status": "reconnecting",
+              "code": 1006,
+              "retryInMs": 2750
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4003 forbidden: closed for good",
+      "options": {
+        "room": "live_1"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "close": {
+            "code": 4003,
+            "reason": "room_forbidden"
+          }
+        },
+        {
+          "advance": 600000
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "closed",
+              "code": 4003,
+              "reason": "room_forbidden",
+              "retryInMs": null
+            },
+            "tokens": [false]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4009 replaced: closed for good",
+      "options": {
+        "room": "live_1"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 0
+          }
+        },
+        {
+          "close": {
+            "code": 4009,
+            "reason": "replaced"
+          }
+        },
+        {
+          "advance": 600000
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "closed",
+              "code": 4009,
+              "reason": "replaced"
+            },
+            "tokens": [false]
+          }
+        }
+      ]
+    },
+    {
+      "name": "room full: retry after 30 s, at most 5 times in a row",
+      "options": {
+        "room": "live_1"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "close": {
+            "code": 4009,
+            "reason": "{\"retry_after\":30}"
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "retryInMs": 30000,
+              "attempt": 1
+            }
+          }
+        },
+        {
+          "advance": 29999
+        },
+        {
+          "expect": {
+            "tokens": [false]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "close": {
+            "code": 4009,
+            "reason": "{\"retry_after\":30}"
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "retryInMs": 30000,
+              "attempt": 2
+            }
+          }
+        },
+        {
+          "advance": 29999
+        },
+        {
+          "expect": {
+            "tokens": [false, false]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "close": {
+            "code": 4009,
+            "reason": "{\"retry_after\":30}"
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "retryInMs": 30000,
+              "attempt": 3
+            }
+          }
+        },
+        {
+          "advance": 29999
+        },
+        {
+          "expect": {
+            "tokens": [false, false, false]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "close": {
+            "code": 4009,
+            "reason": "{\"retry_after\":30}"
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "retryInMs": 30000,
+              "attempt": 4
+            }
+          }
+        },
+        {
+          "advance": 29999
+        },
+        {
+          "expect": {
+            "tokens": [false, false, false, false]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "close": {
+            "code": 4009,
+            "reason": "{\"retry_after\":30}"
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "retryInMs": 30000,
+              "attempt": 5
+            }
+          }
+        },
+        {
+          "advance": 29999
+        },
+        {
+          "expect": {
+            "tokens": [false, false, false, false, false]
+          }
+        },
+        {
+          "advance": 1
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "close": {
+            "code": 4009,
+            "reason": "{\"retry_after\":30}"
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "closed",
+              "code": 4009
+            },
+            "tokens": [false, false, false, false, false, false]
+          }
+        }
+      ]
+    },
+    {
+      "name": "pause (background) closes and keeps last; resume reconnects with it; a token that arrives while paused opens nothing",
+      "options": {
+        "room": "live_1"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 1000
+          }
+        },
+        {
+          "receive": {
+            "t": "gift",
+            "id": 101,
+            "at": 1000,
+            "tx": "gtx_a",
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp"
+            },
+            "quantity": 1,
+            "sender": {
+              "id": "ayla",
+              "name": "Ayla"
+            },
+            "receiver": {
+              "id": "host"
+            }
+          }
+        },
+        {
+          "pause": true
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "paused"
+            },
+            "sockets": [
+              {
+                "closed": {
+                  "code": 1000,
+                  "reason": "client"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "advance": 600000
+        },
+        {
+          "expect": {
+            "tokens": [false]
+          }
+        },
+        {
+          "resume": true
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "connecting"
+            },
+            "tokens": [false, false]
+          }
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "open": true
+        },
+        {
+          "expect": {
+            "sockets": [
+              {},
+              {
+                "sent": [
+                  {
+                    "t": "hello",
+                    "v": 1,
+                    "last": 101
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "pause": true
+        },
+        {
+          "resume": true
+        },
+        {
+          "pause": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "paused"
+            },
+            "tokens": [false, false, false],
+            "sockets": [{}, {}]
+          }
+        }
+      ]
+    },
+    {
+      "name": "reconnectNow (network back) skips the wait",
+      "options": {
+        "room": "live_1"
+      },
+      "random": [0.9],
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "tok_1"
+        },
+        {
+          "close": {
+            "code": 1006,
+            "reason": ""
+          }
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "retryInMs": 4550
+            }
+          }
+        },
+        {
+          "reconnectNow": true
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "connecting"
+            },
+            "tokens": [false, false]
+          }
+        },
+        {
+          "advance": 4550
+        },
+        {
+          "expect": {
+            "tokens": [false, false]
+          }
+        }
+      ]
+    },
+    {
+      "name": "getToken fails: retried like a dropped connection",
+      "options": {
+        "room": "live_1"
+      },
+      "random": [0.5],
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "tokenFail": true
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "code": 1006,
+              "reason": "token_failed",
+              "retryInMs": 2750
+            },
+            "sockets": []
+          }
+        },
+        {
+          "advance": 2750
+        },
+        {
+          "expect": {
+            "tokens": [false, false]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a bad room id closes with 4004 without asking for a token",
+      "options": {
+        "room": "live/1"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "expect": {
+            "state": {
+              "status": "closed",
+              "code": 4004,
+              "reason": "bad_room_id"
+            },
+            "tokens": [],
+            "sockets": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "the user option wins over the token's u claim",
+      "options": {
+        "room": "live_1",
+        "user": "ayla"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "gs_ct_eyJwIjoicHJqX3Rlc3QiLCJlIjoidGVzdCIsImsiOiJrZXlfMSIsInUiOiJtZSIsImV4cCI6MTc2MDE4MzYwMCwiciI6WyJsaXZlXyoiXSwibiI6Ik3DqSJ9.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 1000
+          }
+        },
+        {
+          "receive": {
+            "t": "gift",
+            "id": 101,
+            "at": 1000,
+            "tx": "gtx_a",
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp"
+            },
+            "quantity": 1,
+            "sender": {
+              "id": "ayla",
+              "name": "Ayla"
+            },
+            "receiver": {
+              "id": "host"
+            }
+          }
+        },
+        {
+          "receive": {
+            "t": "gift",
+            "id": 103,
+            "at": 1000,
+            "tx": "gtx_own",
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp"
+            },
+            "quantity": 1,
+            "sender": {
+              "id": "me",
+              "name": "Mé"
+            },
+            "receiver": {
+              "id": "host"
+            }
+          }
+        },
+        {
+          "expect": {
+            "events": [
+              {
+                "tx": "gtx_own",
+                "sender": "Mé",
+                "replayed": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "skipOwn false: the token user's gifts play too",
+      "options": {
+        "room": "live_1",
+        "skipOwn": false
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "gs_ct_eyJwIjoicHJqX3Rlc3QiLCJlIjoidGVzdCIsImsiOiJrZXlfMSIsInUiOiJtZSIsImV4cCI6MTc2MDE4MzYwMCwiciI6WyJsaXZlXyoiXSwibiI6Ik3DqSJ9.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 1000
+          }
+        },
+        {
+          "receive": {
+            "t": "gift",
+            "id": 103,
+            "at": 1000,
+            "tx": "gtx_own",
+            "gift": {
+              "id": "rose",
+              "name": "Rose",
+              "price": 10,
+              "icon_url": "https://assets.test/rose/256.webp"
+            },
+            "quantity": 1,
+            "sender": {
+              "id": "me",
+              "name": "Mé"
+            },
+            "receiver": {
+              "id": "host"
+            }
+          }
+        },
+        {
+          "expect": {
+            "events": [
+              {
+                "tx": "gtx_own",
+                "sender": "Mé",
+                "replayed": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "batch: every event goes through the filter",
+      "options": {
+        "room": "live_1"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "token": "gs_ct_eyJwIjoicHJqX3Rlc3QiLCJlIjoidGVzdCIsImsiOiJrZXlfMSIsInUiOiJtZSIsImV4cCI6MTc2MDE4MzYwMCwiciI6WyJsaXZlXyoiXSwibiI6Ik3DqSJ9.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        {
+          "open": true
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 1000
+          }
+        },
+        {
+          "receive": {
+            "t": "batch",
+            "events": [
+              {
+                "t": "gift",
+                "id": 101,
+                "at": 1000,
+                "tx": "gtx_a",
+                "gift": {
+                  "id": "rose",
+                  "name": "Rose",
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp"
+                },
+                "quantity": 1,
+                "sender": {
+                  "id": "ayla",
+                  "name": "Ayla"
+                },
+                "receiver": {
+                  "id": "host"
+                }
+              },
+              {
+                "t": "gift",
+                "id": 103,
+                "at": 1000,
+                "tx": "gtx_own",
+                "gift": {
+                  "id": "rose",
+                  "name": "Rose",
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp"
+                },
+                "quantity": 1,
+                "sender": {
+                  "id": "me",
+                  "name": "Mé"
+                },
+                "receiver": {
+                  "id": "host"
+                }
+              },
+              {
+                "t": "gift",
+                "id": 102,
+                "at": 2500,
+                "tx": "gtx_c",
+                "gift": {
+                  "id": "rose",
+                  "name": "Rose",
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp"
+                },
+                "quantity": 1,
+                "sender": {
+                  "id": "mert"
+                },
+                "receiver": {
+                  "id": "host"
+                }
+              },
+              {
+                "t": "gift",
+                "id": 101,
+                "at": 1000,
+                "tx": "gtx_a",
+                "gift": {
+                  "id": "rose",
+                  "name": "Rose",
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp"
+                },
+                "quantity": 1,
+                "sender": {
+                  "id": "ayla",
+                  "name": "Ayla"
+                },
+                "receiver": {
+                  "id": "host"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "expect": {
+            "events": [
+              {
+                "tx": "gtx_a",
+                "sender": "Ayla",
+                "replayed": false
+              },
+              {
+                "tx": "gtx_c",
+                "sender": null,
+                "replayed": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "batch then drop: a collapsed gift plays once with its summed quantity, hello.last = id of the batch's last gift",
+      "options": { "room": "live_1" },
+      "random": [0.2],
+      "steps": [
+        { "start": true },
+        { "token": "tok_1" },
+        { "open": true },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 1000
+          }
+        },
+        {
+          "receive": {
+            "t": "batch",
+            "events": [
+              {
+                "t": "gift",
+                "id": 105,
+                "at": 1000,
+                "tx": "gtx_x",
+                "gift": {
+                  "id": "rose",
+                  "name": "Rose",
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp"
+                },
+                "quantity": 6,
+                "sender": { "id": "ayla", "name": "Ayla" },
+                "receiver": { "id": "host" }
+              },
+              {
+                "t": "gift",
+                "id": 107,
+                "at": 1000,
+                "tx": "gtx_y",
+                "gift": {
+                  "id": "rose",
+                  "name": "Rose",
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp"
+                },
+                "quantity": 1,
+                "sender": { "id": "mert" },
+                "receiver": { "id": "host" }
+              }
+            ]
+          }
+        },
+        {
+          "expect": {
+            "events": [
+              { "tx": "gtx_x", "sender": "Ayla", "replayed": false, "quantity": 6 },
+              { "tx": "gtx_y", "sender": null, "replayed": false, "quantity": 1 }
+            ]
+          }
+        },
+        { "close": { "code": 1006, "reason": "" } },
+        { "advance": 1400 },
+        { "token": "tok_1" },
+        { "open": true },
+        {
+          "expect": {
+            "sockets": [
+              { "sent": [{ "t": "hello", "v": 1, "last": null }] },
+              { "sent": [{ "t": "hello", "v": 1, "last": 107 }] }
+            ]
+          }
+        },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [
+              {
+                "t": "gift",
+                "id": 108,
+                "at": 1000,
+                "tx": "gtx_z",
+                "gift": {
+                  "id": "rose",
+                  "name": "Rose",
+                  "price": 10,
+                  "icon_url": "https://assets.test/rose/256.webp"
+                },
+                "quantity": 2,
+                "sender": { "id": "ece" },
+                "receiver": { "id": "host" }
+              }
+            ],
+            "ttl": 3600,
+            "now": 3000
+          }
+        },
+        {
+          "expect": {
+            "events": [
+              { "tx": "gtx_x", "sender": "Ayla", "replayed": false, "quantity": 6 },
+              { "tx": "gtx_y", "sender": null, "replayed": false, "quantity": 1 },
+              { "tx": "gtx_z", "sender": null, "replayed": true, "quantity": 2 }
+            ],
+            "gaps": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "getToken never answers: after 20 s the attempt counts as failed, a late answer is ignored",
+      "options": { "room": "live_1", "heartbeatMs": 0 },
+      "steps": [
+        { "start": true },
+        { "advance": 19999 },
+        { "expect": { "state": { "status": "connecting" }, "tokens": [false], "sockets": [] } },
+        { "advance": 1 },
+        {
+          "expect": {
+            "state": {
+              "status": "reconnecting",
+              "attempt": 1,
+              "code": 1006,
+              "reason": "token_timeout",
+              "retryInMs": 2750
+            },
+            "sockets": []
+          }
+        },
+        { "advance": 2750 },
+        { "expect": { "state": { "status": "connecting" }, "tokens": [false, false] } },
+        { "token": "tok_late" },
+        { "expect": { "state": { "status": "connecting" }, "sockets": [] } },
+        { "token": "tok_2" },
+        {
+          "expect": {
+            "state": { "status": "connecting" },
+            "sockets": [{ "url": "wss://rt.giftingstack.com/v1/rooms/live_1" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 failed attempts in a row: closed with retries_exhausted; reconnectNow starts again with a fresh budget",
+      "options": { "room": "live_1", "heartbeatMs": 0 },
+      "steps": [
+        { "start": true },
+        { "tokenFail": true },
+        { "advance": 2750 },
+        { "tokenFail": true },
+        { "advance": 750 },
+        { "tokenFail": true },
+        { "advance": 1250 },
+        { "tokenFail": true },
+        { "advance": 2250 },
+        { "tokenFail": true },
+        { "advance": 4250 },
+        { "tokenFail": true },
+        { "advance": 8250 },
+        { "tokenFail": true },
+        { "advance": 15250 },
+        { "tokenFail": true },
+        { "advance": 15250 },
+        { "tokenFail": true },
+        { "advance": 15250 },
+        { "tokenFail": true },
+        { "advance": 15250 },
+        { "tokenFail": true },
+        { "advance": 15250 },
+        { "tokenFail": true },
+        { "advance": 15250 },
+        {
+          "expect": {
+            "state": { "status": "connecting", "attempt": 12 },
+            "tokens": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        { "tokenFail": true },
+        {
+          "expect": {
+            "state": {
+              "status": "closed",
+              "attempt": 12,
+              "retryInMs": null,
+              "code": 1006,
+              "reason": "retries_exhausted"
+            },
+            "tokens": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        { "advance": 600000 },
+        {
+          "expect": {
+            "state": { "status": "closed", "reason": "retries_exhausted" },
+            "tokens": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            "sockets": []
+          }
+        },
+        { "reconnectNow": true },
+        {
+          "expect": {
+            "state": { "status": "connecting", "attempt": 0, "retryInMs": null },
+            "tokens": [
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        { "token": "tok_1" },
+        { "open": true },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 0
+          }
+        },
+        {
+          "expect": {
+            "state": { "status": "open" },
+            "sockets": [{ "sent": [{ "t": "hello", "v": 1, "last": null }] }]
+          }
+        },
+        { "close": { "code": 1006, "reason": "" } },
+        { "expect": { "state": { "status": "reconnecting", "attempt": 1, "retryInMs": 2750 } } }
+      ]
+    },
+    {
+      "name": "4011 project suspended: closed without retry; reconnectNow starts again; a final 4003 stays closed",
+      "options": { "room": "live_1", "heartbeatMs": 0 },
+      "steps": [
+        { "start": true },
+        { "token": "tok_1" },
+        { "open": true },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 0
+          }
+        },
+        { "close": { "code": 4011, "reason": "project_suspended" } },
+        {
+          "expect": {
+            "state": {
+              "status": "closed",
+              "code": 4011,
+              "reason": "project_suspended",
+              "retryInMs": null
+            }
+          }
+        },
+        { "advance": 600000 },
+        { "expect": { "state": { "status": "closed" }, "tokens": [false], "sockets": [{}] } },
+        { "reconnectNow": true },
+        {
+          "expect": { "state": { "status": "connecting", "attempt": 0 }, "tokens": [false, false] }
+        },
+        { "token": "tok_2" },
+        { "open": true },
+        { "close": { "code": 4003, "reason": "key_invalid" } },
+        { "expect": { "state": { "status": "closed", "code": 4003, "reason": "key_invalid" } } },
+        { "reconnectNow": true },
+        {
+          "expect": {
+            "state": { "status": "closed", "code": 4003 },
+            "tokens": [false, false],
+            "sockets": [{}, {}]
+          }
+        }
+      ]
+    },
+    {
+      "name": "reconnectNow never skips a 4008 wait; the wait ends on its own (random 0.5: 60 s + 25 % jitter)",
+      "options": { "room": "live_1", "heartbeatMs": 0 },
+      "random": [0.5],
+      "steps": [
+        { "start": true },
+        { "token": "tok_1" },
+        { "close": { "code": 4008, "reason": "{\"retry_after\":60}" } },
+        { "expect": { "state": { "status": "reconnecting", "retryInMs": 67500 } } },
+        { "advance": 10000 },
+        { "reconnectNow": true },
+        {
+          "expect": {
+            "state": { "status": "reconnecting", "retryInMs": 67500 },
+            "tokens": [false],
+            "sockets": [{}]
+          }
+        },
+        { "advance": 57500 },
+        { "expect": { "state": { "status": "connecting" }, "tokens": [false, false] } }
+      ]
+    },
+    {
+      "name": "reconnectNow never skips a 4009 room-full wait either; a later 1006 wait can be skipped again",
+      "options": { "room": "live_1", "heartbeatMs": 0 },
+      "random": [0.5],
+      "steps": [
+        { "start": true },
+        { "token": "tok_1" },
+        { "close": { "code": 4009, "reason": "{\"retry_after\":30}" } },
+        { "expect": { "state": { "status": "reconnecting" } } },
+        { "reconnectNow": true },
+        { "expect": { "state": { "status": "reconnecting" }, "tokens": [false] } },
+        { "advance": 30000 },
+        { "token": "tok_2" },
+        { "close": { "code": 1006, "reason": "" } },
+        { "expect": { "state": { "status": "reconnecting" } } },
+        { "reconnectNow": true },
+        { "expect": { "state": { "status": "connecting" }, "tokens": [false, false, false] } }
+      ]
+    },
+    {
+      "name": "4008 with retry_after: the wait doubles up to 5 minutes and the session never ends",
+      "options": { "room": "live_1", "heartbeatMs": 0 },
+      "random": [0, 0, 0, 0, 0],
+      "steps": [
+        { "start": true },
+        { "token": "tok_1" },
+        { "close": { "code": 4008, "reason": "{\"retry_after\":60}" } },
+        {
+          "expect": {
+            "state": { "status": "reconnecting", "attempt": 1, "retryInMs": 60000, "code": 4008 }
+          }
+        },
+        { "advance": 60000 },
+        { "token": "tok_1" },
+        { "close": { "code": 4008, "reason": "{\"retry_after\":60}" } },
+        {
+          "expect": {
+            "state": { "status": "reconnecting", "attempt": 2, "retryInMs": 120000, "code": 4008 }
+          }
+        },
+        { "advance": 120000 },
+        { "token": "tok_1" },
+        { "close": { "code": 4008, "reason": "{\"retry_after\":60}" } },
+        {
+          "expect": {
+            "state": { "status": "reconnecting", "attempt": 3, "retryInMs": 240000, "code": 4008 }
+          }
+        },
+        { "advance": 240000 },
+        { "token": "tok_1" },
+        { "close": { "code": 4008, "reason": "{\"retry_after\":60}" } },
+        {
+          "expect": {
+            "state": { "status": "reconnecting", "attempt": 4, "retryInMs": 300000, "code": 4008 }
+          }
+        },
+        { "advance": 300000 },
+        { "token": "tok_1" },
+        { "close": { "code": 4008, "reason": "{\"retry_after\":60}" } },
+        {
+          "expect": {
+            "state": { "status": "reconnecting", "attempt": 5, "retryInMs": 300000, "code": 4008 }
+          }
+        },
+        { "advance": 300000 },
+        { "token": "tok_1" },
+        {
+          "expect": {
+            "state": { "status": "connecting" },
+            "tokens": [false, false, false, false, false, false]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4008 with retry_after 60 and random 0.5: 25 % jitter on the first wait",
+      "options": { "room": "live_1", "heartbeatMs": 0 },
+      "random": [0.5],
+      "steps": [
+        { "start": true },
+        { "token": "tok_1" },
+        { "close": { "code": 4008, "reason": "{\"retry_after\":60}" } },
+        { "expect": { "state": { "status": "reconnecting", "retryInMs": 67500 } } },
+        { "advance": 67499 },
+        { "expect": { "tokens": [false] } },
+        { "advance": 1 },
+        { "expect": { "tokens": [false, false] } }
+      ]
+    },
+    {
+      "name": "random 0 never gives a zero wait: the floor is 500 ms",
+      "options": { "room": "live_1", "heartbeatMs": 0 },
+      "random": [0, 0],
+      "steps": [
+        { "start": true },
+        { "token": "tok_1" },
+        { "close": { "code": 1006, "reason": "" } },
+        { "expect": { "state": { "status": "reconnecting", "attempt": 1, "retryInMs": 500 } } },
+        { "advance": 500 },
+        { "token": "tok_1" },
+        { "close": { "code": 1006, "reason": "" } },
+        { "expect": { "state": { "status": "reconnecting", "attempt": 2, "retryInMs": 500 } } }
+      ]
+    },
+    {
+      "name": "refresh jitter: refreshJitterMs 120,000 and random 0.5 refresh 60 s earlier than ttl - 30 s",
+      "options": { "room": "live_1", "heartbeatMs": 0, "refreshJitterMs": 120000 },
+      "random": [0.5],
+      "steps": [
+        { "start": true },
+        { "token": "tok_1" },
+        { "open": true },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 3600,
+            "now": 0
+          }
+        },
+        { "advance": 3509999 },
+        { "expect": { "state": { "status": "open" }, "tokens": [false] } },
+        { "advance": 1 },
+        { "expect": { "state": { "status": "connecting" }, "tokens": [false, true] } }
+      ]
+    },
+    {
+      "name": "refresh jitter never exceeds half of what is left: ttl 90 s, random 0.999",
+      "options": { "room": "live_1", "heartbeatMs": 0, "refreshJitterMs": 120000 },
+      "random": [0.999],
+      "steps": [
+        { "start": true },
+        { "token": "tok_1" },
+        { "open": true },
+        {
+          "receive": {
+            "t": "welcome",
+            "v": 1,
+            "viewers": 1,
+            "gap": false,
+            "replay": [],
+            "ttl": 90,
+            "now": 0
+          }
+        },
+        { "advance": 30029 },
+        { "expect": { "state": { "status": "open" }, "tokens": [false] } },
+        { "advance": 1 },
+        { "expect": { "state": { "status": "connecting" }, "tokens": [false, true] } }
+      ]
+    }
+  ]
+}

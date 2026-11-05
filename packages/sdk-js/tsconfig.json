@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": [],
+    "paths": {
+      "@giftingstack/sdk": ["./src/core/index.ts"],
+      "@giftingstack/sdk/react-native": ["./src/react-native/index.ts"],
+      "@giftingstack/sdk/web": ["./src/web/index.ts"],
+      "@giftingstack/sdk/elements": ["./src/web/elements-register.ts"]
+    }
+  },
+  "include": ["src", "test", "demo", "vitest.config.ts", "vite.build.config.ts"],
+  "exclude": ["demo/pixel.tsx"]
+}

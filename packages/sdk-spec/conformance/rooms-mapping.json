@@ -1,0 +1,209 @@
+{
+  "description": "Gift rooms: a room gift to the GiftEffectEvent the effect layer plays (SPEC 18.4), roomGiftToEffect(event, { catalog, resolveName, replayed }). Format: conformance/README.md.",
+  "catalog": [
+    {
+      "id": "rose",
+      "name": "Rose (catalog)",
+      "description": null,
+      "price": 99,
+      "icon_url": "https://assets.test/rose/256-catalog.webp",
+      "animation_url": "https://assets.test/rose/512.webp",
+      "sort_order": 1
+    },
+    {
+      "id": "cake",
+      "name": "Cake",
+      "description": null,
+      "price": 100,
+      "icon_url": "https://assets.test/cake/256.webp",
+      "animation_url": null,
+      "sort_order": 2
+    },
+    {
+      "id": "kiss",
+      "name": "Kiss",
+      "description": null,
+      "price": 5,
+      "icon_url": null,
+      "animation_url": null,
+      "sort_order": 3
+    }
+  ],
+  "cases": [
+    {
+      "name": "catalog gift: big picture from the catalog; name, price and icon from the event; name claim wins",
+      "event": {
+        "t": "gift",
+        "id": 1760180000123001,
+        "at": 1760180000123,
+        "tx": "gtx_a",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 3,
+        "sender": { "id": "user_123", "name": "Ayse" },
+        "receiver": { "id": "user_456" }
+      },
+      "catalog": true,
+      "names": { "user_123": "Resolved" },
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/512.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ayse",
+        "quantity": 3,
+        "id": 1760180000123001,
+        "tx": "gtx_a",
+        "at": 1760180000123,
+        "senderId": "user_123",
+        "senderName": "Ayse",
+        "receiverId": "user_456",
+        "replayed": false
+      }
+    },
+    {
+      "name": "no catalog: the event icon is the picture; no name claim: resolveName",
+      "event": {
+        "t": "gift",
+        "id": 7,
+        "at": 8,
+        "tx": "gtx_b",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 1,
+        "sender": { "id": "user_123" },
+        "receiver": { "id": "user_456" }
+      },
+      "names": { "user_123": "Ayse R." },
+      "replayed": true,
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ayse R.",
+        "quantity": 1,
+        "id": 7,
+        "tx": "gtx_b",
+        "at": 8,
+        "senderId": "user_123",
+        "senderName": null,
+        "receiverId": "user_456",
+        "replayed": true
+      }
+    },
+    {
+      "name": "no name anywhere: sender absent (the layer shows Someone); no receiver",
+      "event": {
+        "t": "gift",
+        "id": 7,
+        "at": 8,
+        "tx": "gtx_c",
+        "gift": { "id": "unknown", "name": "New gift", "price": 20000, "icon_url": null },
+        "quantity": 2,
+        "sender": { "id": "user_9" },
+        "receiver": null
+      },
+      "catalog": true,
+      "names": {},
+      "expect": {
+        "gift": {
+          "id": "unknown",
+          "name": "New gift",
+          "price": 20000,
+          "image": null,
+          "icon": null
+        },
+        "quantity": 2,
+        "id": 7,
+        "tx": "gtx_c",
+        "at": 8,
+        "senderId": "user_9",
+        "senderName": null,
+        "receiverId": null,
+        "replayed": false
+      }
+    },
+    {
+      "name": "catalog without animation: its icon is the picture; event without icon: the catalog icon",
+      "event": {
+        "t": "gift",
+        "id": 7,
+        "at": 8,
+        "tx": "gtx_d",
+        "gift": { "id": "cake", "name": "Cake", "price": 100, "icon_url": null },
+        "quantity": 1,
+        "sender": { "id": "user_9" },
+        "receiver": { "id": "host" }
+      },
+      "catalog": true,
+      "expect": {
+        "gift": {
+          "id": "cake",
+          "name": "Cake",
+          "price": 100,
+          "image": "https://assets.test/cake/256.webp",
+          "icon": "https://assets.test/cake/256.webp"
+        },
+        "quantity": 1,
+        "id": 7,
+        "tx": "gtx_d",
+        "at": 8,
+        "senderId": "user_9",
+        "senderName": null,
+        "receiverId": "host",
+        "replayed": false
+      }
+    },
+    {
+      "name": "catalog gift without any picture: the event icon",
+      "event": {
+        "t": "gift",
+        "id": 7,
+        "at": 8,
+        "tx": "gtx_e",
+        "gift": {
+          "id": "kiss",
+          "name": "Kiss",
+          "price": 5,
+          "icon_url": "https://assets.test/kiss/256.webp"
+        },
+        "quantity": 1,
+        "sender": { "id": "user_9" },
+        "receiver": { "id": "host" }
+      },
+      "catalog": true,
+      "expect": {
+        "gift": {
+          "id": "kiss",
+          "name": "Kiss",
+          "price": 5,
+          "image": "https://assets.test/kiss/256.webp",
+          "icon": "https://assets.test/kiss/256.webp"
+        },
+        "quantity": 1,
+        "id": 7,
+        "tx": "gtx_e",
+        "at": 8,
+        "senderId": "user_9",
+        "senderName": null,
+        "receiverId": "host",
+        "replayed": false
+      }
+    }
+  ]
+}

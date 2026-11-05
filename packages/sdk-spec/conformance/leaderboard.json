@@ -1,0 +1,1545 @@
+{
+  "description": "Leaderboard (SPEC section 16): rank labels, the pinning rule, the LeaderboardController with a fake clock and a scripted client, the medal colours, and the client calls. Format: conformance/README.md.",
+  "pollMs": {
+    "description": "leaderboardPollMs(refreshIntervalMs): 0 or less is no polling; anything else is at least minPollMs (5,000), whole milliseconds (SPEC 16.4).",
+    "minPollMs": 5000,
+    "cases": [
+      { "refreshIntervalMs": 0, "expect": 0 },
+      { "refreshIntervalMs": -1000, "expect": 0 },
+      { "refreshIntervalMs": 1, "expect": 5000 },
+      { "refreshIntervalMs": 50, "expect": 5000 },
+      { "refreshIntervalMs": 4999, "expect": 5000 },
+      { "refreshIntervalMs": 5000, "expect": 5000 },
+      { "refreshIntervalMs": 30000, "expect": 30000 }
+    ]
+  },
+  "rankLabel": [
+    {
+      "rank": 1,
+      "expect": "#1"
+    },
+    {
+      "rank": 2,
+      "expect": "#2"
+    },
+    {
+      "rank": 417,
+      "expect": "#417"
+    },
+    {
+      "rank": 1000,
+      "expect": "#1,000"
+    },
+    {
+      "rank": null,
+      "expect": "1,000+"
+    },
+    {
+      "rank": null,
+      "labels": {
+        "overflow": "1000+"
+      },
+      "expect": "1000+"
+    }
+  ],
+  "pin": [
+    {
+      "name": "me in the shown rows: not pinned",
+      "metric": "units",
+      "limit": 10,
+      "data": [
+        {
+          "rank": 1,
+          "user": "ayla",
+          "gifts": 10,
+          "units": 1000
+        },
+        {
+          "rank": 2,
+          "user": "mert",
+          "gifts": 10,
+          "units": 1000
+        }
+      ],
+      "me": {
+        "user": "mert",
+        "rank": 2,
+        "gifts": 3,
+        "units": 120,
+        "hidden": false
+      },
+      "expect": false
+    },
+    {
+      "name": "rank beyond the limit: pinned",
+      "metric": "units",
+      "limit": 10,
+      "data": [
+        {
+          "rank": 1,
+          "user": "ayla",
+          "gifts": 10,
+          "units": 1000
+        },
+        {
+          "rank": 2,
+          "user": "mert",
+          "gifts": 10,
+          "units": 1000
+        }
+      ],
+      "me": {
+        "user": "user_123",
+        "rank": 417,
+        "gifts": 3,
+        "units": 120,
+        "hidden": false
+      },
+      "expect": true
+    },
+    {
+      "name": "beyond the top 1,000 (rank null): pinned",
+      "metric": "units",
+      "limit": 10,
+      "data": [
+        {
+          "rank": 1,
+          "user": "ayla",
+          "gifts": 10,
+          "units": 1000
+        }
+      ],
+      "me": {
+        "user": "user_123",
+        "rank": null,
+        "gifts": 3,
+        "units": 120,
+        "hidden": false
+      },
+      "expect": true
+    },
+    {
+      "name": "rank equal to the limit and in the rows: not pinned",
+      "metric": "units",
+      "limit": 3,
+      "data": [
+        {
+          "rank": 1,
+          "user": "a",
+          "gifts": 10,
+          "units": 1000
+        },
+        {
+          "rank": 2,
+          "user": "b",
+          "gifts": 10,
+          "units": 1000
+        },
+        {
+          "rank": 3,
+          "user": "me",
+          "gifts": 10,
+          "units": 1000
+        }
+      ],
+      "me": {
+        "user": "me",
+        "rank": 3,
+        "gifts": 3,
+        "units": 120,
+        "hidden": false
+      },
+      "expect": false
+    },
+    {
+      "name": "rank limit + 1: pinned",
+      "metric": "units",
+      "limit": 3,
+      "data": [
+        {
+          "rank": 1,
+          "user": "a",
+          "gifts": 10,
+          "units": 1000
+        },
+        {
+          "rank": 2,
+          "user": "b",
+          "gifts": 10,
+          "units": 1000
+        },
+        {
+          "rank": 3,
+          "user": "c",
+          "gifts": 10,
+          "units": 1000
+        }
+      ],
+      "me": {
+        "user": "me",
+        "rank": 4,
+        "gifts": 3,
+        "units": 120,
+        "hidden": false
+      },
+      "expect": true
+    },
+    {
+      "name": "tie at the cut: rank within the limit but outside the rows: pinned",
+      "metric": "units",
+      "limit": 3,
+      "data": [
+        {
+          "rank": 1,
+          "user": "a",
+          "gifts": 10,
+          "units": 1000
+        },
+        {
+          "rank": 2,
+          "user": "b",
+          "gifts": 10,
+          "units": 1000
+        },
+        {
+          "rank": 3,
+          "user": "c",
+          "gifts": 10,
+          "units": 1000
+        }
+      ],
+      "me": {
+        "user": "me",
+        "rank": 3,
+        "gifts": 3,
+        "units": 120,
+        "hidden": false
+      },
+      "expect": true
+    },
+    {
+      "name": "hidden: never pinned",
+      "metric": "units",
+      "limit": 10,
+      "data": [
+        {
+          "rank": 1,
+          "user": "a",
+          "gifts": 10,
+          "units": 1000
+        }
+      ],
+      "me": {
+        "user": "me",
+        "rank": null,
+        "gifts": 3,
+        "units": 120,
+        "hidden": true
+      },
+      "expect": false
+    },
+    {
+      "name": "no me block: nothing to pin",
+      "metric": "units",
+      "limit": 10,
+      "data": [
+        {
+          "rank": 1,
+          "user": "a",
+          "gifts": 10,
+          "units": 1000
+        }
+      ],
+      "me": null,
+      "expect": false
+    },
+    {
+      "name": "no score on the metric: not pinned",
+      "metric": "gifts",
+      "limit": 10,
+      "data": [
+        {
+          "rank": 1,
+          "user": "a",
+          "gifts": 10,
+          "units": 1000
+        }
+      ],
+      "me": {
+        "user": "me",
+        "rank": null,
+        "gifts": 0,
+        "units": 0,
+        "hidden": false
+      },
+      "expect": false
+    },
+    {
+      "name": "score on the metric counts, not the other one",
+      "metric": "gifts",
+      "limit": 10,
+      "data": [
+        {
+          "rank": 1,
+          "user": "a",
+          "gifts": 10,
+          "units": 1000
+        }
+      ],
+      "me": {
+        "user": "me",
+        "rank": null,
+        "gifts": 2,
+        "units": 0,
+        "hidden": false
+      },
+      "expect": true
+    }
+  ],
+  "boards": {
+    "weekUnits": {
+      "board": "senders",
+      "period": "week",
+      "metric": "units",
+      "label": "2026-W41",
+      "starts_at": "2026-10-05T00:00:00.000Z",
+      "ends_at": "2026-10-12T00:00:00.000Z",
+      "as_of": "2026-10-11T07:30:00.000Z",
+      "data": [
+        {
+          "rank": 1,
+          "user": "ayla",
+          "gifts": 120,
+          "units": 54000
+        },
+        {
+          "rank": 2,
+          "user": "mert",
+          "gifts": 300,
+          "units": 41000
+        },
+        {
+          "rank": 2,
+          "user": "ece",
+          "gifts": 80,
+          "units": 41000
+        }
+      ],
+      "has_more": false,
+      "me": {
+        "user": "user_123",
+        "rank": null,
+        "gifts": 3,
+        "units": 120,
+        "hidden": false
+      }
+    },
+    "weekUnits2": {
+      "board": "senders",
+      "period": "week",
+      "metric": "units",
+      "label": "2026-W41",
+      "starts_at": "2026-10-05T00:00:00.000Z",
+      "ends_at": "2026-10-12T00:00:00.000Z",
+      "as_of": "2026-10-11T07:30:31.000Z",
+      "data": [
+        {
+          "rank": 1,
+          "user": "ayla",
+          "gifts": 120,
+          "units": 54000
+        },
+        {
+          "rank": 2,
+          "user": "mert",
+          "gifts": 300,
+          "units": 41000
+        }
+      ],
+      "has_more": false,
+      "me": {
+        "user": "user_123",
+        "rank": null,
+        "gifts": 3,
+        "units": 120,
+        "hidden": false
+      }
+    },
+    "weekGifts": {
+      "board": "senders",
+      "period": "week",
+      "metric": "gifts",
+      "label": "2026-W41",
+      "starts_at": "2026-10-05T00:00:00.000Z",
+      "ends_at": "2026-10-12T00:00:00.000Z",
+      "as_of": "2026-10-11T07:30:00.000Z",
+      "data": [
+        {
+          "rank": 1,
+          "user": "mert",
+          "gifts": 300,
+          "units": 41000
+        }
+      ],
+      "has_more": false,
+      "me": {
+        "user": "mert",
+        "rank": 1,
+        "gifts": 3,
+        "units": 120,
+        "hidden": false
+      }
+    },
+    "dayUnits": {
+      "board": "senders",
+      "period": "day",
+      "metric": "units",
+      "label": "2026-10-11",
+      "starts_at": "2026-10-05T00:00:00.000Z",
+      "ends_at": "2026-10-12T00:00:00.000Z",
+      "as_of": "2026-10-11T07:30:00.000Z",
+      "data": [],
+      "has_more": false,
+      "me": {
+        "user": "user_123",
+        "rank": null,
+        "gifts": 0,
+        "units": 0,
+        "hidden": false
+      }
+    }
+  },
+  "controller": [
+    {
+      "name": "first load: loading, then ready; period, metric and limit are sent; me outside the rows is pinned",
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "period": "week",
+            "metric": "units",
+            "rows": null,
+            "refreshing": false,
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits"
+          }
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "rows": ["ayla", "mert", "ece"],
+            "asOf": "2026-10-11T07:30:00.000Z",
+            "refreshing": false,
+            "error": null,
+            "pinned": "user_123"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the receivers board defaults to the gifts metric",
+      "options": {
+        "board": "receivers"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "expect": {
+            "metric": "gifts",
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "receivers",
+                  "query": {
+                    "period": "week",
+                    "metric": "gifts",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "limit and includeMe false are sent",
+      "options": {
+        "limit": 25,
+        "includeMe": false
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "expect": {
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 25,
+                    "includeMe": false
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initial period falls back to the first tab when week is not offered",
+      "options": {
+        "periods": ["day", "all"]
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "expect": {
+            "period": "day",
+            "periods": ["day", "all"],
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "day",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "an empty board is 'empty'; me without a score is not pinned",
+      "options": {
+        "initialPeriod": "day"
+      },
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "dayUnits"
+          }
+        },
+        {
+          "expect": {
+            "status": "empty",
+            "rows": [],
+            "pinned": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a cached tab younger than 30,000 ms shows at once with no request",
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits"
+          }
+        },
+        {
+          "setPeriod": "day"
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "period": "day",
+            "rows": null
+          }
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "dayUnits"
+          }
+        },
+        {
+          "advance": 29999
+        },
+        {
+          "setPeriod": "week"
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "rows": ["ayla", "mert", "ece"],
+            "refreshing": false,
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              },
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "day",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a cached tab 30,000 ms old shows at once and revalidates in the background",
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits"
+          }
+        },
+        {
+          "setPeriod": "day"
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "dayUnits"
+          }
+        },
+        {
+          "advance": 30000
+        },
+        {
+          "setPeriod": "week"
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "asOf": "2026-10-11T07:30:00.000Z",
+            "refreshing": true,
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              },
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "day",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              },
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits2"
+          }
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "asOf": "2026-10-11T07:30:31.000Z",
+            "rows": ["ayla", "mert"],
+            "refreshing": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "a tab already being fetched is not asked again (switching back, refresh)",
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "setPeriod": "day"
+        },
+        {
+          "setPeriod": "week"
+        },
+        {
+          "refresh": true
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              },
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "day",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              }
+            ],
+            "pending": 2
+          }
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits"
+          }
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "rows": ["ayla", "mert", "ece"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "an answer for another tab fills its cache without changing the view",
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "setPeriod": "day"
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits"
+          }
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "period": "day",
+            "rows": null
+          }
+        },
+        {
+          "setPeriod": "week"
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "rows": ["ayla", "mert", "ece"],
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              },
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "day",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "each metric has its own cache entry",
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits"
+          }
+        },
+        {
+          "setMetric": "gifts"
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "metric": "gifts",
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              },
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "gifts",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekGifts"
+          }
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "rows": ["mert"],
+            "pinned": null
+          }
+        },
+        {
+          "setMetric": "units"
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "rows": ["ayla", "mert", "ece"],
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              },
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "gifts",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a failed first load is an error; refresh tries again and a success clears it",
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "reject": {
+            "method": "getLeaderboard",
+            "error": {
+              "status": 503,
+              "type": "leaderboard_building",
+              "message": "Building."
+            }
+          }
+        },
+        {
+          "expect": {
+            "status": "error",
+            "error": "leaderboard_building",
+            "rows": null,
+            "errors": ["leaderboard_building"]
+          }
+        },
+        {
+          "refresh": true
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "error": "leaderboard_building",
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              },
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits"
+          }
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "error": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a failed revalidation keeps the stale rows visible",
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits"
+          }
+        },
+        {
+          "advance": 30000
+        },
+        {
+          "refresh": true
+        },
+        {
+          "expect": {
+            "refreshing": true
+          }
+        },
+        {
+          "reject": {
+            "method": "getLeaderboard",
+            "error": {
+              "status": 500,
+              "type": "internal_error",
+              "message": "Boom."
+            }
+          }
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "asOf": "2026-10-11T07:30:00.000Z",
+            "refreshing": false,
+            "error": "internal_error"
+          }
+        }
+      ]
+    },
+    {
+      "name": "refresh asks again even when the answer is fresh (pull to refresh)",
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits"
+          }
+        },
+        {
+          "refresh": true
+        },
+        {
+          "expect": {
+            "status": "ready",
+            "refreshing": true,
+            "calls": [
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              },
+              {
+                "method": "getLeaderboard",
+                "args": {
+                  "board": "senders",
+                  "query": {
+                    "period": "week",
+                    "metric": "units",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "dispose: a late answer changes nothing",
+      "steps": [
+        {
+          "start": true
+        },
+        {
+          "dispose": true
+        },
+        {
+          "resolve": {
+            "method": "getLeaderboard",
+            "value": "weekUnits"
+          }
+        },
+        {
+          "expect": {
+            "status": "loading",
+            "rows": null
+          }
+        }
+      ]
+    }
+  ],
+  "rankColors": {
+    "tokens": {
+      "rank1": "#e8a93a",
+      "rank2": "#b8bcc8",
+      "rank3": "#c07a45"
+    },
+    "text": "noticeBigText",
+    "min": 4.5,
+    "themes": ["defaultTheme", "darkTheme", "lightTheme"]
+  },
+  "client": [
+    {
+      "name": "getLeaderboard with no query: no query string",
+      "call": {
+        "method": "getLeaderboard",
+        "args": {
+          "board": "senders"
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/leaderboards/senders",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": ["Content-Type", "Idempotency-Key"],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "board": "senders",
+              "period": "week",
+              "metric": "units",
+              "label": "2026-W41",
+              "starts_at": "2026-10-05T00:00:00.000Z",
+              "ends_at": "2026-10-12T00:00:00.000Z",
+              "as_of": "2026-10-11T07:30:00.000Z",
+              "data": [
+                {
+                  "rank": 1,
+                  "user": "ayla",
+                  "gifts": 120,
+                  "units": 54000
+                },
+                {
+                  "rank": 2,
+                  "user": "mert",
+                  "gifts": 300,
+                  "units": 41000
+                },
+                {
+                  "rank": 2,
+                  "user": "ece",
+                  "gifts": 80,
+                  "units": 41000
+                }
+              ],
+              "has_more": false,
+              "me": {
+                "user": "user_123",
+                "rank": null,
+                "gifts": 3,
+                "units": 120,
+                "hidden": false
+              }
+            }
+          }
+        }
+      ],
+      "result": {
+        "board": "senders",
+        "period": "week",
+        "metric": "units",
+        "label": "2026-W41",
+        "starts_at": "2026-10-05T00:00:00.000Z",
+        "ends_at": "2026-10-12T00:00:00.000Z",
+        "as_of": "2026-10-11T07:30:00.000Z",
+        "data": [
+          {
+            "rank": 1,
+            "user": "ayla",
+            "gifts": 120,
+            "units": 54000
+          },
+          {
+            "rank": 2,
+            "user": "mert",
+            "gifts": 300,
+            "units": 41000
+          },
+          {
+            "rank": 2,
+            "user": "ece",
+            "gifts": 80,
+            "units": 41000
+          }
+        ],
+        "has_more": false,
+        "me": {
+          "user": "user_123",
+          "rank": null,
+          "gifts": 3,
+          "units": 120,
+          "hidden": false
+        }
+      }
+    },
+    {
+      "name": "every parameter, in the fixed order period, metric, at, limit, include_me",
+      "call": {
+        "method": "getLeaderboard",
+        "args": {
+          "board": "receivers",
+          "query": {
+            "includeMe": false,
+            "limit": 25,
+            "at": "2026-10-11",
+            "metric": "gifts",
+            "period": "day"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/leaderboards/receivers?period=day&metric=gifts&at=2026-10-11&limit=25&include_me=false",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": [],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "board": "senders",
+              "period": "day",
+              "metric": "units",
+              "label": "2026-10-11",
+              "starts_at": "2026-10-05T00:00:00.000Z",
+              "ends_at": "2026-10-12T00:00:00.000Z",
+              "as_of": "2026-10-11T07:30:00.000Z",
+              "data": [],
+              "has_more": false,
+              "me": {
+                "user": "user_123",
+                "rank": null,
+                "gifts": 0,
+                "units": 0,
+                "hidden": false
+              }
+            }
+          }
+        }
+      ],
+      "result": {
+        "board": "senders",
+        "period": "day",
+        "metric": "units",
+        "label": "2026-10-11",
+        "starts_at": "2026-10-05T00:00:00.000Z",
+        "ends_at": "2026-10-12T00:00:00.000Z",
+        "as_of": "2026-10-11T07:30:00.000Z",
+        "data": [],
+        "has_more": false,
+        "me": {
+          "user": "user_123",
+          "rank": null,
+          "gifts": 0,
+          "units": 0,
+          "hidden": false
+        }
+      }
+    },
+    {
+      "name": "includeMe true is the default and is left out",
+      "call": {
+        "method": "getLeaderboard",
+        "args": {
+          "board": "senders",
+          "query": {
+            "includeMe": true,
+            "period": "all"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/leaderboards/senders?period=all",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": [],
+            "body": null
+          },
+          "response": {
+            "status": 200,
+            "headers": {},
+            "body": {
+              "board": "senders",
+              "period": "week",
+              "metric": "units",
+              "label": "2026-W41",
+              "starts_at": "2026-10-05T00:00:00.000Z",
+              "ends_at": "2026-10-12T00:00:00.000Z",
+              "as_of": "2026-10-11T07:30:00.000Z",
+              "data": [
+                {
+                  "rank": 1,
+                  "user": "ayla",
+                  "gifts": 120,
+                  "units": 54000
+                },
+                {
+                  "rank": 2,
+                  "user": "mert",
+                  "gifts": 300,
+                  "units": 41000
+                },
+                {
+                  "rank": 2,
+                  "user": "ece",
+                  "gifts": 80,
+                  "units": 41000
+                }
+              ],
+              "has_more": false,
+              "me": {
+                "user": "user_123",
+                "rank": null,
+                "gifts": 3,
+                "units": 120,
+                "hidden": false
+              }
+            }
+          }
+        }
+      ],
+      "result": {
+        "board": "senders",
+        "period": "week",
+        "metric": "units",
+        "label": "2026-W41",
+        "starts_at": "2026-10-05T00:00:00.000Z",
+        "ends_at": "2026-10-12T00:00:00.000Z",
+        "as_of": "2026-10-11T07:30:00.000Z",
+        "data": [
+          {
+            "rank": 1,
+            "user": "ayla",
+            "gifts": 120,
+            "units": 54000
+          },
+          {
+            "rank": 2,
+            "user": "mert",
+            "gifts": 300,
+            "units": 41000
+          },
+          {
+            "rank": 2,
+            "user": "ece",
+            "gifts": 80,
+            "units": 41000
+          }
+        ],
+        "has_more": false,
+        "me": {
+          "user": "user_123",
+          "rank": null,
+          "gifts": 3,
+          "units": 120,
+          "hidden": false
+        }
+      }
+    },
+    {
+      "name": "503 leaderboard_building: one immediate retry like any 5xx (Retry-After ignored), then the error",
+      "call": {
+        "method": "getLeaderboard",
+        "args": {
+          "board": "senders"
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/leaderboards/senders",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": [],
+            "body": null
+          },
+          "response": {
+            "status": 503,
+            "headers": {
+              "Retry-After": "30"
+            },
+            "body": {
+              "error": {
+                "type": "leaderboard_building",
+                "message": "Leaderboards are being built. Try again shortly.",
+                "request_id": "req_9"
+              }
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/leaderboards/senders",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": [],
+            "body": null
+          },
+          "response": {
+            "status": 503,
+            "headers": {
+              "Retry-After": "30"
+            },
+            "body": {
+              "error": {
+                "type": "leaderboard_building",
+                "message": "Leaderboards are being built. Try again shortly.",
+                "request_id": "req_9"
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 503,
+        "type": "leaderboard_building",
+        "message": "Leaderboards are being built. Try again shortly.",
+        "requestId": "req_9",
+        "retryable": true,
+        "insufficientBalance": false
+      }
+    },
+    {
+      "name": "400 period_out_of_range is not retried",
+      "call": {
+        "method": "getLeaderboard",
+        "args": {
+          "board": "senders",
+          "query": {
+            "period": "day",
+            "at": "2020-01-01"
+          }
+        }
+      },
+      "tokens": [
+        {
+          "forceRefresh": false,
+          "returns": "tok_1"
+        }
+      ],
+      "exchanges": [
+        {
+          "request": {
+            "method": "GET",
+            "url": "https://api.giftingstack.com/v1/client/leaderboards/senders?period=day&at=2020-01-01",
+            "headers": {
+              "Authorization": "Bearer tok_1"
+            },
+            "absentHeaders": [],
+            "body": null
+          },
+          "response": {
+            "status": 400,
+            "headers": {},
+            "body": {
+              "error": {
+                "type": "period_out_of_range",
+                "message": "Too old.",
+                "request_id": "req_3"
+              }
+            }
+          }
+        }
+      ],
+      "error": {
+        "status": 400,
+        "type": "period_out_of_range",
+        "message": "Too old.",
+        "requestId": "req_3",
+        "retryable": false,
+        "insufficientBalance": false
+      }
+    }
+  ]
+}

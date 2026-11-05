@@ -1,0 +1,38 @@
+{
+  "description": "Theming (SPEC.md section 9.2): the WCAG contrast ratio, and the contrast rule every themeFromAccent theme and both presets must meet. Colours themselves are not pinned. Format: conformance/README.md.",
+  "contrast": [
+    { "a": "#ffffff", "b": "#000000", "ratio": 21 },
+    { "a": "#000000", "b": "#ffffff", "ratio": 21 },
+    { "a": "#777777", "b": "#ffffff", "ratio": 4.48 },
+    { "a": "#8b7bff", "b": "#ffffff", "ratio": 3.29 },
+    { "a": "#fff", "b": "#14141F", "ratio": 18.27 },
+    { "a": "#2a1600", "b": "#e8a93a", "ratio": 8.38 },
+    { "a": "#ffd27a", "b": "#1e1e2e", "ratio": 11.52 },
+    { "a": "#336699", "b": "#336699", "ratio": 1 }
+  ],
+  "rules": [
+    { "fg": "text", "bg": "surface", "min": 4.5 },
+    { "fg": "text", "bg": "background", "min": 4.5 },
+    { "fg": "text", "bg": "selected", "min": 4.5 },
+    { "fg": "muted", "bg": "surface", "min": 4.5 },
+    { "fg": "coin", "bg": "surface", "min": 4.5 },
+    { "fg": "accentText", "bg": "accent", "min": 4.5 },
+    { "fg": "coinText", "bg": "coin", "min": 4.5 },
+    { "fg": "noticeText", "bg": "accent", "min": 4.5 },
+    { "fg": "noticeBigText", "bg": "noticeBigBackground", "min": 4.5 }
+  ],
+  "presets": ["darkTheme", "lightTheme"],
+  "accents": [
+    { "accent": "#ff4f9a", "normalized": "#ff4f9a" },
+    { "accent": "#2fbf71", "normalized": "#2fbf71" },
+    { "accent": "#FFEB3B", "normalized": "#ffeb3b" },
+    { "accent": "#808080", "normalized": "#808080" },
+    { "accent": "#000000", "normalized": "#000000" },
+    { "accent": "#ffffff", "normalized": "#ffffff" },
+    { "accent": "#3355ff", "normalized": "#3355ff" },
+    { "accent": "#f80", "normalized": "#ff8800" },
+    { "accent": "#8b7bff", "normalized": "#8b7bff" }
+  ],
+  "modes": ["dark", "light"],
+  "invalid": ["red", "#12345", "rgb(1, 2, 3)", ""]
+}

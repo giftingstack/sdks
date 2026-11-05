@@ -1,0 +1,72 @@
+{
+  "description": "Which picture URLs are drawn (isPictureUrl) and how long a failed picture is remembered (PictureFailures). Format: conformance/README.md. A URL without a scheme is not in this file: the web allows it (a path on the page's origin), native SDKs refuse it.",
+  "maxBytes": 5242880,
+  "failureMemoryMs": 60000,
+  "urls": [
+    { "url": "https://assets.giftingstack.com/gifts/rose/256.webp", "allowed": true },
+    { "url": "HTTPS://Assets.Example.com/a.png", "allowed": true },
+    { "url": "http://localhost:8788/gifts/rose.webp", "allowed": true },
+    { "url": "http://127.0.0.1/rose.png", "allowed": true },
+    { "url": "http://[::1]:8788/rose.png", "allowed": true },
+    { "url": "http://10.0.2.2:8788/rose.png", "allowed": true },
+    { "url": "http://assets.example.com/rose.png", "allowed": false },
+    { "url": "http://localhost.evil.com/rose.png", "allowed": false },
+    { "url": "http://192.168.1.20/rose.png", "allowed": false },
+    { "url": "data:image/png;base64,iVBORw0KGgo=", "allowed": true },
+    { "url": "DATA:image/webp;base64,AAAA", "allowed": true },
+    { "url": "data:text/html;base64,PHNjcmlwdD4=", "allowed": false },
+    { "url": "javascript:alert(1)", "allowed": false },
+    { "url": "file:///etc/passwd", "allowed": false },
+    { "url": "ftp://assets.example.com/rose.png", "allowed": false },
+    { "url": "blob:https://example.com/1234", "allowed": false },
+    { "url": "//assets.example.com/rose.png", "allowed": false },
+    { "url": "", "allowed": false }
+  ],
+  "dataUrlSize": {
+    "description": "A data:image URL longer than ceil(maxBytes x 4 / 3) + 256 = 6990763 characters is refused; at the limit it is allowed. The runner builds the prefix 'data:image/png;base64,' followed by 'A' repeated until the whole URL has totalChars characters.",
+    "cases": [
+      { "totalChars": 6990763, "allowed": true },
+      { "totalChars": 6990764, "allowed": false }
+    ]
+  },
+  "failures": [
+    {
+      "name": "a failed picture is remembered for 60 s, then tried again",
+      "steps": [
+        { "atMs": 1000, "failed": { "https://a.test/x.webp": false } },
+        { "atMs": 1000, "fail": "https://a.test/x.webp" },
+        {
+          "atMs": 1000,
+          "failed": { "https://a.test/x.webp": true, "https://a.test/y.webp": false }
+        },
+        { "atMs": 60999, "failed": { "https://a.test/x.webp": true } },
+        { "atMs": 61000, "failed": { "https://a.test/x.webp": false } }
+      ]
+    },
+    {
+      "name": "failing again restarts the 60 s",
+      "steps": [
+        { "atMs": 0, "fail": "https://a.test/x.webp" },
+        { "atMs": 50000, "fail": "https://a.test/x.webp" },
+        { "atMs": 109999, "failed": { "https://a.test/x.webp": true } },
+        { "atMs": 110000, "failed": { "https://a.test/x.webp": false } }
+      ]
+    },
+    {
+      "name": "only the failed URL is remembered; the memory holds at most 200 URLs, oldest forgotten first",
+      "steps": [
+        { "atMs": 0, "fail": "https://a.test/first.webp" },
+        { "atMs": 1, "failMany": { "prefix": "https://a.test/m", "count": 200 } },
+        {
+          "atMs": 2,
+          "failed": {
+            "https://a.test/first.webp": false,
+            "https://a.test/m0": true,
+            "https://a.test/m199": true,
+            "https://a.test/other.webp": false
+          }
+        }
+      ]
+    }
+  ]
+}

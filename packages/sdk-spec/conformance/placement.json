@@ -1,0 +1,431 @@
+{
+  "description": "Web tray placement (spec section 9.3, web only). resolve: resolveTrayPlacement(input) must equal expect. popover: positionPopover(input) must deep-equal expect (defaults gap 8, margin 8, maxHeightFraction 0.7).",
+  "resolve": [
+    {
+      "name": "auto, 599 px with an anchor: sheet",
+      "input": {
+        "placement": "auto",
+        "containerWidth": 599,
+        "hasAnchor": true
+      },
+      "expect": "sheet"
+    },
+    {
+      "name": "auto, exactly 600 px with an anchor: popover (the threshold is inclusive)",
+      "input": {
+        "placement": "auto",
+        "containerWidth": 600,
+        "hasAnchor": true
+      },
+      "expect": "popover"
+    },
+    {
+      "name": "auto, exactly 600 px without an anchor: inline",
+      "input": {
+        "placement": "auto",
+        "containerWidth": 600,
+        "hasAnchor": false
+      },
+      "expect": "inline"
+    },
+    {
+      "name": "auto, 599 px without an anchor: sheet",
+      "input": {
+        "placement": "auto",
+        "containerWidth": 599,
+        "hasAnchor": false
+      },
+      "expect": "sheet"
+    },
+    {
+      "name": "placement not given means auto: 1100 px with an anchor",
+      "input": {
+        "containerWidth": 1100,
+        "hasAnchor": true
+      },
+      "expect": "popover"
+    },
+    {
+      "name": "an unknown placement means auto",
+      "input": {
+        "placement": "dock",
+        "containerWidth": 1100,
+        "hasAnchor": false
+      },
+      "expect": "inline"
+    },
+    {
+      "name": "auto, width 0 (not laid out yet): sheet",
+      "input": {
+        "placement": "auto",
+        "containerWidth": 0,
+        "hasAnchor": true
+      },
+      "expect": "sheet"
+    },
+    {
+      "name": "auto, width not a number counts as 0: sheet",
+      "input": {
+        "placement": "auto",
+        "containerWidth": null,
+        "hasAnchor": true
+      },
+      "expect": "sheet"
+    },
+    {
+      "name": "auto, negative width counts as 0: sheet",
+      "input": {
+        "placement": "auto",
+        "containerWidth": -50,
+        "hasAnchor": false
+      },
+      "expect": "sheet"
+    },
+    {
+      "name": "sheet is kept on a wide container",
+      "input": {
+        "placement": "sheet",
+        "containerWidth": 1100,
+        "hasAnchor": true
+      },
+      "expect": "sheet"
+    },
+    {
+      "name": "inline is kept on a narrow container",
+      "input": {
+        "placement": "inline",
+        "containerWidth": 300,
+        "hasAnchor": true
+      },
+      "expect": "inline"
+    },
+    {
+      "name": "popover is kept on a narrow container when there is an anchor",
+      "input": {
+        "placement": "popover",
+        "containerWidth": 300,
+        "hasAnchor": true
+      },
+      "expect": "popover"
+    },
+    {
+      "name": "popover without an anchor has nothing to open from: inline",
+      "input": {
+        "placement": "popover",
+        "containerWidth": 1100,
+        "hasAnchor": false
+      },
+      "expect": "inline"
+    }
+  ],
+  "popover": [
+    {
+      "name": "toolbar button near the bottom: no room below, flips above, right edges aligned",
+      "input": {
+        "anchor": {
+          "left": 1000,
+          "top": 600,
+          "right": 1040,
+          "bottom": 636
+        },
+        "panel": {
+          "width": 380,
+          "height": 500
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "expect": {
+        "left": 660,
+        "top": 92,
+        "width": 380,
+        "maxHeight": 560,
+        "height": 500,
+        "side": "above",
+        "align": "end"
+      }
+    },
+    {
+      "name": "button near the top: room below, opens below, left edges aligned",
+      "input": {
+        "anchor": {
+          "left": 100,
+          "top": 40,
+          "right": 140,
+          "bottom": 76
+        },
+        "panel": {
+          "width": 380,
+          "height": 500
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "expect": {
+        "left": 100,
+        "top": 84,
+        "width": 380,
+        "maxHeight": 560,
+        "height": 500,
+        "side": "below",
+        "align": "start"
+      }
+    },
+    {
+      "name": "exactly enough room below (inclusive): opens below",
+      "input": {
+        "anchor": {
+          "left": 100,
+          "top": 600,
+          "right": 140,
+          "bottom": 636
+        },
+        "panel": {
+          "width": 380,
+          "height": 548
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1200
+        }
+      },
+      "expect": {
+        "left": 100,
+        "top": 644,
+        "width": 380,
+        "maxHeight": 548,
+        "height": 548,
+        "side": "below",
+        "align": "start"
+      }
+    },
+    {
+      "name": "one px too tall for below: flips above where it fits",
+      "input": {
+        "anchor": {
+          "left": 100,
+          "top": 600,
+          "right": 140,
+          "bottom": 636
+        },
+        "panel": {
+          "width": 380,
+          "height": 549
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1200
+        }
+      },
+      "expect": {
+        "left": 100,
+        "top": 43,
+        "width": 380,
+        "maxHeight": 584,
+        "height": 549,
+        "side": "above",
+        "align": "start"
+      }
+    },
+    {
+      "name": "fits on neither side, equal room: below (ties go below), shrunk to the room",
+      "input": {
+        "anchor": {
+          "left": 600,
+          "top": 280,
+          "right": 640,
+          "bottom": 320
+        },
+        "panel": {
+          "width": 380,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 600
+        }
+      },
+      "expect": {
+        "left": 600,
+        "top": 328,
+        "width": 380,
+        "maxHeight": 264,
+        "height": 264,
+        "side": "below",
+        "align": "start"
+      }
+    },
+    {
+      "name": "fits on neither side, more room below: below, shrunk",
+      "input": {
+        "anchor": {
+          "left": 600,
+          "top": 300,
+          "right": 640,
+          "bottom": 340
+        },
+        "panel": {
+          "width": 380,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "expect": {
+        "left": 600,
+        "top": 348,
+        "width": 380,
+        "maxHeight": 444,
+        "height": 444,
+        "side": "below",
+        "align": "start"
+      }
+    },
+    {
+      "name": "fits on neither side, more room above: above, shrunk",
+      "input": {
+        "anchor": {
+          "left": 600,
+          "top": 500,
+          "right": 640,
+          "bottom": 540
+        },
+        "panel": {
+          "width": 380,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "expect": {
+        "left": 600,
+        "top": 8,
+        "width": 380,
+        "maxHeight": 484,
+        "height": 484,
+        "side": "above",
+        "align": "start"
+      }
+    },
+    {
+      "name": "height capped at 70 % of the viewport",
+      "input": {
+        "anchor": {
+          "left": 1000,
+          "top": 760,
+          "right": 1040,
+          "bottom": 796
+        },
+        "panel": {
+          "width": 380,
+          "height": 2000
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "expect": {
+        "left": 660,
+        "top": 192,
+        "width": 380,
+        "maxHeight": 560,
+        "height": 560,
+        "side": "above",
+        "align": "end"
+      }
+    },
+    {
+      "name": "pushed inside the right margin",
+      "input": {
+        "anchor": {
+          "left": 1240,
+          "top": 700,
+          "right": 1276,
+          "bottom": 736
+        },
+        "panel": {
+          "width": 380,
+          "height": 300
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "expect": {
+        "left": 892,
+        "top": 392,
+        "width": 380,
+        "maxHeight": 560,
+        "height": 300,
+        "side": "above",
+        "align": "end"
+      }
+    },
+    {
+      "name": "pushed inside the left margin",
+      "input": {
+        "anchor": {
+          "left": 0,
+          "top": 700,
+          "right": 36,
+          "bottom": 736
+        },
+        "panel": {
+          "width": 380,
+          "height": 300
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "expect": {
+        "left": 8,
+        "top": 392,
+        "width": 380,
+        "maxHeight": 560,
+        "height": 300,
+        "side": "above",
+        "align": "start"
+      }
+    },
+    {
+      "name": "narrow viewport: the panel narrows to the viewport minus the margins",
+      "input": {
+        "anchor": {
+          "left": 300,
+          "top": 580,
+          "right": 340,
+          "bottom": 616
+        },
+        "panel": {
+          "width": 380,
+          "height": 400
+        },
+        "viewport": {
+          "width": 360,
+          "height": 640
+        }
+      },
+      "expect": {
+        "left": 8,
+        "top": 172,
+        "width": 344,
+        "maxHeight": 448,
+        "height": 400,
+        "side": "above",
+        "align": "end"
+      }
+    }
+  ]
+}
