@@ -209,7 +209,7 @@ public struct GiftingClient: GiftingAPI, GiftWallAPI, GiftAwayAPI, GiftLeaderboa
             roomId: input.roomId
         )
         let data = try JSONEncoder().encode(body)
-        // One key per call, reused by the 401 repeat and the 5xx retry.
+        // One key per call, reused by the 401 retry and the 5xx retry.
         let key = input.idempotencyKey ?? newIdempotencyKey()
         return try await request(
             GiftTransaction.self,
@@ -251,17 +251,17 @@ public struct GiftingClient: GiftingAPI, GiftWallAPI, GiftAwayAPI, GiftLeaderboa
         body: Data?,
         idempotencyKey: String?
     ) async throws -> HTTPResponse {
-        let repeat = LostConnectionRepeat()
+        let lostConnection = LostConnectionRepeat()
         var token = try await getToken(false)
-        var response = try await once(method: method, path: path, token: token, body: body, idempotencyKey: idempotencyKey, repeat: repeat)
+        var response = try await once(method: method, path: path, token: token, body: body, idempotencyKey: idempotencyKey, lostConnection: lostConnection)
         // A rejected token is usually just an expired one: get a fresh one and try once more.
         if response.status == 401 {
             token = try await getToken(true)
-            response = try await once(method: method, path: path, token: token, body: body, idempotencyKey: idempotencyKey, repeat: repeat)
+            response = try await once(method: method, path: path, token: token, body: body, idempotencyKey: idempotencyKey, lostConnection: lostConnection)
         }
         // One quiet retry for a server hiccup, same token, same key, no delay.
         if response.status >= 500 {
-            response = try await once(method: method, path: path, token: token, body: body, idempotencyKey: idempotencyKey, repeat: repeat)
+            response = try await once(method: method, path: path, token: token, body: body, idempotencyKey: idempotencyKey, lostConnection: lostConnection)
         }
         guard response.status >= 200 && response.status <= 299 else {
             throw GiftingClient.error(from: response)
@@ -275,7 +275,7 @@ public struct GiftingClient: GiftingAPI, GiftWallAPI, GiftAwayAPI, GiftLeaderboa
         token: String,
         body: Data?,
         idempotencyKey: String?,
-        repeat: LostConnectionRepeat
+        lostConnection: LostConnectionRepeat
     ) async throws -> HTTPResponse {
         var headers: [String: String] = [
             "Authorization": "Bearer \(token)",
@@ -298,10 +298,10 @@ public struct GiftingClient: GiftingAPI, GiftWallAPI, GiftAwayAPI, GiftLeaderboa
             // sendGift repeats ONE lost connection at once, same token, same key (the server replays it if the
             // first request arrived). Not our own timeout, not a GET, not a POST without a key (SPEC 3.4, R-18).
             let timedOut = (error as? URLError)?.code == .timedOut
-            if let key = idempotencyKey, !key.isEmpty, !repeat.used, !timedOut, !(error is CancellationError) {
-                repeat.used = true
+            if let key = idempotencyKey, !key.isEmpty, !lostConnection.used, !timedOut, !(error is CancellationError) {
+                lostConnection.used = true
                 return try await once(
-                    method: method, path: path, token: token, body: body, idempotencyKey: idempotencyKey, repeat: repeat
+                    method: method, path: path, token: token, body: body, idempotencyKey: idempotencyKey, lostConnection: lostConnection
                 )
             }
             throw GiftingError.network

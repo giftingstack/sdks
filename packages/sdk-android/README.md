@@ -14,24 +14,15 @@ post, spec 14), a "while you were away" card with an effect replay (15) and a le
 
 ## Install
 
-The coordinates are `com.giftingstack:giftingstack:0.1.0` (the build has the publishing setup: sources and
-Javadoc jars, POM, signing from the environment; nothing is on Maven Central yet):
+The coordinates are `com.giftingstack:giftingstack:0.1.1` on Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("com.giftingstack:giftingstack:0.1.0")
+    implementation("com.giftingstack:giftingstack:0.1.1")
 }
 ```
 
-Until it is on Maven Central include the module from this repository, in `settings.gradle.kts`:
-
-```kotlin
-include(":giftingstack")
-project(":giftingstack").projectDir = file("path/to/giftingstack/packages/sdk-android/giftingstack")
-```
-
-and `implementation(project(":giftingstack"))`. The app needs the `INTERNET` permission (the
-library manifest already declares it).
+The app needs the `INTERNET` permission (the library manifest already declares it).
 
 ## Token flow
 

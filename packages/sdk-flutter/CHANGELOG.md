@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+No code change. The four SDKs (JavaScript, Flutter, Android, iOS) share one version number from now
+on; Android and iOS gained the 5,000 ms leaderboard polling minimum this package already had.
+
 ## 0.1.0 (preview)
 
 First release on pub.dev. Everything below was built before it; the API can still change before 1.0.

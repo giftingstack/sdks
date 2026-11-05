@@ -7,7 +7,7 @@ import XCTest
 /// `client` section (getLeaderboard, the 503 retry).
 @MainActor
 final class LeaderboardConformanceTests: XCTestCase {
-    private static let topKeys: Set<String> = ["description", "rankLabel", "pin", "rankColors", "boards", "controller", "client"]
+    private static let topKeys: Set<String> = ["description", "pollMs", "rankLabel", "pin", "rankColors", "boards", "controller", "client"]
     private static let optionKeys: Set<String> = ["board", "periods", "initialPeriod", "metric", "limit", "includeMe"]
     private static let stepKeys: Set<String> = ["start", "setPeriod", "setMetric", "refresh", "dispose", "advance", "resolve", "reject", "expect"]
     private static let expectKeys: Set<String> = [
@@ -17,6 +17,20 @@ final class LeaderboardConformanceTests: XCTestCase {
     func testFileHasOnlyKnownSections() throws {
         let f = try Fixtures.conformance("leaderboard.json")
         assertKnownKeys(f, LeaderboardConformanceTests.topKeys, "[leaderboard.json]")
+    }
+
+    // MARK: - pollMs
+
+    func testPollMs() throws {
+        let f = try Fixtures.conformance("leaderboard.json")
+        let poll = f["pollMs"]
+        assertKnownKeys(poll, ["description", "minPollMs", "cases"], "[leaderboard.json pollMs]")
+        XCTAssertEqual(leaderboardMinPollMs, poll?["minPollMs"]?.intValue)
+        for c in try Fixtures.list(poll?["cases"], "leaderboard.json pollMs") {
+            let at = "[leaderboard.json pollMs] \(c)"
+            assertKnownKeys(c, ["refreshIntervalMs", "expect"], at)
+            XCTAssertEqual(leaderboardPollMs(c["refreshIntervalMs"]?.intValue), c["expect"]?.intValue, at)
+        }
     }
 
     // MARK: - rankLabel

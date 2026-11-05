@@ -85,6 +85,7 @@ import com.giftingstack.core.LeaderboardStatus
 import com.giftingstack.core.groupThousands
 import com.giftingstack.core.leaderboardPinnedSpoken
 import com.giftingstack.core.leaderboardPinnedText
+import com.giftingstack.core.leaderboardPollMs
 import com.giftingstack.core.leaderboardRowSpoken
 import com.giftingstack.core.leaderboardScore
 import com.giftingstack.core.leaderboardUnitsName
@@ -150,7 +151,8 @@ fun rememberGiftLeaderboardHandle(): GiftLeaderboardHandle = remember { GiftLead
  * @param resolveUsers external ids are often not display names: map them here. Unknown ids keep
  *   the id itself.
  * @param highlightUser whose row is highlighted. Default: the signed-in user (`me`).
- * @param refreshIntervalMs 0 (default): no polling; otherwise the shown tab is fetched again this often.
+ * @param refreshIntervalMs 0 (default): no polling; otherwise the shown tab is fetched again this often
+ *   (at least 5,000 ms: a smaller value is raised, SPEC 16.4).
  * @param renderRow draws the inside of each ranked row yourself. The board still loads, orders,
  *   names, highlights and pins; it keeps the row container, its spoken label and the press. A
  *   custom row may be taller than 52 dp. The pinned "You" row stays the default. Null (default):
@@ -206,9 +208,11 @@ fun GiftLeaderboard(
         }
     }
     LaunchedEffect(controller, refreshIntervalMs) {
-        if (refreshIntervalMs > 0) {
+        // At least 5 s once polling is on (SPEC 16.4, audit R-17).
+        val every = leaderboardPollMs(refreshIntervalMs)
+        if (every > 0) {
             while (true) {
-                delay(refreshIntervalMs)
+                delay(every)
                 controller.refresh()
             }
         }

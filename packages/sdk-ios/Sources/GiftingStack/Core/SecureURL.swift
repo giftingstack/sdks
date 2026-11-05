@@ -62,7 +62,7 @@ enum SecureURL {
     static func refusalMessage(_ url: String, what: String) -> String {
         let s = scheme(of: url)
         let secure = s == "ws" ? "wss" : "https"
-        return "(what) uses plain (s)://(host(of: url) ?? "?"). Use (secure), or pass allowInsecure: true "
+        return "\(what) uses plain \(s)://\(host(of: url) ?? "?"). Use \(secure), or pass allowInsecure: true "
             + "(localhost, 127.0.0.1, ::1 and 10.0.2.2 are always allowed)."
     }
 }

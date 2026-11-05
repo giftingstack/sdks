@@ -22,6 +22,19 @@ val LEADERBOARD_PERIODS: List<LeaderboardPeriod> =
 const val LEADERBOARD_STALE_MS = 30_000L
 const val DEFAULT_LEADERBOARD_LIMIT = 10
 
+/** The shortest polling period a leaderboard accepts: 5 s (SPEC 16.4, audit R-17). */
+const val LEADERBOARD_MIN_POLL_MS = 5_000L
+
+/**
+ * The polling period of a `refreshIntervalMs` option: 0 (or less, or null) is no polling, anything
+ * else is at least [LEADERBOARD_MIN_POLL_MS], so `refreshIntervalMs = 50` cannot turn a screen into a
+ * request flood. Fixture: conformance/leaderboard.json "pollMs".
+ */
+fun leaderboardPollMs(refreshIntervalMs: Long?): Long {
+    val ms = refreshIntervalMs ?: 0L
+    return if (ms > 0L) maxOf(ms, LEADERBOARD_MIN_POLL_MS) else 0L
+}
+
 /**
  * Medal colours for ranks 1 to 3 (new tokens, used only by the leaderboard), `#rrggbb`. The rank
  * number on them uses the theme's `noticeBigText`; the contract is >= 4.5:1 (fixture

@@ -3,6 +3,11 @@
 All notable changes to `@giftingstack/sdk`. The shared contract (`packages/sdk-spec`) has its own
 version (`SPEC_VERSION`); this package states which one it passes.
 
+## 0.1.1
+
+No code change. The four SDKs (JavaScript, Flutter, Android, iOS) share one version number from now
+on; Android and iOS gained the 5,000 ms leaderboard polling minimum this package already had.
+
 ## 0.1.0 (preview)
 
 First publishable build: ESM with TypeScript declarations for `@giftingstack/sdk`,

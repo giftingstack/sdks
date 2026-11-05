@@ -75,7 +75,7 @@ public final class GiftTrayModel: ObservableObject {
                 self.isOpen = openState.isOpen
             }
         }
-        unsubscribe =controller.subscribe { [weak self] next in
+        unsubscribe = controller.subscribe { [weak self] next in
             guard let self = self else {
                 return
             }

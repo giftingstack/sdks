@@ -113,7 +113,7 @@ public final class GiftLeaderboardModel: ObservableObject {
     private func startPolling() {
         pollTask?.cancel()
         pollTask = nil
-        let ms = refreshIntervalMs
+        let ms = leaderboardPollMs(refreshIntervalMs)
         guard ms > 0 else {
             return
         }

@@ -8,6 +8,17 @@ import Foundation
 public let leaderboardStaleMs = 30_000
 public let defaultLeaderboardLimit = 10
 
+/// The shortest polling period a leaderboard accepts: 5 s (SPEC 16.4, audit R-17).
+public let leaderboardMinPollMs = 5000
+
+/// The polling period of a `refreshIntervalMs` option: 0 (or less, or nil) is no polling, anything
+/// else is at least `leaderboardMinPollMs`, so `refreshIntervalMs: 50` cannot turn a screen into a
+/// request flood. Fixture: conformance/leaderboard.json "pollMs".
+public func leaderboardPollMs(_ refreshIntervalMs: Int?) -> Int {
+    let ms = refreshIntervalMs ?? 0
+    return ms > 0 ? max(ms, leaderboardMinPollMs) : 0
+}
+
 /// Medal colours for ranks 1 to 3 (spec 16.2): new tokens used only by the leaderboard, not part
 /// of `GiftTheme`. The rank number on them uses the theme's `noticeBigText`; the contract is
 /// >= 4.5:1 (fixture `leaderboard.json#rankColors`).

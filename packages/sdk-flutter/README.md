@@ -19,7 +19,7 @@ or in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  giftingstack: ^0.1.0
+  giftingstack: ^0.1.1
 ```
 
 The pure Dart part (no Flutter imports) is `package:giftingstack/giftingstack_core.dart`. The whole

@@ -4,12 +4,10 @@ Swift Package for GiftingStack: the `/v1/client` API client, the gift effects la
 tray. It implements the shared contract in `packages/sdk-spec` (spec version 1.0.0) and is a port
 of the TypeScript reference in `packages/sdk-js`.
 
-> **Status: CI is the only compiler.** This package is written on a machine without Swift or
-> Xcode; the GitHub Actions job `.github/workflows/sdk-ios.yml` (macOS runner) builds and tests it.
-> Version 0.1.0 passed that job and ran on an iPhone 13 through TestFlight. The 0.2.0 additions
-> (bottom sheet, themes, remote recipes, demo changes) were written blind and have **not** been
-> through CI yet; neither have the 0.3.0 components (gift wall, away summary, leaderboard). See
-> [Verification](#verification).
+> **Status: preview.** The package builds on macOS and for the iOS Simulator and passes all 156 tests
+> (every fixture of the shared contract), checked in CI for every release. The UI has not been tried
+> on a physical device since the bottom sheet, themes and the gift wall, away card and leaderboard
+> were added: expect rough edges in the sheet drag and scrolling. See [Verification](#verification).
 
 Requirements: iOS 15+, Swift 5.9+ (Xcode 15+). macOS 12+ is declared so the tests run on a Mac.
 
@@ -20,16 +18,16 @@ pick the `GiftingStack` product. In a `Package.swift`:
 
 ```swift
 dependencies: [
-    // Placeholder: the package lives in packages/sdk-ios of the GiftingStack repository.
-    .package(url: "https://github.com/<org>/giftingstack-ios.git", from: "0.1.0"),
+    .package(url: "https://github.com/giftingstack/sdks.git", from: "0.1.1"),
 ],
 targets: [
-    .target(name: "YourApp", dependencies: [.product(name: "GiftingStack", package: "giftingstack-ios")]),
+    .target(name: "YourApp", dependencies: [.product(name: "GiftingStack", package: "sdks")]),
 ]
 ```
 
-During development you can also add the folder as a local package (File > Add Package
-Dependencies > Add Local, choose `packages/sdk-ios`).
+The package manifest is at the root of that repository (`Package.swift`), so the repository URL is
+all Xcode needs. To work on the SDK itself, clone the repository and add `packages/sdk-ios` as a
+local package (File > Add Package Dependencies > Add Local).
 
 ## Token flow
 
@@ -149,7 +147,7 @@ data, the uptime clock as a required-reason API).
 Errors are `GiftingError` (`status`, `type`, `message`, `requestId`, `retryable`,
 `insufficientBalance`). `retryable` is true for network failures (status 0), 429 and 5xx.
 
-### Gift wall, "while you were away", leaderboard (spec 14-16, 0.3.0, not compiled yet)
+### Gift wall, "while you were away", leaderboard (spec 14-16, 0.3.0)
 
 ```swift
 let walls = GiftWallLoader(client: client)            // one per app or screen: shared batches + cache
@@ -181,7 +179,7 @@ ScrollView { GiftLeaderboard(model: board, metricToggle: true, theme: theme) }
   `onPressChip` is set, rows "Rank 1, ayla, 54,000 coins", pinned "Your rank: 417, 120 coins", an
   announcement when the away card appears, `focusOnShow` moves the focus to it.
 
-### Render slots (not compiled yet)
+### Render slots
 
 Draw the inside of a chip, a row or the card body yourself with a closure returning `AnyView?`. The SDK
 keeps loading, order, names, the container, the spoken label, the press and the actions. `nil` draws the default.
@@ -198,7 +196,7 @@ GiftAwaySummary(model: away,
 The "+37" overflow chip and the pinned "You" row stay the default. Wall chips wrap by an estimated
 width, so keep a custom chip about as wide as the default.
 
-### Gift rooms: everyone watching sees the gift (spec 17-18, beta, not compiled yet)
+### Gift rooms: everyone watching sees the gift (spec 17-18, beta)
 
 A room is everyone watching one live stream, audio room or chat. Join it on the viewer screen and
 every gift sent with that `roomId` plays on every viewer's screen, about 0.1-0.4 s after it was
@@ -268,7 +266,7 @@ struct LiveScreen: View {
   struct whose `effectEvent` the layer plays; `subscribeEvents` instead of the reference's
   `onEvent(listener)`.
 
-### Battle bar (versus; spec 18.7, not compiled yet)
+### Battle bar (versus; spec 18.7)
 
 `GiftBattleBar` draws a battle round of the room: both receivers with their scores, a countdown, and a bar whose boundary slides as gifts arrive. It draws `battleView` only; your server starts and ends rounds. Nothing is drawn while the room has no round with two sides. VoiceOver gets one element (both scores, then the result).
 
@@ -333,9 +331,6 @@ Or with [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodege
 `cd packages/sdk-ios/Demo && xcodegen generate && open GiftingStackDemo.xcodeproj`, set your team
 and Run.
 
-Without a Mac: the manual workflow `SDK iOS TestFlight` archives the demo on a GitHub runner and
-uploads it to TestFlight. Setup: [TESTFLIGHT.md](TESTFLIGHT.md).
-
 ## Development
 
 ```sh
@@ -353,17 +348,15 @@ recipes, combo, `EffectScheduler`, `PictureGate`, `EffectTimeline`, `GiftTrayCon
 
 ## Verification
 
-Nothing is compiled on the machine this package is written on: there is no Swift toolchain and no
-Mac. CI (`macos-latest`) is the compiler. Status per step:
+The package is built and tested on a macOS runner in CI for every release:
 
-| step                                       | proves                                                                                                                                                                                                                                                                                                                   | status                                                                                                                                                                                                 |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `node tool/generate-spec-data.mjs --check` | `SpecData.generated.swift` is what `recipes.json` generates                                                                                                                                                                                                                                                              | ran locally, up to date (2026-10-11)                                                                                                                                                                   |
-| `swift build`                              | Core and UI compile for macOS (SwiftUI on macOS 12+)                                                                                                                                                                                                                                                                     | 0.1.0 green in CI; 0.2.0 not run yet; 0.3.0 components never compiled                                                                                                                                  |
-| `swift test`                               | L1: constants equal `recipes.json`. L2: every case of `tiers`, `combo`, `client`, `effects`, `tray`, `sheet`, `theme`, `remote-recipes`, and (0.3.0) `wall`, `away`, `leaderboard` with their `client` sections; the SPEC 13.3 limits table; every fixture file has a runner (`placement.json` acknowledged as web only) | 0.1.0 green in CI (5 fixture files); 0.2.0 not run yet (8 files); 0.3.0 not run (11 files, runners written blind)                                                                                      |
-| `xcodebuild ... iOS Simulator`             | the package, including the UIKit-only paths, compiles for iOS                                                                                                                                                                                                                                                            | 0.1.0 green in CI; 0.2.0 not run yet; 0.3.0 never compiled                                                                                                                                             |
-| `demo` job                                 | `project.yml` is valid and the demo app compiles for iOS                                                                                                                                                                                                                                                                 | 0.1.0 green in CI; 0.2.0 not run yet; 0.3.0 demo additions never compiled                                                                                                                              |
-| TestFlight on an iPhone 13                 | the demo runs on a device                                                                                                                                                                                                                                                                                                | 0.1.0 ran (2026-10-11). A 0.2.0 build ran on an iPhone: the sheet stopped below 90 % and grid scrolling was erratic. Fixes written blind after that (see CHANGELOG): not compiled, not on a device yet |
+| step                                       | proves                                                                                                                                                                                     | status                                                                                                                                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `node tool/generate-spec-data.mjs --check` | `SpecData.generated.swift` is what `recipes.json` generates                                                                                                                                | green                                                                                                                                                                    |
+| `swift build`                              | Core and UI compile for macOS (SwiftUI on macOS 12+)                                                                                                                                       | green                                                                                                                                                                    |
+| `swift test`                               | 156 tests: the constants equal `recipes.json`, and every fixture of the shared contract (`tiers`, `combo`, `client`, `effects`, `tray`, `sheet`, `theme`, `wall`, `away`, `leaderboard` …) | green                                                                                                                                                                    |
+| `xcodebuild ... iOS Simulator`             | the package, including the UIKit-only paths, compiles for iOS                                                                                                                              | green                                                                                                                                                                    |
+| A real iPhone                              | the demo runs on a device                                                                                                                                                                  | an early build ran on an iPhone 13. Since then the bottom sheet, themes and the wall, away card and leaderboard were added: they are not tried on a device yet (preview) |
 
 Which test covers what (to trace a red run): `SheetConformanceTests` (sheet.json heights and
 scenarios, defaults 600 / 0.9, observers, velocity), `SheetMeasureTests` (measurement to

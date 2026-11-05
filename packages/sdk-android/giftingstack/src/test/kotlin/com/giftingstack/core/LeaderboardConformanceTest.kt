@@ -15,6 +15,24 @@ import org.junit.runners.Parameterized
 
 private fun board(key: String): Leaderboard = Leaderboard.fromJson(Fixtures.conformance("leaderboard.json").obj("boards").getValue(key))
 
+/** leaderboard.json "pollMs": leaderboardPollMs(refreshIntervalMs), at least 5 s once polling is on (R-17). */
+class LeaderboardPollMsConformanceTest {
+    private val poll = Fixtures.conformance("leaderboard.json").obj("pollMs")
+
+    @Test
+    fun minimum() {
+        assertEquals(poll.intOrNull("minPollMs")!!.toLong(), LEADERBOARD_MIN_POLL_MS)
+    }
+
+    @Test
+    fun cases() {
+        for (c in poll.getValue("cases").arr().map { it.obj() }) {
+            assertEquals("$c", c.intOrNull("expect")!!.toLong(), leaderboardPollMs(c.intOrNull("refreshIntervalMs")!!.toLong()))
+        }
+        assertEquals(0L, leaderboardPollMs(null))
+    }
+}
+
 /** leaderboard.json "rankLabel". */
 @RunWith(Parameterized::class)
 class LeaderboardRankLabelConformanceTest(private val name: String, private val c: JsonObject) {
