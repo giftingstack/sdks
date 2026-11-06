@@ -136,7 +136,7 @@ export const CSS: string = `
   will-change: transform; transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .gs-handle {
-  flex: none; display: flex; justify-content: center; margin: 0 -14px -8px; padding: 8px 0 4px;
+  flex: none; display: flex; justify-content: center; margin: 0 -14px; padding: 8px 0 4px;
   border: 0; background: none; cursor: grab; touch-action: none;
 }
 .gs-dragging .gs-handle { cursor: grabbing; }

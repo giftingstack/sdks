@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+No code change. The shared version moved with the web, React Native and iOS trays, whose "Test mode"
+badge no longer touches the drag handle (SPEC 9.1); this tray already matched.
+
 ## 0.1.1
 
 - Leaderboard polling is at least 5,000 ms (SPEC 16.4, audit R-17): `GiftLeaderboard(refreshIntervalMs = ...)`

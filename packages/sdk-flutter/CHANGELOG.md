@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+No code change. The shared version moved with the web, React Native and iOS trays, whose "Test mode"
+badge no longer touches the drag handle (SPEC 9.1); this tray already matched.
+
 ## 0.1.1
 
 No code change. The four SDKs (JavaScript, Flutter, Android, iOS) share one version number from now

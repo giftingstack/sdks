@@ -3,6 +3,12 @@
 All notable changes to `@giftingstack/sdk`. The shared contract (`packages/sdk-spec`) has its own
 version (`SPEC_VERSION`); this package states which one it passes.
 
+## 0.1.2
+
+- The tray's "Test mode" badge no longer touches the drag handle: the header starts right below the
+  handle (web and React Native; SPEC 9.1). The sheet is a few points taller; its heights are measured,
+  so nothing else changes.
+
 ## 0.1.1
 
 No code change. The four SDKs (JavaScript, Flutter, Android, iOS) share one version number from now

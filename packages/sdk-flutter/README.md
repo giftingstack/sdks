@@ -5,7 +5,7 @@ GiftingStack API. Flutter port of
 `@giftingstack/sdk` (React Native), built from the shared contract in `packages/sdk-spec`
 (spec 1.0.0). Dart 3, null-safe. Dependencies: `flutter` and `http`.
 
-Status: 0.1.1, a preview: the API can still change before 1.0 (see `CHANGELOG.md`). The logic is
+Status: 0.1.2, a preview: the API can still change before 1.0 (see `CHANGELOG.md`). The logic is
 machine-checked; how the animations and the sheet drag feel is not checked on a device yet (see
 "Verification"). The newest Flutter demo was not run on a phone or an emulator at all.
 
@@ -19,7 +19,7 @@ or in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  giftingstack: ^0.1.1
+  giftingstack: ^0.1.2
 ```
 
 The pure Dart part (no Flutter imports) is `package:giftingstack/giftingstack_core.dart`. The whole

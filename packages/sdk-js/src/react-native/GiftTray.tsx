@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     marginHorizontal: -14,
     marginTop: -6,
-    marginBottom: -12,
+    marginBottom: -6,
   },
   handlePill: { width: 36, height: 5, borderRadius: 3, opacity: 0.7 },
   sheetGrid: { flex: 1 },

@@ -360,7 +360,6 @@ extension GiftTray {
             .accessibilityAction(named: Text(verbatim: "Show fewer gifts")) {
                 _ = sheetModel.controller.step(-1)
             }
-            .padding(.bottom, -8)
     }
 
     /// The grid is scrolled by the sheet's own gesture (iOS 15 has no way to switch a

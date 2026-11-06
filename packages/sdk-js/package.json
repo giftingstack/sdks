@@ -1,6 +1,6 @@
 {
   "name": "@giftingstack/sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "description": "Gift tray and effects for apps that use GiftingStack: shared recipes, a small API client, React Native components and a framework-free web player.",

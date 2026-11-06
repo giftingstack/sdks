@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 (preview)
+
+- The tray's "Test mode" badge no longer touches the drag handle: the header starts right below the
+  handle (SPEC 9.1). The sheet is a few points taller; its heights are measured, so nothing else changes.
+
 ## 0.1.1 (preview)
 
 First release as a Swift package, together with the JavaScript, Flutter and Android SDKs (all four

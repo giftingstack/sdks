@@ -696,7 +696,7 @@ SHOULD offer the same or respect the system inset). The web tray adds `getSheetS
   price row as in the cells; max 45 % wide; hidden from screen readers, the Send label already
   names the gift) and the Send button (flex 1); padding 10 top, 14 sides, 14 bottom (+ safe area),
   side borders. The body slides down behind the footer.
-- Handle: a button the full width of the sheet, padding 8 top and 4 bottom, margin -8 below; a
+- Handle: a button the full width of the sheet, padding 8 top and 4 bottom, no negative margin (the header starts right below it, so the Test mode badge never touches the pill); a
   pill 36 x 5, radius 3, `muted` at opacity 0.7. Focus ring on the pill (web).
 - Grid: fills the rest of the body (no `gridMaxHeight`). It scrolls only when `gridScrollable`.
 - In `peek` (settled) the grid is out of sight and MUST be out of the tab order and the

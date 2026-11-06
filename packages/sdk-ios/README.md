@@ -18,7 +18,7 @@ pick the `GiftingStack` product. In a `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/giftingstack/sdks.git", from: "0.1.1"),
+    .package(url: "https://github.com/giftingstack/sdks.git", from: "0.1.2"),
 ],
 targets: [
     .target(name: "YourApp", dependencies: [.product(name: "GiftingStack", package: "sdks")]),

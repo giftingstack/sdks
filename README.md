@@ -1,7 +1,7 @@
 # GiftingStack SDKs
 
 Client libraries for [GiftingStack](https://giftingstack.com), a virtual gifting API for apps: your
-users send each other gifts, and everyone sees them. Version 0.1.1.
+users send each other gifts, and everyone sees them. Version 0.1.2.
 
 Gifts are a virtual currency inside your app. No real money moves through GiftingStack, and a
 received gift never becomes spendable balance.
