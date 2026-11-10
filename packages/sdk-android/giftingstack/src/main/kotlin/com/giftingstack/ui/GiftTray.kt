@@ -691,8 +691,9 @@ private fun TrayHeader(
         BasicText(
             title,
             modifier = Modifier.weight(1f),
-            // On a narrow screen the title gives way (two lines at most); the badge and the balance never overlap it.
-            maxLines = 2,
+            // One line, ends with "…" (SPEC 9): the badge and the balance never overlap it, and a long or
+            // translated title never changes the peek height.
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             style = TextStyle(color = theme.text, fontSize = 15.sp, fontWeight = FontWeight.Bold),
         )

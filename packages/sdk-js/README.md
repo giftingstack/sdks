@@ -808,7 +808,7 @@ GiftingStack's own repository, so it does not run from this repository.
   `react-native-web`, plus unit tests. **Not measured on an older or low-end phone**: check frame rate there
   before you rely on it, and use `quality="low"` if needed.
 - The pictures are still images. The effect is drawn around them.
-- Version 0.1.3 is a preview: the API can still change before 1.0. The package is ESM with types
+- Version 0.1.4 is a preview: the API can still change before 1.0. The package is ESM with types
   (`npm run build`); `npm run prepublishOnly` (tests, typecheck, build) runs before every publish.
 
 ## License

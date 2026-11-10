@@ -448,7 +448,9 @@ export function GiftTray(props: GiftTrayProps) {
 
   const head = (
     <View style={styles.head}>
-      <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+      <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>
+        {title}
+      </Text>
       {testMode && (
         <View style={styles.testBadge} testID="gift-test-mode">
           <Text style={styles.testBadgeText}>{testModeLabel}</Text>
@@ -611,7 +613,14 @@ export function GiftTray(props: GiftTrayProps) {
       importantForAccessibility={open ? "auto" : "no-hide-descendants"}
       testID="gift-sheet"
     >
-      {props.scrim && <Scrim on={scrimOn} active={scrimActive} fadeMs={scrimFadeMs(s.reduced)} onPress={tapScrim} />}
+      {props.scrim && (
+        <Scrim
+          on={scrimOn}
+          active={scrimActive}
+          fadeMs={scrimFadeMs(s.reduced)}
+          onPress={tapScrim}
+        />
+      )}
       <View
         style={[
           styles.sheetRoot,
@@ -717,7 +726,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   head: { flexDirection: "row", alignItems: "center", gap: 10 },
-  title: { flex: 1, fontSize: 15, fontWeight: "700" },
+  // One line, ends with "…" (SPEC 9): a long or translated title never changes the peek height.
+  title: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: "700" },
   testBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,

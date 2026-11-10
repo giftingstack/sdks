@@ -374,8 +374,10 @@ public struct GiftTray: View {
             Text(verbatim: title)
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(theme.text)
-                // On a narrow screen the title gives way (two lines at most); the badge and the balance never overlap it.
-                .lineLimit(2)
+                // One line, ends with "…" (SPEC 9): the badge and the balance never overlap it, and a long or
+                // translated title never changes the peek height.
+                .lineLimit(1)
+                .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if showsTestMode {

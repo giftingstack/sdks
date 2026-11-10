@@ -1,6 +1,6 @@
 {
   "name": "@giftingstack/sdk",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "license": "MIT",
   "type": "module",
   "description": "Gift tray and effects for apps that use GiftingStack: shared recipes, a small API client, React Native components and a framework-free web player.",
@@ -89,7 +89,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "jsdom": "^30.1.3",
+    "jsdom": "^30.1.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-native": "^0.87.1",

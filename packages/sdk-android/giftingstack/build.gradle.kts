@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.giftingstack"
-version = "0.1.3"
+version = "0.1.4"
 
 // The conformance fixtures live in the sibling package packages/sdk-spec. They are used by the tests
 // only; a checkout without that folder still builds and publishes the library.
@@ -98,7 +98,7 @@ dependencies {
 }
 
 // Publishing (not run by the tests): `./gradlew :giftingstack:publishReleasePublicationToMavenLocal` for a
-// local check. The coordinates are com.giftingstack:giftingstack:0.1.3. Releasing to Maven Central needs
+// local check. The coordinates are com.giftingstack:giftingstack:0.1.4. Releasing to Maven Central needs
 // the signing key and the repository credentials from the environment; nothing is published from CI yet.
 afterEvaluate {
     publishing {
@@ -107,7 +107,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.giftingstack"
                 artifactId = "giftingstack"
-                version = "0.1.3"
+                version = "0.1.4"
                 pom {
                     name.set("GiftingStack Android SDK")
                     description.set(

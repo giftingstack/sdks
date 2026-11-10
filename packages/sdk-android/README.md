@@ -14,11 +14,11 @@ post, spec 14), a "while you were away" card with an effect replay (15) and a le
 
 ## Install
 
-The coordinates are `com.giftingstack:giftingstack:0.1.3` on Maven Central:
+The coordinates are `com.giftingstack:giftingstack:0.1.4` on Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("com.giftingstack:giftingstack:0.1.3")
+    implementation("com.giftingstack:giftingstack:0.1.4")
 }
 ```
 

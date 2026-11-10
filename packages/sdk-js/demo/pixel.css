@@ -154,6 +154,9 @@ p {
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--card) 94%, transparent);
   backdrop-filter: blur(14px);
+  /* Above the page content that scrolls under it (the battle bar is positioned and sits later in
+     the document); the gift tray and its dim are z-index 1 too and come later, so they stay above. */
+  z-index: 1;
 }
 .tab {
   position: relative;

@@ -698,8 +698,13 @@ class GiftTrayWidgetState extends State<GiftTray>
     return Row(
       children: <Widget>[
         Expanded(
+          // One line, ends with "…" (SPEC 9): a long or translated title never
+          // changes the peek height.
           child: Text(
             widget.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
             style: _style(theme.text, 15, FontWeight.w700),
           ),
         ),

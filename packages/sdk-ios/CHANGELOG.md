@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 (preview)
+
+- The tray title stays on one line and ends with "…" when it does not fit (SPEC 9): a long or translated `title` no longer wraps and pushes the small (peek) tray taller.
+
 ## 0.1.3 (preview)
 
 - With `scrim` on, a tap on the empty space beside a tray at peek (the small state) now closes it: the dim stays hidden there, but it takes the tap (SPEC 9.4, `scrimTakesTouches`; a tall tray still lowers to peek first with `scrimTap` "lower"). The page behind a peeking tray is no longer touchable while the tray is open; leave `scrim` off for that.

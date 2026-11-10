@@ -3,6 +3,11 @@
 All notable changes to `@giftingstack/sdk`. The shared contract (`packages/sdk-spec`) has its own
 version (`SPEC_VERSION`); this package states which one it passes.
 
+## 0.1.4
+
+- React Native: the gift notice's text shrinks and ends with "…", so the combo count (x2, x3) stays inside the pill (found on a real iPhone through Expo Go; same rule as the web notice).
+- The tray title stays on one line and ends with "…" when it does not fit (SPEC 9): a long or translated `title` no longer wraps and pushes the small (peek) tray taller.
+
 ## 0.1.3
 
 The React Native layer has the same changes as the web one (jsdom tests only); it was not tried on a device for this release.

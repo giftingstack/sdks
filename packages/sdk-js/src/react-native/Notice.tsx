@@ -153,11 +153,17 @@ export function Notice({
           {data.senderName.slice(0, 1).toUpperCase()}
         </Text>
       </View>
-      <View>
-        <Text style={[styles.name, { color: big ? theme.noticeBigText : theme.noticeText }]}>
+      <View style={styles.text}>
+        <Text
+          numberOfLines={1}
+          style={[styles.name, { color: big ? theme.noticeBigText : theme.noticeText }]}
+        >
           {data.senderName}
         </Text>
-        <Text style={[styles.what, { color: big ? theme.noticeBigText : theme.noticeText }]}>
+        <Text
+          numberOfLines={1}
+          style={[styles.what, { color: big ? theme.noticeBigText : theme.noticeText }]}
+        >
           {receiver ? `sent ${data.giftName} to ${receiver.name}` : `sent ${data.giftName}`}
         </Text>
       </View>
@@ -168,7 +174,7 @@ export function Notice({
           source={{ uri: pictureSrc(data.image) as string }}
           onError={() => pictureFailed(data.image)}
           fadeDuration={0}
-          style={{ width: big ? 46 : 36, height: big ? 46 : 36 }}
+          style={{ width: big ? 46 : 36, height: big ? 46 : 36, flexShrink: 0 }}
           resizeMode="contain"
         />
       )}
@@ -206,6 +212,7 @@ const styles = StyleSheet.create({
     maxWidth: "92%",
   },
   avatar: {
+    flexShrink: 0,
     width: 28,
     height: 28,
     borderRadius: 14,
@@ -214,10 +221,17 @@ const styles = StyleSheet.create({
   },
   avatarBig: { width: 34, height: 34, borderRadius: 17 },
   avatarText: { fontWeight: "700", fontSize: 12 },
+  // Like the web notice: the text column shrinks and ends with "…", so a long gift or receiver
+  // name never pushes the combo count out of the pill.
+  text: { flexShrink: 1, minWidth: 0 },
   name: { fontWeight: "700", fontSize: 12.5, lineHeight: 15 },
   what: { fontSize: 12.5, lineHeight: 15, opacity: 0.92 },
   combo: {
+    flexShrink: 0,
     fontSize: 28,
+    lineHeight: 32,
+    // Room for the italic slant of the last digit.
+    paddingRight: 2,
     fontWeight: "800",
     fontStyle: "italic",
     minWidth: 40,

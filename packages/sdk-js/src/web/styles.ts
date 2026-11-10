@@ -78,7 +78,10 @@ export const CSS: string = `
   opacity: 0; object-fit: contain; pointer-events: none;
 }
 .gs-head { display: flex; align-items: center; gap: 10px; }
-.gs-title { flex: 1; margin: 0; font-size: 15px; font-weight: 700; color: var(--gs-text); }
+.gs-title {
+  flex: 1; min-width: 0; margin: 0; font-size: 15px; font-weight: 700; color: var(--gs-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .gs-test-badge {
   flex: none; padding: 2px 8px; border-radius: 6px; background: #f5a524; color: #1a1300;
   font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;

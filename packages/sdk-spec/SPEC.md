@@ -618,7 +618,7 @@ Parameters and defaults: `gifts`, `balance`, `onSend(gift)`, `onTopUp?` (enables
 Layout intent (dp): a bottom sheet with top corners 24, hairline border (`border`), padding 14,
 vertical gap 12, background `surface`.
 
-- Header row (gap 10): title (15, bold, `text`, takes the free width); balance pill
+- Header row (gap 10): title (15, bold, `text`, takes the free width; one line, ends with "…" when it does not fit, so a long or translated title never changes the peek height); balance pill
   (`background`, padding 4 x 10, a 14 dp `coin` disc, the number 13 bold tabular digits); "+ Coins"
   (13 bold, `coin`) only when `onTopUp` is given; it calls `onTopUp`.
 - Test mode badge (after the title, only when `testMode`): `testModeLabel` in capitals, 11

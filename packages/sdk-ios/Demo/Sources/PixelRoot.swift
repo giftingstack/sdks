@@ -161,7 +161,7 @@ private struct PixelContent: View {
             // come from the model.
             tray: tray,
             onTopUp: { model.storeOpen = true },
-            title: "Gift \(PixelData.firstName(post.author))",
+            title: "Send a gift",
             defaultSelectedId: model.trayGiftId ?? model.selectedId,
             bottomPadding: 14 + bottomInset + 56,
             theme: theme,

@@ -338,7 +338,7 @@ fun PixelApp(awayOnce: AwayOnce) {
                     scrimTap = ScrimTap.Dismiss,
                     // A real app opens ITS coin store here; the demo's pretend store ADDS the coins.
                     onTopUp = { store = true },
-                    title = "Send a gift to ${firstName(forPost.author)}",
+                    title = "Send a gift",
                     defaultSelectedId = trayGift ?: selected?.id ?: "sun-dragon",
                     theme = theme,
                     onSelectedChange = { selected = it },
