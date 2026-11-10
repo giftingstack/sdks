@@ -157,6 +157,9 @@ export const CSS: string = `
   background: var(--gs-surface); pointer-events: auto;
 }
 .gs-footer .gs-send { flex: 1; width: auto; min-width: 0; }
+/* The footer stays put (spec 9.1) and takes no drag, but a finger on it must not scroll or pull the
+   page behind the sheet either (the header does the same). Taps still work. */
+.gs-sheet .gs-footer { touch-action: none; user-select: none; -webkit-user-select: none; }
 .gs-picked { flex: none; display: flex; align-items: center; gap: 8px; max-width: 45%; min-width: 0; }
 .gs-picked-icon { flex: none; width: 36px; height: 36px; object-fit: contain; }
 .gs-picked-text { display: flex; flex-direction: column; min-width: 0; }

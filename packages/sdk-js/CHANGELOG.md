@@ -3,6 +3,10 @@
 All notable changes to `@giftingstack/sdk`. The shared contract (`packages/sdk-spec`) has its own
 version (`SPEC_VERSION`); this package states which one it passes.
 
+## 0.1.5
+
+- Web: a finger on the tray footer (selected gift and Send) no longer scrolls the page behind the sheet; the header already behaved that way. Taps still work.
+
 ## 0.1.4
 
 - React Native: the gift notice's text shrinks and ends with "…", so the combo count (x2, x3) stays inside the pill (found on a real iPhone through Expo Go; same rule as the web notice).

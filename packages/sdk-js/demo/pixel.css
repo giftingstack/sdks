@@ -44,6 +44,10 @@ html,
 body {
   height: 100%;
   margin: 0;
+  /* The app fills the screen and scrolls inside: the page itself never moves (in the site's phone
+     frame a drag from the sheet's footer must not pan the framed page). */
+  overflow: hidden;
+  overscroll-behavior: none;
   background: var(--bg);
   color: var(--text);
   font-family:

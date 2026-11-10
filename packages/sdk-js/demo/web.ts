@@ -115,6 +115,8 @@ async function main(): Promise<void> {
   if (new URLSearchParams(location.search).get("embed") === "1" && window.parent !== window) {
     const post = (call: Record<string, unknown>): void =>
       window.parent.postMessage({ type: "giftingstack-demo-call", call }, "*");
+    // The app is up: the page can show the frame now, without waiting for every picture to load.
+    window.parent.postMessage({ type: "giftingstack-demo-ready" }, "*");
     const send = client.sendGift.bind(client);
     client.sendGift = async (input) => {
       const body = {
