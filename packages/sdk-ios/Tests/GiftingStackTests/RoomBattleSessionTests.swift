@@ -58,6 +58,51 @@ final class RoomBattleSessionTests: XCTestCase {
         return Session(clock: clock, script: script, room: room)
     }
 
+    private static func giftJSON(_ at: Int, _ to: String) -> String {
+        #"{"t":"gift","id":\#(at),"at":\#(at),"tx":"gtx_\#(at)","gift":{"id":"rose","name":"Rose","price":10},"quantity":1,"sender":{"id":"u1","name":"Ava"},"receiver":{"id":"\#(to)"}}"#
+    }
+
+    func testAGiftOfTheRoundGetsTheReceiverWithTheRoomNamesAndColoursAndReceiverForAnswersForNow() async throws {
+        let clock = FakeGiftClock()
+        let script = RoomSessionScript()
+        var events: [RoomGiftEvent] = []
+        let room = RoomClient(
+            room: "live_1",
+            getToken: { force in
+                try await script.token(force)
+            },
+            socket: { url, protocols, handlers in
+                script.open(url, protocols, handlers)
+            },
+            resolveName: { $0 == "mateo" ? "Mateo" : nil },
+            sideColors: ["#ff3366", "#00aa88"],
+            onEvent: { events.append($0) },
+            heartbeatMs: 0,
+            clock: clock
+        )
+        room.start()
+        await clock.settle()
+        try script.resolveToken("tok", "start")
+        await clock.settle()
+        try script.newest("open").handlers.onOpen()
+        let socket = try script.newest("socket")
+        XCTAssertNil(room.receiverFor("ava"))
+        socket.handlers.onMessage(RoomBattleSessionTests.welcome(now: 5_000, battle: RoomBattleSessionTests.battleJSON(0, 0)))
+        socket.handlers.onMessage(RoomBattleSessionTests.giftJSON(5_000, "mateo"))
+        socket.handlers.onMessage(RoomBattleSessionTests.giftJSON(5_001, "ava"))
+        socket.handlers.onMessage(RoomBattleSessionTests.giftJSON(5_002, "viewer"))
+        XCTAssertEqual(events.count, 3)
+        XCTAssertEqual(events[0].receiver, GiftEffectReceiver(name: "Mateo", side: 1, color: "#00aa88"))
+        XCTAssertEqual(events[1].receiver, GiftEffectReceiver(name: "ava", side: 0, color: "#ff3366"))
+        XCTAssertNil(events[2].receiver)
+        XCTAssertEqual(room.receiverFor("mateo")?.name, "Mateo")
+        XCTAssertNil(room.receiverFor("viewer"))
+        socket.handlers.onMessage(#"{"t":"scores","battle":null}"#)
+        socket.handlers.onMessage(RoomBattleSessionTests.giftJSON(5_003, "mateo"))
+        XCTAssertNil(events[3].receiver)
+        XCTAssertNil(room.receiverFor("mateo"))
+    }
+
     func testTakesTheRoundFromWelcomeThenEachScoresFrameNilWhenRemoved() async throws {
         let s = try await open()
         var seen: [RoomBattle?] = []

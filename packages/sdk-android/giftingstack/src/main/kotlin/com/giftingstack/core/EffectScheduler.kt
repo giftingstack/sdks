@@ -21,6 +21,9 @@ data class ScheduledEffect(
     val count: Int,
 )
 
+/** What tells two receivers apart for the combo and the notice key: the side and the name. Null without a receiver. */
+private fun receiverKey(r: GiftEffectReceiver?): String? = r?.let { "${it.side ?: ""}:${it.name}" }
+
 data class NoticeData(
     /** Changes when a different gift or sender starts a new notice. */
     val id: Int,
@@ -30,6 +33,8 @@ data class NoticeData(
     /** Gifts in a row, 1 for a single gift. */
     val count: Int,
     val big: Boolean,
+    /** Only in a battle (SPEC 7.4): who got the gift and the side's colour. */
+    val receiver: GiftEffectReceiver? = null,
 )
 
 /** What the UI implements. All calls come on the thread that called the scheduler. */
@@ -129,7 +134,9 @@ class EffectScheduler(
         val sender = event.sender ?: DEFAULT_SENDER_NAME
         val quantity = event.quantity ?: 1
         val id = nextId++
-        val run = combo.hit(sender, event.gift.id, now())
+        // A combo counts per receiver too: gifts to two hosts of a battle are two runs.
+        val rkey = receiverKey(event.receiver)
+        val run = combo.hit(sender, if (rkey == null) event.gift.id else "${event.gift.id}\u0000$rkey", now())
         val count = if (quantity > 1) quantity else run
         val item = ScheduledEffect(id, event, recipe, count)
         // Without an effect the notice shows now; with one, it shows when the effect starts.
@@ -209,7 +216,10 @@ class EffectScheduler(
     private fun showNotice(item: ScheduledEffect) {
         val event = item.event
         val sender = event.sender ?: DEFAULT_SENDER_NAME
-        val key = "$sender|${event.gift.id}"
+        val receiver = event.receiver
+        // The receiver is part of the key: a combo to one host and one to the other are two notices.
+        val rkey = receiverKey(receiver)
+        val key = if (rkey == null) "$sender|${event.gift.id}" else "$sender|${event.gift.id}|$rkey"
         noticeOwner = item.id
         // Every pair keeps its own id while it is remembered, so a combo returns to its own line
         // even when other people sent gifts in between.
@@ -225,6 +235,7 @@ class EffectScheduler(
                 image = event.gift.icon ?: event.gift.image,
                 count = item.count,
                 big = item.recipe.noticeBig,
+                receiver = receiver?.let { GiftEffectReceiver(it.name, it.side, it.color) },
             )
         noticeData = data
         noticeVisible = true

@@ -460,6 +460,24 @@ Drawing order, back to front: dim, rays, glow, sparks, coins, picture. The pictu
   `sent {giftName}` (12.5, opacity 0.92); the picture (`data.image`) 36 (big: 46), contain, only if
   not null; the counter `x{count}` only if `count > 1` (28, weight 800, italic, min width 40,
   centred).
+- Battle receiver (added 2026-11-07): when `data.receiver` is set (only in a battle, 18.4; an app
+  may also set `GiftEffectEvent.receiver` itself) line two reads `sent {giftName} to {receiver.name}`
+  and the pill gets a 2 px border in the side colour: `receiver.color` (any CSS/hex colour the
+  customer gave; one the platform cannot read counts as none), else the side's colour of the default
+  palette: side 0 = the theme's accent, side 1 = its coin colour, side 2 = teal `#2ec4b6`, side 3 =
+  pink `#ff5d8f`, then the same four again (the battle bar's palette, 18.7; a battle has up to 8
+  sides). Inside that border runs a 1 px line in
+  the pill's text colour (`noticeText`, big: `noticeBigText`), so the ring shows even where the side
+  colour is the pill's own colour (the default accent on the default notice, 2026-11-07 phone test).
+  Both sit INSIDE the pill's edge (web: inset shadows; elsewhere the padding gives the 3 px back), so
+  the pill keeps its size and lines with and without a receiver line up. Text stays in `noticeText`: the border is the colour cue
+  (contrast). Without a receiver nothing changes (no border, line two as before). A receiver is told
+  apart by `{side}:{name}` (side empty when absent): the scheduler's notice key is `{sender}|{gift id}`
+  plus `|{side}:{name}` when a receiver is set, and the combo runs per `(sender, gift id, receiver)`
+  (the combo key is the gift id alone without a receiver, so every existing fixture is unchanged), so
+  a combo to one side and one to the other are two notices with their own counters, even for two
+  hosts with the same name. `NoticeData.receiver` carries `{ name, side?, color }` (`color` null when
+  none was given). Fixtures `effects.json` (scenarios) and `rooms-mapping.json`.
 - Colours: background `noticeBackground` (big: `noticeBigBackground`), text `noticeText` (big:
   `noticeBigText`), counter `comboText` (big: `noticeBigText`).
 - Slide: visible animates a progress to 1 over 380 ms (ease-out back 1.2); hidden animates it to 0
@@ -994,9 +1012,9 @@ Reference: `packages/sdk-js/src/core/scrim.ts` (pure), `src/web/GiftTray.ts` + `
 
 Pure core (all platforms port it; fixture `tray-scrim.json`): the constants `SCRIM_FADE_MS = 200`
 and `SCRIM_OPACITY = 0.4`; `scrimVisible({ scrim, open, snap, placed })`;
-`scrimFadeMs(reducedMotion)`; `scrimTapOutcome({ scrim, scrimTap = lower, open, snap })`; the
+`scrimTakesTouches({ scrim, open, placed })`; `scrimFadeMs(reducedMotion)`; `scrimTapOutcome({ scrim, scrimTap = lower, open, snap })`; the
 class `TrayOpenState({ open = true, onChange })`. Dart names: `kScrimFadeMs`, `kScrimOpacity`,
-`scrimVisible`, `scrimFadeMs`, `scrimTapOutcome` (returns `ScrimTapOutcome.ignored`, `.lower` or
+`scrimVisible`, `scrimTakesTouches`, `scrimFadeMs`, `scrimTapOutcome` (returns `ScrimTapOutcome.ignored`, `.lower` or
 `.dismiss`), `TrayOpenState`.
 
 #### Pure functions
@@ -1008,13 +1026,16 @@ scrimVisible = scrim AND open AND placed AND snap != peek
    placed = the sheet is measured and drawn where it belongs (web: phase "placing" or "live";
             RN: its `ready` after the placing jump; Flutter: `_shown`)
 
+scrimTakesTouches = scrim AND open AND placed          (every snap, peek included; 2026-11-09)
+
 scrimFadeMs(reducedMotion) = reducedMotion ? 0 : 200
 
 scrimTapOutcome:
    not scrim or not open                      -> "ignored"
    scrimTap == lower and snap != peek         -> "lower"
    otherwise                                  -> "dismiss"
-      (lower from peek dismisses; dismiss mode dismisses from every state)
+      (lower from peek dismisses; dismiss mode dismisses from every state; the tap from peek is
+      real: the scrim takes touches at peek, see below)
 ```
 
 `TrayOpenState`: `isOpen`, `open()`, `close()`, `toggle()`; each method returns the new state. A
@@ -1045,15 +1066,21 @@ is shown, as before).
 - It is hidden while the sheet is at `peek` (the page or stream stays in sight). `snap` is what
   counts, so the dim goes away the moment a snap TO peek is chosen (the target), not when the
   animation ends, and comes back when a snap to `default` or `expanded` is chosen.
-- Touches: it takes touches **only while `scrimVisible` is true**. While visible it takes every
+- Touches (changed 2026-11-09, owner's phone test: a tap on the empty space beside a small tray did
+  nothing): it takes touches **whenever `scrimTakesTouches` is true**, that is in every state of
+  an open, placed tray, **peek included**, although the dim is not drawn at peek. It takes every
   touch above the sheet (the sheet and the footer above it keep theirs); an activation (click,
-  press, tap) is a "scrim tap". While hidden or fading out it takes none: they reach the screen
-  behind (web `pointer-events: none`, RN `pointerEvents="none"`, Flutter `IgnorePointer`).
+  press, tap) is a "scrim tap"; from peek it dismisses (`scrimTapOutcome`). The page behind a
+  peeking tray is therefore no longer touchable while the tray is open: the first tap closes the
+  tray (as in TikTok), the next one reaches the page. A host that wants a touchable page beside a
+  small tray leaves `scrim` off. When the tray is closed or not placed it takes none: they reach
+  the screen behind (web `pointer-events: none`, RN `pointerEvents="none"`, Flutter
+  `IgnorePointer`).
 - Accessibility: web `aria-hidden="true"` (keyboard users have the handle and `close()`);
-  native: a button labelled `"Close gift tray"` while visible, excluded from the accessibility
-  tree while hidden.
+  native: a button labelled `"Close gift tray"` while it takes touches, excluded from the
+  accessibility tree otherwise.
 - Markers for tests. Web: `data-gs-scrim` on the element, `data-gs-visible` while visible, an
-  inline `transition-duration` of `"200ms"` or `"0ms"`. Flutter: the `GestureDetector` has
+  `data-gs-active` while it takes touches, an inline `transition-duration` of `"200ms"` or `"0ms"`. Flutter: the `GestureDetector` has
   `ValueKey('tray-scrim')` and an `AnimatedOpacity` below it (`opacity` 0 or 0.4, `duration`
   200 ms or zero). RN: `testID="gift-scrim"` (the dim) and `"gift-scrim-press"` (the button).
 
@@ -1080,7 +1107,7 @@ is shown, as before).
   The web popover keeps its own `open()`, `close()`, `toggle()`, `isOpen()` of 9.3 (Escape,
   outside click, the anchor); for the inline tray they do nothing and `isOpen()` is `true`.
 - **Closed** means: the sheet, the footer and the scrim are invisible (web `hidden` on the tray
-  root; RN opacity 0; Flutter opacity 0 over 180 ms), take no touches (RN `pointerEvents="none"`,
+  root; RN opacity 0; Flutter opacity 0 over 200 ms), take no touches (RN `pointerEvents="none"`,
   Flutter `IgnorePointer`) and are out of the accessibility tree. The tray's data (gifts,
   balance, selection, loading) keeps working. `onInsetChange(0)` is called once when it closes
   (and once at the start when `open` is false), so the notice drops to its base position. While
@@ -1088,9 +1115,17 @@ is shown, as before).
 - When it closes, the sheet goes back to `initialSnap` **with a jump** (it is invisible), so
   nothing glides on the next open. `onSnapChange(initialSnap)` is called if that changes the
   snap. The person's selected gift stays.
+- Entrance feel (Flutter, iOS and web, same values, 2026-11-09 phone test: iOS appeared "hard"; the
+  site demo followed the same day): once placed the whole sheet fades in over 200 ms (ease-out) while
+  rising from 3 % of its height below its place over 220 ms (ease-out-cubic); snaps are a critically
+  damped spring (mass 1, stiffness 320, damping 36; web keeps its 280 ms ease-out snap curve).
+  Reduced motion: none of it (shown at once, snaps jump). Closing is at once. Web: the CSS animations
+  `gs-sheet-fade` and `gs-sheet-rise` on the tray root, switched on by `data-gs-entering` when the
+  sheet is placed and off at the end of the rise. Android (200 ms entrance) and React Native keep
+  their own entrance.
 - When it opens, the sheet is placed again at `initialSnap` without a glide (web: the
   "measuring" and "placing" phases run again, so it is invisible until measured, at most 700 ms;
-  RN: placed with a jump, shown in the next render; Flutter: it fades in over 180 ms),
+  RN: placed with a jump, shown in the next render; Flutter: it fades in over 200 ms),
   `scrimVisible` turns true once placed, and `onInsetChange(visibleHeight)` is called with the
   new inset.
 - `onOpenChange(open)` (the web option, the holders) runs after every change and never for a call
@@ -2069,6 +2104,29 @@ event's `icon_url`, else the catalog's `icon_url`, else `null`; `sender` = `send
 "Someone"); `quantity`; plus `id`, `tx`, `at`, `senderId`, `senderName` (the name claim or null),
 `receiverId` (or null), `replayed` (came in a `welcome`).
 
+`receiver` (added 2026-11-07, only in battles): given the room's current battle (`RoomClient` passes
+its own) with at least two sides, when the gift's receiver id is one of the sides (any of
+`scores[0..n-1]`, the API allows up to 8: a free-for-all, 2026-11-09) and the gift belongs to the round
+(`battle.started <= gift.at < battle.ends`, both server clock: a replayed gift from before the round
+or a gift at or after its end is no battle gift) the event gets `receiver { name, side, color }`:
+`name` = `resolveName(receiver id)` (empty or failing counts as nothing), else the id; `side` = the
+index in `scores`; `color` = the option `sideColors[side]` (the bar's list, any CSS/hex string; the
+list may be shorter than the sides or longer; a missing entry counts as none), else null (the notice
+then uses the default palette, 7.4). No battle, one side, or a receiver that is no side: no
+`receiver` key, so the notice looks as before. The options are `battle` and `sideColors` of
+`roomGiftToEffect`; every platform's room entry point (web `joinRoom` and `<gift-room side-colors>`,
+React Native `useGiftRoom`, Flutter `GiftRoom`, Android `rememberGiftRoom`, iOS `GiftRoomModel`)
+takes `sideColors` and `RoomClient` passes its current battle. Pass the same colours to the bar and
+the room.
+
+The user's OWN gift (played by the tray at the tap, 9.x) says who got it too: the tray option
+`receiverOf(receiver id)` (web `createGiftTray`, React Native `useGiftTray`, Flutter
+`GiftTrayNotifier`, Android `rememberGiftTray`/`GiftTrayController`, iOS `GiftTrayController`) returns the
+side for the tray's receiver and the tray puts it on the effect event; the room offers it as
+`receiverFor(user)` (`RoomClient.receiverFor`, `joinRoom(...).receiverFor`, `GiftRoom.receiverFor`,
+`GiftRoomModel.receiverFor`), which is `battleReceiver` for the server time now (a throwing
+`receiverOf` counts as none). Wire it with `receiverOf: room.receiverFor`.
+
 ### 18.5 Session (`RoomClient`)
 
 States: `idle`, `connecting`, `open`, `reconnecting` (with `attempt` and `retryInMs`), `paused`,
@@ -2146,20 +2204,31 @@ and `RoomBattle` model exist on each.
 
 ### 18.7 Battle bar (drawn)
 
-A drawn versus bar on all five SDKs (web `GiftBattleBar`, React Native `BattleBar`, Flutter
+A drawn bar on all five SDKs (web `GiftBattleBar`, React Native `BattleBar`, Flutter
 `GiftBattleBar`, Android `GiftBattleBar`, iOS `GiftBattleBar`). Fixture `conformance/battle-bar.json`.
 It draws `battleView` and decides nothing about the round. Hidden (nothing drawn) while the room has
-no round with two sides; a third side is ignored.
+no round with two sides. Two sides are the classic versus (below, unchanged); three or more (up to
+the API's 8, added 2026-11-09, a free-for-all where everybody races on their own; teams are not
+part of it) use the multi layout at the end of this section.
 
-Model (pure, ported from `core/battleBar.ts`): `pct` = first side's `share x 100` clamped to 6..94;
+Model (pure, ported from `core/battleBar.ts`): `sides` = every side in the server's order; `pcts` =
+each side's part of the bar, percent, summing to 100 (`battleSegmentPcts`: `share x 100`, but no side
+under 6: such a side is held at 6 and the others share what is left in proportion to their shares,
+repeated until every part is at least 6; nobody scored: equal parts); `pct` = `pcts[0]`, for two
+sides the first side's `share x 100` clamped to 6..94 (so `pcts = [pct, 100 - pct]`);
 `clock` = `m:ss` of `remainingMs` rounded up (`Final` once the round is not open); `urgent` = open and
 at most 10 whole seconds left (rounded up); `winner` = the leader once the round ended; `banner` =
 `{name} wins the round` / `Draw: nobody wins this round` once ended, else empty; side score = full
 number up to 9,999, then `10K` / `1.2M` (`formatCount`); spoken = `{name} {score with thousands}`
-per side joined by `, `. Labels: `vs`, `final`, `wins`, `draw`, `spoken`, `side`, `thousand`, `million`.
-Side colours: the theme's accent and coin colour, each with the theme's own text colour on it (4.5:1 in
-both presets); an override pair takes black or white text, whichever contrasts more (an unreadable
-colour string counts as white text).
+per side joined by `, ` (two sides: the `spoken` label `"{a}, {b}"` as before; more: each side's text
+joined by `, `); `banner` names the leader of any number of sides. Labels: `vs`, `final`, `wins`, `draw`,
+`spoken`, `side`, `thousand`, `million`. Side colours (`battleSidePalette(theme, count, override)`):
+side `i` takes the app's `sideColors[i]` when given (black or white text, whichever contrasts more;
+an unreadable colour string counts as white text), else the default palette: the theme's accent and
+coin colour, each with the theme's own text colour on it (4.5:1 in both presets), then teal
+`#2ec4b6` and pink `#ff5d8f` (text by contrast), then the same four again. `sideColors` is a list of
+any length (a two-element list works as before); `battleSideColors(theme, override)` is the first two.
+Fixture `palette[]`.
 
 Drawing (every platform the same): a top row, side A | middle | side B (side B mirrored); a side is a
 40 px avatar (picture or the name's first letter on the side colour) in a 2 px ring in the side
@@ -2170,6 +2239,18 @@ fill with a border; urgent = danger border and text; final = accent fill with th
 Under it a 16 px high bar (radius 8, 1 px border): side B colour as the base, side A colour from the
 left up to `pct`, and a 4 x 26 px white spark on the boundary. Under that the banner (13, bold,
 centred, only when not empty). A screen reader reads one element: `spoken`, then the banner.
+
+Multi layout (three or more sides): the clock is the middle element as before (the `vs` label over
+the pill), but on its own centred line at the top; under it ONE row of N equal-width cells, each a
+centred column: avatar, name, score, with the avatar 36 px (30 px from five sides), the name 12
+(11) and the score 17 (14); the avatar ring, the crown of the winner, the loser's 50 % opacity and
+the pulse of a side that gained are as above. Under the cells the bar (16 px, radius 8, 1 px border)
+holds N segments, side `i` in its palette colour with the width `pcts[i]`, separated by 2 px white
+lines (no spark). The banner and the screen reader text (`spoken`, then the banner) are as above.
+Motion: each segment's width slides in 800 ms (ease out cubic), scores count and pulse as above.
+
+The gift notice of a battle (7.4, 18.4) borders its pill in the receiving side's colour: give the
+room the same `sideColors` as the bar so the two match.
 
 Motion (skipped entirely under reduced motion: no slide, count or pulse): the boundary slides to a
 new `pct` in 800 ms (ease out cubic); a score counts to its new value in 650 ms (ease out cubic,

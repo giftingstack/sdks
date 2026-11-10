@@ -124,11 +124,15 @@ void main() {
     Future<(GiftTrayController, ScriptedClient)> tray({
       void Function(GiftTransaction)? onSent,
       void Function(GiftingException)? onError,
+      EffectPlayer? player,
+      GiftEffectReceiver? Function(String)? receiverOf,
     }) async {
       final api = ScriptedClient();
       final c = GiftTrayController(GiftTrayOptions(
         client: api,
         receiver: 'bob',
+        effects: player == null ? null : () => player,
+        receiverOf: receiverOf,
         onSent: onSent,
         onError: onError,
       ));
@@ -157,6 +161,43 @@ void main() {
       expect(onErrorCalls, 0);
     });
 
+    test("the user's own gift in a battle says who got it (SPEC 18.4)",
+        () async {
+      final played = <GiftEffectEvent>[];
+      final player = _Recorder(played);
+      final (c, api) = await tray(
+        player: player,
+        receiverOf: (r) =>
+            r == 'bob' ? const GiftEffectReceiver(name: 'Bob', side: 1) : null,
+      );
+      final sending = c.send(rose);
+      api.take('sendGift', 'send').completer.complete(tx());
+      await sending;
+      expect(played.single.receiver?.name, 'Bob');
+      expect(played.single.receiver?.side, 1);
+    });
+
+    test('no battle, or a throwing receiverOf: the event has no receiver',
+        () async {
+      final played = <GiftEffectEvent>[];
+      final (a, apiA) = await tray(
+        player: _Recorder(played),
+        receiverOf: (_) => null,
+      );
+      final one = a.send(rose);
+      apiA.take('sendGift', 'send').completer.complete(tx());
+      await one;
+      final (b, apiB) = await tray(
+        player: _Recorder(played),
+        receiverOf: (_) => throw StateError('app bug'),
+      );
+      final two = b.send(rose);
+      apiB.take('sendGift', 'send').completer.complete(tx());
+      await two;
+      expect(played, hasLength(2));
+      expect(played.every((e) => e.receiver == null), isTrue);
+    });
+
     test('a throwing onError is ignored and the refund still happens',
         () async {
       final (c, api) = await tray(onError: (_) => throw StateError('app bug'));
@@ -170,4 +211,19 @@ void main() {
       expect(c.state.error?.type, 'internal_error');
     });
   });
+}
+
+class _Recorder implements EffectPlayer {
+  _Recorder(this.played);
+
+  final List<GiftEffectEvent> played;
+
+  @override
+  int play(GiftEffectEvent event) {
+    played.add(event);
+    return played.length;
+  }
+
+  @override
+  void cancel(int id) {}
 }

@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type RoomBattle,
   RoomClient,
+  type RoomClientOptions,
+  type RoomGiftEvent,
   type RoomSocketHandlers,
   battleView,
   parseRoomFrame,
@@ -44,7 +46,7 @@ const battle = (units: [number, number], round = "r1"): RoomBattle => ({
 });
 
 /** A RoomClient on a scripted socket and a manual clock. */
-function session() {
+function session(extra: Partial<RoomClientOptions> = {}) {
   let now = 0;
   const sockets: RoomSocketHandlers[] = [];
   const onBattle = vi.fn();
@@ -60,6 +62,7 @@ function session() {
     setTimeout: () => 0,
     clearTimeout: () => {},
     onBattle,
+    ...extra,
   });
   const socket = () => sockets[sockets.length - 1] as RoomSocketHandlers;
   const send = (frame: unknown) => socket().onMessage(JSON.stringify(frame));
@@ -76,6 +79,60 @@ function session() {
 const flush = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve();
 };
+
+describe("RoomClient battle gifts (SPEC 18.4)", () => {
+  const gift = (at: number, to: string) => ({
+    t: "gift",
+    id: at,
+    at,
+    tx: `gtx_${at}`,
+    gift: { id: "rose", name: "Rose", price: 10 },
+    quantity: 1,
+    sender: { id: "u1", name: "Ava" },
+    receiver: { id: to },
+  });
+
+  it("gives a gift of the round the receiver, with the room's names and colours", async () => {
+    const events: RoomGiftEvent[] = [];
+    const s = session({
+      onEvent: (e) => events.push(e),
+      resolveName: (id) => (id === "mateo" ? "Mateo" : undefined),
+      sideColors: ["#ff3366", "#00aa88"],
+    });
+    s.room.start();
+    await flush();
+    s.socket().onOpen();
+    s.send(welcome({ now: 5_000, battle: battle([0, 0]) }));
+    s.send(gift(5_000, "mateo"));
+    s.send(gift(5_001, "ava"));
+    s.send(gift(5_002, "viewer"));
+    expect(events.map((e) => e.receiver)).toEqual([
+      { name: "Mateo", side: 1, color: "#00aa88" },
+      { name: "ava", side: 0, color: "#ff3366" },
+      undefined,
+    ]);
+    s.send({ t: "scores", battle: null });
+    s.send(gift(5_003, "mateo"));
+    expect(events[3]?.receiver).toBeUndefined();
+  });
+
+  it("receiverFor names the side of a user now, for the app's own gifts", async () => {
+    const s = session({
+      resolveName: (id) => (id === "ava" ? "Ava" : undefined),
+      sideColors: ["#111", "#222"],
+    });
+    s.room.start();
+    await flush();
+    s.socket().onOpen();
+    expect(s.room.receiverFor("ava")).toBeUndefined();
+    s.send(welcome({ now: 5_000, battle: battle([0, 0]) }));
+    expect(s.room.receiverFor("ava")).toEqual({ name: "Ava", side: 0, color: "#111" });
+    expect(s.room.receiverFor("mateo")).toEqual({ name: "mateo", side: 1, color: "#222" });
+    expect(s.room.receiverFor("viewer")).toBeUndefined();
+    s.setNow(70_000); // past the round's end (61,000 on the server clock)
+    expect(s.room.receiverFor("ava")).toBeUndefined();
+  });
+});
 
 describe("RoomClient battle state", () => {
   it("takes the round from welcome, then each scores frame; null when removed", async () => {

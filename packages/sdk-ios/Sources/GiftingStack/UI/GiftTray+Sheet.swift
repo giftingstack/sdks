@@ -138,11 +138,14 @@ extension GiftTray {
                 }
                 sheetStack(width: geo.size.width, height: geo.size.height)
                     // Closed: nothing to touch and nothing for VoiceOver (the view itself is invisible).
-                    .allowsHitTesting(isOpen)
+                    // Until it is shown it is invisible too: an unseen sheet must not take the
+                    // touches meant for your Gift buttons behind it.
+                    .allowsHitTesting(isOpen && sheetShown)
                     .accessibilityHidden(!isOpen)
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .onAppear {
+                sheetOpen = isOpen
                 containerHeight = geo.size.height
                 sheetModel.controller.setOnSnapChange(onSnapChange)
                 applySheetMeasure(sheetMeasure(container: geo.size.height))
@@ -173,11 +176,13 @@ extension GiftTray {
             // `floorsReady`: header and footer measured, and a row when there are gifts. An EMPTY catalog has
             // no row to measure, and used to leave the sheet invisible for good.
             // A closed tray is not shown; opening runs `sheetOpenChanged`.
-            if !sheetShown, isOpen, next.floorsReady {
+            if !sheetShown, sheetOpen, next.floorsReady {
                 // The layout is in place (without animation): show the sheet a moment later.
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 60_000_000)
-                    sheetShown = true
+                    if sheetOpen {
+                        sheetShown = true
+                    }
                 }
             }
         }
@@ -188,7 +193,7 @@ extension GiftTray {
         }
         .onChange(of: sheetModel.state.visibleHeight) { value in
             // While closed `onInsetChange` only ever says 0 (said once, when it closed).
-            if isOpen {
+            if sheetOpen {
                 onInsetChange?(CGFloat(value))
             }
         }
@@ -201,6 +206,8 @@ extension GiftTray {
     /// first state with a jump (nothing is visible, nothing glides on the next open); the inset is 0.
     /// Opening places it again without a glide: it is shown a moment after, as for the first time.
     private func sheetOpenChanged(_ open: Bool) {
+        // `open` is the new value; `isOpen` here may still be the previous render's (see `sheetOpen`).
+        sheetOpen = open
         if !open {
             sheetShown = false
             sheetModel.controller.snapTo(initialSnap)
@@ -211,7 +218,7 @@ extension GiftTray {
         if !sheetShown, sheetMeasure(container: containerHeight).floorsReady {
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 60_000_000)
-                if isOpen {
+                if sheetOpen {
                     sheetShown = true
                 }
             }
@@ -220,9 +227,10 @@ extension GiftTray {
     }
 
     /// The dim (spec 9.4): black at `scrimOpacity`, fades over `scrimFadeMs` (ease-out, both directions).
-    /// It takes touches and is the button "Close gift tray" only while visible.
+    /// It takes touches and is the button "Close gift tray" in every state, peek included (hidden there).
     private var scrimLayer: some View {
         let visible = scrimVisible(scrim: scrim, open: isOpen, snap: sheetModel.state.snap, placed: sheetShown)
+        let active = scrimTakesTouches(scrim: scrim, open: isOpen, placed: sheetShown)
         let ms = scrimFadeMs(reducedMotion: reduceMotion)
         return Color.black
             .opacity(visible ? scrimOpacity : 0)
@@ -231,11 +239,11 @@ extension GiftTray {
             .onTapGesture {
                 tapScrim()
             }
-            .allowsHitTesting(visible)
+            .allowsHitTesting(active)
             .accessibilityElement()
             .accessibilityLabel(Text(verbatim: "Close gift tray"))
             .accessibilityAddTraits(.isButton)
-            .accessibilityHidden(!visible)
+            .accessibilityHidden(!active)
             .accessibilityAction {
                 tapScrim()
             }
@@ -256,13 +264,14 @@ extension GiftTray {
         }
     }
 
-    /// Like the web tray: if no grid row was measured after `SheetMeasure.emptyFallbackMs` (no gifts, or the
-    /// catalog is still loading), the sheet is shown anyway instead of staying invisible. `rowHeight` is
-    /// `@State`, so this reads the current value, not the one of the render that started the wait.
+    /// Like the web tray: if the sheet is still not shown after `SheetMeasure.emptyFallbackMs` while the tray
+    /// is open (no grid row was measured because there are no gifts or the catalog is still loading, or a
+    /// measurement never settled), it is shown anyway instead of staying open but invisible. The state is
+    /// `@State`, so this reads the current values, not those of the render that started the wait.
     private func showAfterFallbackWithoutRows() {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(SheetMeasure.emptyFallbackMs) * 1_000_000)
-            if !sheetShown, isOpen, rowHeight == 0 {
+            if !sheetShown, sheetOpen {
                 sheetShown = true
             }
         }
@@ -280,10 +289,16 @@ extension GiftTray {
         .coordinateSpace(name: GiftTray.sheetSpace)
         // Drawn from the first measured layout on (the heights, the first row and the footer), so
         // the sheet never shows its unmeasured guess and then jumps: it fades in where it belongs.
+        // The entrance is as soft as Flutter's (SPEC 9.4): opacity over 200 ms ease-out, rising from 3 % of
+        // the sheet's height below its place over 220 ms ease-out-cubic.
         .opacity(sheetShown ? 1 : 0)
-        .offset(y: sheetShown || reduceMotion ? 0 : 24)
-        // Only the entrance glides; hiding (a closed tray) is at once.
         .animation(reduceMotion || !sheetShown ? nil : .easeOut(duration: 0.2), value: sheetShown)
+        .offset(y: sheetShown || reduceMotion ? 0 : height * 0.03)
+        // Only the entrance glides; hiding (a closed tray) is at once.
+        .animation(
+            reduceMotion || !sheetShown ? nil : .timingCurve(0.215, 0.61, 0.355, 1, duration: 0.22),
+            value: sheetShown
+        )
     }
 
     // MARK: - Body (handle, header, grid)
@@ -320,7 +335,8 @@ extension GiftTray {
         if st.dragging || reduceMotion {
             return nil
         }
-        return .timingCurve(0.22, 1, 0.36, 1, duration: 0.28)
+        // A critically damped spring, the same as Flutter's snaps (SPEC 9.4): stiffness 320, damping 36.
+        return .interpolatingSpring(mass: 1, stiffness: 320, damping: 36, initialVelocity: 0)
     }
 
     private func sheetHandle(_ st: TraySheetState) -> some View {

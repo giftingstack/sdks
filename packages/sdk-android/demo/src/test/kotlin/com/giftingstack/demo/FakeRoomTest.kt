@@ -58,6 +58,30 @@ class FakeRoomTest {
         assertEquals("Paused (app in the background)", liveStatusLine(RoomState(status = RoomStatus.Paused)))
     }
 
+    @Test fun battle4HasFourHostsInEveryRound() = runTest {
+        val clock = Clock()
+        val server = FakeRoomServer(gifts = { catalog }, timers = clock.api, now = { clock.now }, random = Random(7), sides = 4)
+        val room =
+            RoomClient(
+                RoomClientOptions(
+                    room = LIVE_ROOM_4,
+                    getToken = { demoRoomToken(DEMO_VIEWER) },
+                    socket = server.factory,
+                    scope = backgroundScope,
+                    timers = clock.api,
+                    now = { clock.now },
+                ),
+            )
+        room.start()
+        runCurrent()
+        clock.advance(200)
+        assertEquals(LIVE_HOSTS, room.getBattle()?.scores?.map { it.id })
+        clock.advance(60_000)
+        assertEquals("demo_r2", room.getBattle()?.round)
+        assertEquals(4, room.getBattle()?.scores?.size)
+        room.leave()
+    }
+
     @Test fun roomClientJoinsGetsViewersAndOthersGifts() = runTest {
         val clock = Clock()
         val server = FakeRoomServer(gifts = { catalog }, timers = clock.api, now = { clock.now }, random = Random(7))
@@ -89,6 +113,7 @@ class FakeRoomTest {
         // The round ends after 45 s and a new one starts after the break.
         clock.advance(20_000)
         assertEquals("demo_r2", room.getBattle()?.round)
+        assertEquals(listOf(LIVE_HOST, LIVE_RIVAL), room.getBattle()?.scores?.map { it.id })
         assertTrue("others sent gifts", events.isNotEmpty())
         assertTrue(events.all { it.senderId in LIVE_SENDERS && !it.replayed && it.gift.id == "rose" })
         assertTrue("names come from the sender", events.all { it.sender == displayName(it.senderId) })

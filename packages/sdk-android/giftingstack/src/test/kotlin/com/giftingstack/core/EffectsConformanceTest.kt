@@ -38,7 +38,21 @@ class EffectsConformanceTest(private val name: String, private val s: JsonObject
                     "image" to (d.image?.let { JsonPrimitive(it) } ?: JsonNull),
                     "count" to JsonPrimitive(d.count),
                     "big" to JsonPrimitive(d.big),
-                ),
+                ) +
+                    (
+                        d.receiver?.let { r ->
+                            mapOf(
+                                "receiver" to
+                                    JsonObject(
+                                        buildMap {
+                                            put("name", JsonPrimitive(r.name))
+                                            r.side?.let { put("side", JsonPrimitive(it)) }
+                                            put("color", r.color?.let { JsonPrimitive(it) } ?: JsonNull)
+                                        },
+                                    ),
+                            )
+                        } ?: emptyMap()
+                    ),
             )
         }
 
@@ -95,7 +109,9 @@ class EffectsConformanceTest(private val name: String, private val s: JsonObject
                 step.has("play") -> {
                     step.intOrNull("atMs")?.let { clock = it.toLong() }
                     val p = step.getValue("play").obj()
-                    val id = scheduler.play(GiftEffectEvent(gift(p.string("gift")), p.stringOrNull("sender"), p.intOrNull("quantity")))
+                    val receiver =
+                        p["receiver"]?.obj()?.let { r -> GiftEffectReceiver(r.string("name"), r.intOrNull("side"), r.stringOrNull("color")) }
+                    val id = scheduler.play(GiftEffectEvent(gift(p.string("gift")), p.stringOrNull("sender"), p.intOrNull("quantity"), receiver))
                     step.intOrNull("returns")?.let { assertEquals("$at play() id", it, id) }
                 }
                 step.has("started") -> scheduler.started(step.intOrNull("started")!!)

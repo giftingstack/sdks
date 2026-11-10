@@ -64,6 +64,54 @@ const mk = (options: GiftBattleBarOptions = {}) => {
 const $ = (sel: string) => page.querySelector(sel) as HTMLElement;
 const text = (sel: string) => $(sel)?.textContent;
 
+const three = (units: [number, number, number], now = 1_000): BattleView =>
+  battleView(
+    {
+      round: "r3",
+      started: 0,
+      ends: 60_000,
+      scores: [
+        { id: "mia", units: units[0], gifts: 1 },
+        { id: "theo", units: units[1], gifts: 1 },
+        { id: "noor", units: units[2], gifts: 1 },
+      ],
+    },
+    now,
+  );
+
+describe("GiftBattleBar with three or more sides (SPEC 18.7)", () => {
+  it("draws a cell per side, the clock above, and a segment per side in proportion", () => {
+    const bar = mk({ reducedMotion: true, sideColors: ["#ff3366"] });
+    bar.setView(three([300, 100, 100]));
+    expect(page.querySelectorAll(".gs-vs-multi .gs-vs-side")).toHaveLength(3);
+    expect(page.querySelectorAll(".gs-vs-seg")).toHaveLength(3);
+    expect(($(".gs-vs-seg0") as HTMLElement).style.width).toBe("60%");
+    expect(($(".gs-vs-seg1") as HTMLElement).style.width).toBe("20%");
+    expect(($(".gs-vs-seg2") as HTMLElement).style.width).toBe("20%");
+    expect(text(".gs-vs-s2 .gs-vs-score")).toBe("100");
+    expect($(".gs-vs-bar").getAttribute("aria-label")).toBe("mia 300, theo 100, noor 100");
+    // The app's colour for side 0, the palette for the rest (teal for the third).
+    const root = $(".gs-vs") as HTMLElement;
+    expect(root.style.getPropertyValue("--gs-side-0")).toBe("#ff3366");
+    expect(root.style.getPropertyValue("--gs-side-2")).toBe("#2ec4b6");
+  });
+
+  it("marks the winner and the losers once the round ended", () => {
+    const bar = mk({ reducedMotion: true });
+    bar.setView(three([100, 300, 100], 61_000));
+    expect($(".gs-vs-s1").classList.contains("gs-win")).toBe(true);
+    expect($(".gs-vs-s0").classList.contains("gs-lose")).toBe(true);
+    expect(text(".gs-vs-banner")).toBe("theo wins the round");
+  });
+
+  it("two sides keep the versus layout", () => {
+    const bar = mk({ reducedMotion: true });
+    bar.setView(at(300, 100));
+    expect(page.querySelector(".gs-vs-multi")).toBeNull();
+    expect(page.querySelector(".gs-vs-spark")).not.toBeNull();
+  });
+});
+
 describe("GiftBattleBar", () => {
   it("is hidden without a round and draws both sides when one arrives", () => {
     const bar = mk({ reducedMotion: true });

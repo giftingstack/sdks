@@ -13,7 +13,7 @@ import {
   tierFor,
 } from "./recipes";
 import { type RecipeSet, embeddedRecipeSet, mergeRecipeSet } from "./remote-recipes";
-import type { GiftEffectEvent } from "./types";
+import type { GiftEffectEvent, GiftEffectReceiver } from "./types";
 
 /** The built-in set, used when no remote set is given. */
 const EMBEDDED_SET = embeddedRecipeSet();
@@ -30,6 +30,14 @@ export const MAX_QUEUED_LARGE = 5;
 export const DEFAULT_SENDER_NAME = "Someone";
 /** Notice ids remembered at once, one per (sender, gift) pair; the oldest is dropped beyond this. */
 export const MAX_NOTICE_KEYS = 32;
+
+/**
+ * What tells two receivers apart for the combo and the notice key: the side and the name (two
+ * hosts that share a display name still sit on different sides). null without a receiver.
+ */
+function receiverKey(receiver: GiftEffectReceiver | undefined): string | null {
+  return receiver ? `${receiver.side ?? ""}:${receiver.name}` : null;
+}
 
 export interface ScheduledEffect {
   id: number;
@@ -48,6 +56,8 @@ export interface NoticeData {
   /** Gifts in a row, 1 for a single gift. */
   count: number;
   big: boolean;
+  /** Only in a battle (SPEC 7.4): who got the gift and the side's colour. */
+  receiver?: GiftEffectReceiver;
 }
 
 export interface EffectSchedulerListener {
@@ -157,7 +167,13 @@ export class EffectScheduler {
     const sender = event.sender ?? DEFAULT_SENDER_NAME;
     const quantity = event.quantity ?? 1;
     const id = this.nextId++;
-    const run = this.combo.hit(sender, event.gift.id, this.now());
+    // A combo counts per receiver too: gifts to two hosts of a battle are two runs.
+    const rkey = receiverKey(event.receiver);
+    const run = this.combo.hit(
+      sender,
+      rkey === null ? event.gift.id : JSON.stringify([event.gift.id, rkey]),
+      this.now(),
+    );
     const count = quantity > 1 ? quantity : run;
     const item: ScheduledEffect = { id, event, recipe, count };
     // Without an effect the notice shows now; with one, it shows when the effect starts.
@@ -242,7 +258,10 @@ export class EffectScheduler {
   private showNotice(item: ScheduledEffect): void {
     const { event, recipe, count, id } = item;
     const sender = event.sender ?? DEFAULT_SENDER_NAME;
-    const key = `${sender}|${event.gift.id}`;
+    const receiver = event.receiver;
+    // The receiver is part of the key: a combo to one host and one to the other are two notices.
+    const rkey = receiverKey(receiver);
+    const key = rkey === null ? `${sender}|${event.gift.id}` : `${sender}|${event.gift.id}|${rkey}`;
     this.noticeOwner = id;
     // Every pair keeps its own id while it is remembered, so a combo returns to its own line
     // even when other people sent gifts in between.
@@ -262,6 +281,13 @@ export class EffectScheduler {
       count,
       big: recipe.noticeBig,
     };
+    if (receiver) {
+      this.noticeData.receiver = {
+        name: receiver.name,
+        ...(receiver.side !== undefined ? { side: receiver.side } : {}),
+        color: receiver.color ?? null,
+      };
+    }
     this.noticeVisible = true;
     this.listener.notice?.(this.noticeData, recipe.noticeMs);
   }

@@ -37,13 +37,15 @@ const effectIds = () =>
   );
 /** The line of the notice the scheduler wrote last: a combo updates its own line in place, which
  * is not always the newest one. */
-const pill = (of?: { senderName: string; giftName: string }) => {
+const whatOf = (d: { giftName: string; receiver?: { name: string } }) =>
+  d.receiver ? `sent ${d.giftName} to ${d.receiver.name}` : `sent ${d.giftName}`;
+const pill = (of?: { senderName: string; giftName: string; receiver?: { name: string } }) => {
   const all = [...container.querySelectorAll("[data-gs-notice]")] as HTMLElement[];
   if (of !== undefined) {
     const same = all.filter(
       (p) =>
         p.querySelector(".gs-notice-name")?.textContent === of.senderName &&
-        p.querySelector(".gs-notice-what")?.textContent === `sent ${of.giftName}`,
+        p.querySelector(".gs-notice-what")?.textContent === whatOf(of),
     );
     return same[same.length - 1] ?? null;
   }
@@ -108,6 +110,7 @@ describe("web layer: effects.json scheduler scenarios", () => {
             const event: GiftEffectEvent = { gift: fixture.gifts[step.play.gift] };
             if (step.play.sender !== undefined) event.sender = step.play.sender;
             if (step.play.quantity !== undefined) event.quantity = step.play.quantity;
+            if (step.play.receiver !== undefined) event.receiver = step.play.receiver;
             const id = layer.play(event);
             if (step.returns !== undefined) expect(id, `${at} play() id`).toBe(step.returns);
           } else if (step.started !== undefined) scheduler.started(step.started);
@@ -155,7 +158,7 @@ describe("web layer: effects.json scheduler scenarios", () => {
               expect(p?.getAttribute("data-gs-visible"), `${at} DOM notice shown`).toBe("true");
               const d = notice.data!;
               expect(p!.querySelector(".gs-notice-name")!.textContent).toBe(d.senderName);
-              expect(p!.querySelector(".gs-notice-what")!.textContent).toBe(`sent ${d.giftName}`);
+              expect(p!.querySelector(".gs-notice-what")!.textContent).toBe(whatOf(d));
               expect(p!.querySelector("[data-gs-combo]")?.textContent ?? null).toBe(
                 d.count > 1 ? `x${d.count}` : null,
               );

@@ -3,6 +3,16 @@
 All notable changes to `@giftingstack/sdk`. The shared contract (`packages/sdk-spec`) has its own
 version (`SPEC_VERSION`); this package states which one it passes.
 
+## 0.1.3
+
+The React Native layer has the same changes as the web one (jsdom tests only); it was not tried on a device for this release.
+
+- With `scrim` on, a tap on the empty space beside a tray at peek (the small state) now closes it: the dim stays hidden there, but it takes the tap (SPEC 9.4, `scrimTakesTouches`; a tall tray still lowers to peek first with `scrimTap` "lower"). The page behind a peeking tray is no longer touchable while the tray is open; leave `scrim` off for that.
+- The web tray (sheet) now fades in over 200 ms and rises from 3 % of its height over 220 ms when it opens, like the Flutter and iOS trays; it was appearing at once (SPEC 9.4). Reduced motion: no entrance.
+- A battle can have three to eight sides (SPEC 18.7, a free-for-all: everybody races on their own; teams are not part of it). The battle bar draws every side: two sides look exactly as before, three or more get a row of cells (avatar, name, score) with the clock above and a bar of proportional segments (each side in its colour, none under 6 %, white lines between them); the winner, the banner and the spoken sentence cover every side. `sideColors` is a list with one colour per side (`GiftBattleBar`, `BattleBar`, `joinRoom`, `useGiftRoom`, `<gift-room side-colors>`) (a shorter list keeps the default for the sides it does not name; the default palette is the theme's accent, its coin colour, then teal `#2ec4b6` and pink `#ff5d8f`, then the same four again). The gift notice of a battle names the receiver and borders its pill for every side, not only the first two. New: `battleSidePalette`, `battleSegmentPcts`, `BattleBarModel.pcts`.
+
+- The gift notice of a battle says who got the gift (SPEC 7.4, 18.4): line two reads `sent Rose to Mia` and the pill has a 2 px border in the receiving side's colour (the bar's accent / coin colour, or the new room option `sideColors`, the same pair you give the bar). Only when the room has a battle round with two sides and the receiver is one of them; every other notice looks as before. `GiftEffectEvent.receiver` and `NoticeData.receiver` are new, so an app that plays its own events can set them; `roomGiftToEffect` takes `battle` and `sideColors`. Web: `joinRoom({ sideColors })`, `<gift-room side-colors="#ff3366,#00aa88">`; React Native: `useGiftRoom({ sideColors })`. The user's own gift says who got it too: `createGiftTray({ receiverOf: room.receiverFor })` / `useGiftTray({ receiverOf: room.controller.receiverFor })` (new `RoomClient.receiverFor`, `battleReceiver`). The pill border is a 2 px ring in the side colour plus a 1 px line in the text colour inside it, so it shows on a pill of the same colour (the default accent); a gift only counts as a battle gift inside the round (`started <= at < ends`); a combo counts per receiver.
+
 ## 0.1.2
 
 - The tray's "Test mode" badge no longer touches the drag handle: the header starts right below the

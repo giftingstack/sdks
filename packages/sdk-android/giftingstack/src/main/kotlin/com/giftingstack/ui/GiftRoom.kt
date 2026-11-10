@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -56,6 +57,11 @@ class GiftRoomOptions(
     val minTier: EffectTier = EffectTier.Small,
     val thresholds: TierThresholds = DEFAULT_THRESHOLDS,
     val resolveName: ((String) -> String?)? = null,
+    /**
+     * The border colours of the two battle sides in the gift notice (SPEC 7.4): pass the same pair
+     * as `GiftBattleBar(sideColors = ...)`. Null: the theme's accent and coin colour.
+     */
+    val sideColors: List<Color>? = null,
     /** Default `wss://rt.giftingstack.com`. */
     val url: String = DEFAULT_ROOMS_URL,
     /** The WebSocket transport. Default [javaRoomSocketFactory] (main-thread callbacks). */
@@ -83,6 +89,12 @@ class GiftRoom(options: GiftRoomOptions, private val scope: CoroutineScope, time
 
     val state: StateFlow<RoomState> get() = controller.state
 
+    /**
+     * The battle side [user] is on now (SPEC 18.4): pass it to the tray as `receiverOf = room::receiverFor` so your own
+     * gift says who got it too. Null outside a round.
+     */
+    fun receiverFor(user: String): com.giftingstack.core.GiftEffectReceiver? = controller.receiverFor(user)
+
     /** The room's battle round (SPEC 18.6), null when there is none. Headless: draw your own bar. */
     val battle: StateFlow<RoomBattle?> get() = controller.battle
 
@@ -107,6 +119,7 @@ class GiftRoom(options: GiftRoomOptions, private val scope: CoroutineScope, time
             thresholds = o.thresholds,
             getCatalog = { catalog },
             resolveName = { u -> options.resolveName?.invoke(u) },
+            sideColors = o.sideColors?.map(::colorCss),
             onEvent = { e ->
                 options.effects?.invoke()?.play(e.toEffect())
                 options.onEvent?.invoke(e)
@@ -190,6 +203,7 @@ fun rememberGiftRoom(
     minTier: EffectTier = EffectTier.Small,
     thresholds: TierThresholds = DEFAULT_THRESHOLDS,
     resolveName: ((String) -> String?)? = null,
+    sideColors: List<Color>? = null,
     url: String = DEFAULT_ROOMS_URL,
     socket: RoomSocketFactory? = null,
     allowInsecure: Boolean = false,
@@ -210,6 +224,7 @@ fun rememberGiftRoom(
             minTier = minTier,
             thresholds = thresholds,
             resolveName = resolveName,
+            sideColors = sideColors,
             url = url,
             socket = socket,
             allowInsecure = allowInsecure,
@@ -239,3 +254,4 @@ fun rememberGiftRoom(
     LaunchedEffect(holder, client) { if (inRoom) holder.loadCatalog() }
     return holder
 }
+

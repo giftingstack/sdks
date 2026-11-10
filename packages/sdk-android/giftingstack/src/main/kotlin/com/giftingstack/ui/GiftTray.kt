@@ -105,6 +105,7 @@ import com.giftingstack.core.TraySheetController
 import com.giftingstack.core.sendButtonState
 import com.giftingstack.core.sheetEntranceAlpha
 import com.giftingstack.core.scrimFadeMs
+import com.giftingstack.core.scrimTakesTouches
 import com.giftingstack.core.scrimTapOutcome
 import com.giftingstack.core.scrimVisible
 import com.giftingstack.core.sheetEntranceRise
@@ -429,6 +430,7 @@ private fun SheetTray(
         if (scrim) {
             TrayScrim(
                 visible = scrimVisible(scrim, open, state.snap, placed),
+                active = scrimTakesTouches(scrim, open, placed),
                 reduced = reduced,
                 onTap = {
                     when (scrimTapOutcome(scrim, scrimTap, open, controller.getState().snap)) {
@@ -509,7 +511,7 @@ private fun SheetTray(
  * fading out or hidden it takes none and is out of the accessibility tree.
  */
 @Composable
-private fun TrayScrim(visible: Boolean, reduced: Boolean, onTap: () -> Unit) {
+private fun TrayScrim(visible: Boolean, active: Boolean, reduced: Boolean, onTap: () -> Unit) {
     val alpha = remember { Animatable(0f) }
     LaunchedEffect(visible, reduced) {
         val target = if (visible) SCRIM_OPACITY.toFloat() else 0f
@@ -521,7 +523,7 @@ private fun TrayScrim(visible: Boolean, reduced: Boolean, onTap: () -> Unit) {
         Modifier.fillMaxSize()
             .drawBehind { drawRect(Color.Black, alpha = alpha.value) }
             .then(
-                if (visible) {
+                if (active) {
                     Modifier.clickable(interactionSource = source, indication = null, role = Role.Button, onClick = onTap)
                         .semantics { contentDescription = "Close gift tray" }
                 } else {

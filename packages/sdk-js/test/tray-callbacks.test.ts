@@ -106,3 +106,52 @@ describe("tray callbacks never undo a charged send", () => {
     expect(tray.getState().error).toBe(failure);
   });
 });
+
+describe("the user's own gift in a battle (SPEC 18.4)", () => {
+  const play = () => {
+    const played: unknown[] = [];
+    return {
+      played,
+      effects: () => ({
+        play: (e: unknown) => {
+          played.push(e);
+          return 1;
+        },
+        cancel: () => {},
+      }),
+    };
+  };
+
+  it("says who got the gift when receiverOf knows the side", async () => {
+    const p = play();
+    const receiverOf = vi.fn((r: string) => ({
+      name: r === "bob" ? "Bob" : "?",
+      side: 1,
+      color: null,
+    }));
+    const tray = setup(async () => TX, { effects: p.effects, receiverOf });
+    await tray.refresh();
+    await tray.send(ROSE);
+    expect(receiverOf).toHaveBeenCalledWith("bob");
+    expect(p.played[0]).toMatchObject({ receiver: { name: "Bob", side: 1, color: null } });
+  });
+
+  it("leaves the event alone outside a battle or when receiverOf throws", async () => {
+    const a = play();
+    const none = setup(async () => TX, { effects: a.effects, receiverOf: () => undefined });
+    await none.refresh();
+    await none.send(ROSE);
+    expect(a.played[0]).not.toHaveProperty("receiver");
+    const b = play();
+    const bad = setup(async () => TX, {
+      effects: b.effects,
+      receiverOf: () => {
+        throw new Error("app bug");
+      },
+    });
+    await bad.refresh();
+    await bad.send(ROSE);
+    expect(b.played).toHaveLength(1);
+    expect(b.played[0]).not.toHaveProperty("receiver");
+  });
+});

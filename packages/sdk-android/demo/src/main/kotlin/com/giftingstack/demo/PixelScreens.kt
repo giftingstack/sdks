@@ -116,30 +116,49 @@ private fun fmtLikes(n: Int): String = fmt(n)
  * pretend rooms server FakeRoomServer), and a gift sent here carries the room id, so everyone in the room sees it.
  */
 @Composable
-internal fun LiveScreen(room: GiftRoom, state: RoomState, theme: GiftingTheme, reduced: Boolean?, onGift: (Post) -> Unit) {
+internal fun LiveScreen(room: GiftRoom, state: RoomState, theme: GiftingTheme, reduced: Boolean?, battle4: Boolean, onBattle4: (Boolean) -> Unit, onGift: (Post) -> Unit) {
+    val hosts = if (battle4) LIVE_HOSTS else LIVE_HOSTS.take(2)
     TabColumn {
+        // The two modes: "Battle" (two hosts) and "Battle 4+" (four hosts in every round, a free-for-all).
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill("Battle", theme, filled = !battle4, modifier = Modifier.testTag("live-mode-battle")) { onBattle4(false) }
+            Pill("Battle 4+", theme, filled = battle4, modifier = Modifier.testTag("live-mode-battle4")) { onBattle4(true) }
+        }
         Card(theme) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Avatar(LIVE_HOST, 40.dp)
                     Column {
-                        Txt("${firstName(LIVE_HOST)} vs ${firstName(LIVE_RIVAL)}", theme.text, 15f, bold = true)
+                        Txt(hosts.joinToString(if (battle4) ", " else " vs ") { firstName(it) }, theme.text, 15f, bold = true)
                         Txt(liveStatusLine(state), theme.muted, 12f, modifier = Modifier.testTag("live-status"))
                     }
                 }
                 // The SDK's battle bar, driven by the room: a round between two hosts, nothing drawn between rounds.
                 GiftBattleBar(
                     room,
-                    users = mapOf(LIVE_HOST to BattleBarUser(displayName(LIVE_HOST)), LIVE_RIVAL to BattleBarUser(displayName(LIVE_RIVAL))),
+                    users = LIVE_HOSTS.associateWith { BattleBarUser(displayName(it)) },
                     reducedMotion = reduced,
                     theme = theme,
                 )
                 Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f).clip(RoundedCornerShape(12.dp))) { PostArt(LIVE_POST.art) }
                 Txt("Gifts that other viewers send show up here as effects. Send one yourself: everyone in the room sees it.", theme.text, 15f)
                 // One Gift button per side of the battle, the host on the left like the bar.
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    for (post in listOf(LIVE_POST, LIVE_RIVAL_POST)) {
-                        Pill("Gift ${firstName(post.author)}", theme, filled = true, icon = { GiftIcon(it) }) { onGift(post) }
+                if (hosts.size > 2) {
+                    // Three or more sides: two columns, so a name never wraps or leaves the screen.
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (pair in LIVE_HOST_POSTS.take(hosts.size).chunked(2)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                for (post in pair) {
+                                    Pill("Gift ${firstName(post.author)}", theme, filled = true, modifier = Modifier.weight(1f), icon = { GiftIcon(it) }) { onGift(post) }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        for (post in LIVE_HOST_POSTS.take(hosts.size)) {
+                            Pill("Gift ${firstName(post.author)}", theme, filled = true, icon = { GiftIcon(it) }) { onGift(post) }
+                        }
                     }
                 }
             }

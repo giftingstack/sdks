@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.3 (preview)
+
+- With `scrim` on, a tap on the empty space beside a tray at peek (the small state) now closes it: the dim stays hidden there, but it takes the tap (SPEC 9.4, `scrimTakesTouches`; a tall tray still lowers to peek first with `scrimTap` "lower"). The page behind a peeking tray is no longer touchable while the tray is open; leave `scrim` off for that.
+- A battle can have three to eight sides (SPEC 18.7, a free-for-all: everybody races on their own; teams are not part of it). The battle bar draws every side: two sides look exactly as before, three or more get a row of cells (avatar, name, score) with the clock above and a bar of proportional segments (each side in its colour, none under 6 %, white lines between them); the winner, the banner and the spoken sentence cover every side. `sideColors` is a list with one colour per side (`GiftBattleBar`, `GiftRoomModel`) (a shorter list keeps the default for the sides it does not name; the default palette is the theme's accent, its coin colour, then teal `#2ec4b6` and pink `#ff5d8f`, then the same four again). The gift notice of a battle names the receiver and borders its pill for every side, not only the first two. New: `battleSidePalette`, `battleSegmentPcts`, `BattleBarModel.pcts`.
+- The tray opens as softly as Flutter's (SPEC 9.4): the sheet fades in over 200 ms while rising from 3 % of its height below its place over 220 ms, and the snaps use the same critically damped spring (stiffness 320, damping 36). Reduced motion: none of it.
+
+- The gift notice of a battle says who got the gift (SPEC 7.4, 18.4): line two reads `sent Rose to Mia` and the pill has a 2 px border in the receiving side's colour (the bar's accent / coin colour, or the new `GiftRoomModel(sideColors:)`, the same pair you give `GiftBattleBar`). Only in a battle with two sides; every other notice looks as before. `GiftEffectEvent.receiver` is new for apps that play their own events. The user's own gift says who got it too: `GiftTrayModel(receiverOf: room.receiverFor)` (new `RoomClient.receiverFor`, `GiftRoomModel.receiverFor`). The border is a 2 px ring in the side colour plus a 1 px line in the text colour inside it, so it shows on a pill of the same colour; a gift only counts as a battle gift inside the round; a combo counts per receiver.
+- A tray opened again for the same receiver (`toggle()` or `open()` after a close) now shows its sheet. It
+  stayed open but invisible: the delayed show read the previous render's closed state. Meanwhile the hidden
+  sheet reported its height (notices moved up over nothing) and took the touches meant for the screen
+  behind it; an unseen sheet now takes no touches, and an open tray is shown after 700 ms at most.
+
 ## 0.1.2 (preview)
 
 - The tray's "Test mode" badge no longer touches the drag handle: the header starts right below the

@@ -995,6 +995,7 @@ class RoomGiftEvent extends GiftEffectEvent {
     required this.senderId,
     required this.replayed,
     super.sender,
+    super.receiver,
     this.senderName,
     this.receiverId,
   });
@@ -1038,12 +1039,16 @@ class RoomGiftEvent extends GiftEffectEvent {
 /// the catalog gift's `animationUrl`, else its `iconUrl`, else the event's
 /// icon; `icon` = the event's icon, else the catalog's; `sender` = the name
 /// claim, else [resolveName] of the sender id, else absent (the effect layer
-/// then shows "Someone").
+/// then shows "Someone"). With a [battle] of two or more sides and the receiver
+/// one of the first two, the event gets a `receiver` (name, side, colour from
+/// [sideColors]).
 RoomGiftEvent roomGiftToEffect(
   RoomGiftMessage msg, {
   List<Gift>? catalog,
   String? Function(String user)? resolveName,
   bool replayed = false,
+  RoomBattle? battle,
+  List<String>? sideColors,
 }) {
   Gift? known;
   if (catalog != null) {
@@ -1083,6 +1088,46 @@ RoomGiftEvent roomGiftToEffect(
     receiverId: msg.receiverId,
     replayed: replayed,
     sender: sender,
+    receiver: _battleReceiver(
+        msg.receiverId, msg.at, battle, resolveName, sideColors),
+  );
+}
+
+/// The receiver of a battle gift (SPEC 18.4): any side of [battle] (the API
+/// allows up to 8); the name is [resolveName] of the id, else the id.
+GiftEffectReceiver? _battleReceiver(
+  String? id,
+  int at,
+  RoomBattle? battle,
+  String? Function(String user)? resolveName,
+  List<String>? sideColors,
+) {
+  // Only a gift of the round itself: a replayed gift from before the round (or
+  // after it ended) is no battle gift.
+  if (id == null ||
+      id.isEmpty ||
+      battle == null ||
+      battle.scores.length < 2 ||
+      at < battle.started ||
+      at >= battle.ends) {
+    return null;
+  }
+  final side = battle.scores.indexWhere((s) => s.id == id);
+  if (side < 0) return null;
+  var name = '';
+  if (resolveName != null) {
+    try {
+      name = resolveName(id) ?? '';
+    } on Object {
+      name = '';
+    }
+  }
+  return GiftEffectReceiver(
+    name: name.isEmpty ? id : name,
+    side: side,
+    color: sideColors != null && side < sideColors.length
+        ? sideColors[side]
+        : null,
   );
 }
 
@@ -1196,6 +1241,7 @@ class RoomClientOptions {
     this.catalog,
     this.getCatalog,
     this.resolveName,
+    this.sideColors,
     this.onEvent,
     this.onViewers,
     this.onGap,
@@ -1253,6 +1299,11 @@ class RoomClientOptions {
   /// Display name of a sender without a name claim. Return null for the
   /// default.
   final String? Function(String user)? resolveName;
+
+  /// The border colours of the two battle sides in the gift notice (`#rgb`,
+  /// `#rrggbb` or `rgba()` strings, the bar's pair). Null: the theme's accent
+  /// and coin colour.
+  final List<String>? sideColors;
 
   /// Called for every gift that passes the filter.
   final void Function(RoomGiftEvent event)? onEvent;
@@ -1389,6 +1440,17 @@ class RoomClient {
 
   /// Server time now (from the last welcome), null before the first welcome.
   int? serverNow() => filter.serverNow(_now());
+
+  /// The battle side [user] is on right now (SPEC 18.4), for the gifts this
+  /// app plays itself: give it to the tray as `receiverOf` so the user's own
+  /// gift says who got it too. Null outside a round or when [user] is no side.
+  GiftEffectReceiver? receiverFor(String user) => _battleReceiver(
+        user,
+        serverNow() ?? _now(),
+        _battle,
+        _options.resolveName,
+        _options.sideColors,
+      );
 
   /// [battleView] of the current round at the server's time now, null without
   /// a round.
@@ -1662,6 +1724,8 @@ class RoomClient {
         catalog: o.getCatalog?.call() ?? o.catalog,
         resolveName: o.resolveName,
         replayed: replayed,
+        battle: _battle,
+        sideColors: o.sideColors,
       );
       _safe(() => o.onEvent?.call(event));
       for (final l in _eventListeners.toList()) {

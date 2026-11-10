@@ -318,7 +318,12 @@ class GiftEffectGift {
 /// What an effect player needs to show a gift.
 class GiftEffectEvent {
   /// Creates an event.
-  const GiftEffectEvent({required this.gift, this.sender, this.quantity});
+  const GiftEffectEvent({
+    required this.gift,
+    this.sender,
+    this.quantity,
+    this.receiver,
+  });
 
   /// The gift.
   final GiftEffectGift gift;
@@ -329,10 +334,40 @@ class GiftEffectEvent {
   /// How many were sent in this one send. Default 1.
   final int? quantity;
 
-  /// Wire-style JSON; absent [sender] and [quantity] are left out.
+  /// Who got the gift, for a battle (SPEC 7.4): the notice then reads "sent
+  /// Rose to Mia" and its pill gets a border in the side's colour. Leave it
+  /// out outside battles.
+  final GiftEffectReceiver? receiver;
+
+  /// Wire-style JSON; absent [sender], [quantity] and [receiver] are left out.
   Map<String, Object?> toJson() => <String, Object?>{
         'gift': gift.toJson(),
         if (sender != null) 'sender': sender,
         if (quantity != null) 'quantity': quantity,
+        if (receiver != null) 'receiver': receiver!.toJson(),
+      };
+}
+
+/// The receiving side of a battle gift (SPEC 7.4, 18.4).
+class GiftEffectReceiver {
+  /// Creates a receiver.
+  const GiftEffectReceiver({required this.name, this.side, this.color});
+
+  /// Shown in the notice.
+  final String name;
+
+  /// 0 = first side, 1 = second side (the battle bar's order). Picks the
+  /// default colour.
+  final int? side;
+
+  /// The border colour as `#rgb`, `#rrggbb` or `rgba(r, g, b, a)`; null: the
+  /// side's default (the theme's accent, then its coin colour).
+  final String? color;
+
+  /// Wire-style JSON, `color` always present.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'name': name,
+        if (side != null) 'side': side,
+        'color': color,
       };
 }

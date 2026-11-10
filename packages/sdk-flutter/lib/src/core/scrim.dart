@@ -27,6 +27,17 @@ bool scrimVisible({
 }) =>
     scrim && open && placed && snap != SheetSnap.peek;
 
+/// The scrim takes touches: asked for, open and in place, in EVERY state
+/// including peek (a tap on the empty space closes a peeking tray, 2026-11-09).
+/// The dim itself stays hidden at peek ([scrimVisible]); only its touches are
+/// taken.
+bool scrimTakesTouches({
+  required bool scrim,
+  required bool open,
+  required bool placed,
+}) =>
+    scrim && open && placed;
+
 /// Fade duration in ms: [kScrimFadeMs], or 0 with reduced motion.
 int scrimFadeMs(bool reducedMotion) => reducedMotion ? 0 : kScrimFadeMs;
 
@@ -44,8 +55,8 @@ enum ScrimTapOutcome {
 
 /// A tap on the scrim. [ScrimTap.lower] (default) lowers any state above peek
 /// and dismisses from peek; [ScrimTap.dismiss] dismisses from every state. A
-/// hidden scrim takes no touches, so from peek this is only reached by calling
-/// it directly.
+/// scrim that is hidden at peek still takes the tap ([scrimTakesTouches]), so a
+/// tap on the empty space dismisses a peeking tray.
 ScrimTapOutcome scrimTapOutcome({
   required bool scrim,
   ScrimTap scrimTap = ScrimTap.lower,

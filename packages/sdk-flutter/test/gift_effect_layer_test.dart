@@ -256,6 +256,40 @@ void main() {
       await advance(tester, 3000);
     });
 
+    testWidgets('a battle gift names the receiver and borders the pill',
+        (tester) async {
+      const theme = GiftingTheme();
+      // The 2 px border in the side colour (the newest pill is the last one).
+      Border? pillBorder() {
+        Border? last;
+        for (final e in find.byType(Container).evaluate()) {
+          final d = (e.widget as Container).decoration;
+          if (d is BoxDecoration && d.border is Border) {
+            final b = d.border! as Border;
+            if (b.top.width == 2) last = b;
+          }
+        }
+        return last;
+      }
+
+      await start(tester, reducedMotion: true);
+      fx.play(giftEvent('rose', 10, sender: 'ayla'));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(pillBorder(), isNull, reason: 'no receiver: no border');
+      fx.play(
+        GiftEffectEvent(
+          gift: giftEvent('lily', 10).gift,
+          sender: 'ayla',
+          receiver: const GiftEffectReceiver(name: 'Mia', side: 1),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('sent lily to Mia'), findsOneWidget);
+      expect(pillBorder()!.top.width, 2);
+      expect(pillBorder()!.top.color, theme.coin, reason: 'side 1 default');
+      await advance(tester, 3500);
+    });
+
     testWidgets('missing sender is Someone', (tester) async {
       await start(tester, reducedMotion: true);
       fx.play(giftEvent('rose', 10));

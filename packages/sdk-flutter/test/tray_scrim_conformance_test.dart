@@ -10,6 +10,7 @@ void main() {
 
   test('tray-scrim.json has cases (nothing is silently skipped)', () {
     expect(asList(f['visible']).length, 24);
+    expect(asList(f['takesTouches']).length, 8);
     expect(asList(f['tap']).length, greaterThan(10));
     expect(asList(f['open']).length, greaterThan(3));
   });
@@ -30,6 +31,23 @@ void main() {
             scrim: c['scrim']! as bool,
             open: c['open']! as bool,
             snap: SheetSnapName.fromWireName(c['snap'] as String)!,
+            placed: c['placed']! as bool,
+          ),
+          c['expect'],
+        );
+      });
+    }
+  });
+
+  group('scrimTakesTouches', () {
+    var i = 0;
+    for (final c in asList(f['takesTouches']).map(asMap)) {
+      i++;
+      test('#$i $c', () {
+        expect(
+          scrimTakesTouches(
+            scrim: c['scrim']! as bool,
+            open: c['open']! as bool,
             placed: c['placed']! as bool,
           ),
           c['expect'],

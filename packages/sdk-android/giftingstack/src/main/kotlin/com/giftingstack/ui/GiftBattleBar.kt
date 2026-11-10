@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -57,6 +58,7 @@ import com.giftingstack.core.BattleView
 import com.giftingstack.core.battleBarModel
 import com.giftingstack.core.battleGains
 import com.giftingstack.core.battleReadableOn
+import com.giftingstack.core.BATTLE_EXTRA_COLORS
 import com.giftingstack.core.formatBattleScore
 import com.giftingstack.core.initialOf
 import kotlin.math.abs
@@ -76,15 +78,17 @@ private const val COUNT_MS = 650
 private val EaseOutCubic = Easing { t -> 1f - (1f - t).pow(3) }
 
 /**
- * The battle bar of a versus round (SPEC 18.7): both receivers with their scores, a countdown, and
- * a split bar whose boundary slides as gifts arrive. It draws [view] only; your server starts and
- * ends rounds. Nothing is drawn while [view] is null or has fewer than two sides. A screen reader
- * gets one element: both scores and the result.
+ * The battle bar of a round (SPEC 18.7): the receivers with their scores, a countdown, and a split
+ * bar whose boundary slides as gifts arrive. Two sides are the classic versus; three or more (up
+ * to 8) are a free-for-all: the clock, a row of cells, a bar of proportional segments. It draws
+ * [view] only; your server starts and ends rounds. Nothing is drawn while [view] is null or has
+ * fewer than two sides. A screen reader gets one element: the scores and the result.
  *
  * @param view from [GiftRoom.battleView], or use the overload that takes the room.
- * @param users names and pictures of the two receivers by id. Fallback: the id.
- * @param sideColors override the two side colours (default: the theme's accent against its coin
- *   colour).
+ * @param users names and pictures of the receivers by id. Fallback: the id.
+ * @param sideColors override the side colours, one per side in order (default: the theme's accent,
+ *   its coin colour, then teal and pink, then the same again). A shorter list keeps the default for
+ *   the sides it does not name. Give the room the same list (`rememberGiftRoom(sideColors = ...)`).
  * @param reducedMotion default: the system "Remove animations" setting. Reduced motion: no
  *   sliding, counting or pulse.
  */
@@ -93,7 +97,7 @@ fun GiftBattleBar(
     view: BattleView?,
     modifier: Modifier = Modifier,
     users: Map<String, BattleBarUser> = emptyMap(),
-    sideColors: Pair<Color, Color>? = null,
+    sideColors: List<Color>? = null,
     reducedMotion: Boolean? = null,
     theme: GiftingTheme = GiftingTheme(),
     labels: BattleBarLabels = BattleBarLabels(),
@@ -106,16 +110,35 @@ fun GiftBattleBar(
     val pulses = tracker.update(view)
     if (model == null) return
 
-    val colors =
-        if (sideColors != null) {
-            listOf(sideColors.first, sideColors.second).map { c -> c to hexText(c) }
-        } else {
-            listOf(theme.accent to theme.accentText, theme.coin to theme.coinText)
-        }
+    val colors = sidePalette(theme, model.sides.size, sideColors)
+    val multi = model.sides.size > 2
     val clockFill = if (model.isFinal) theme.accent else theme.background
     val clockBorder = if (model.isFinal) Color.Transparent else if (model.urgent) theme.danger else theme.border
     val clockText = if (model.isFinal) theme.accentText else if (model.urgent) theme.danger else theme.text
     val spoken = listOf(model.spoken, model.banner).filter { it.isNotEmpty() }.joinToString(". ")
+
+    val clock: @Composable () -> Unit = {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            BasicText(
+                labels.vs,
+                style = TextStyle(color = theme.muted, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.8.sp),
+            )
+            Box(
+                Modifier.defaultMinSize(minWidth = 52.dp)
+                    .clip(CircleShape)
+                    .background(clockFill)
+                    .border(1.dp, clockBorder, CircleShape)
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .testTag("gift-battle-clock"),
+                contentAlignment = Alignment.Center,
+            ) {
+                BasicText(
+                    model.clock,
+                    style = TextStyle(color = clockText, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = TABULAR_NUMBERS),
+                )
+            }
+        }
+    }
 
     Column(
         modifier.clearAndSetSemantics {
@@ -124,9 +147,33 @@ fun GiftBattleBar(
         }.testTag("gift-battle-bar"),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (multi) {
+            // Three or more sides (SPEC 18.7): the clock, a row of cells, a bar of proportional segments.
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { clock() }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Top) {
+                model.sides.forEachIndexed { i, side ->
+                    BattleSideView(
+                        side = side,
+                        index = i,
+                        cell = if (model.sides.size > 4) 30.dp else 36.dp,
+                        right = false,
+                        color = colors[i].first,
+                        textColor = colors[i].second,
+                        user = users[side.id],
+                        pulse = pulses.getOrElse(i) { 0 },
+                        still = still,
+                        theme = theme,
+                        labels = labels,
+                        loader = loader,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            MultiBar(model.pcts, colors.map { it.first }, theme, still)
+        } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             BattleSideView(
                 side = model.sides[0],
+                index = 0,
                 right = false,
                 color = colors[0].first,
                 textColor = colors[0].second,
@@ -138,28 +185,10 @@ fun GiftBattleBar(
                 loader = loader,
                 modifier = Modifier.weight(1f),
             )
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                BasicText(
-                    labels.vs,
-                    style = TextStyle(color = theme.muted, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.8.sp),
-                )
-                Box(
-                    Modifier.defaultMinSize(minWidth = 52.dp)
-                        .clip(CircleShape)
-                        .background(clockFill)
-                        .border(1.dp, clockBorder, CircleShape)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                        .testTag("gift-battle-clock"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    BasicText(
-                        model.clock,
-                        style = TextStyle(color = clockText, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = TABULAR_NUMBERS),
-                    )
-                }
-            }
+            clock()
             BattleSideView(
                 side = model.sides[1],
+                index = 1,
                 right = true,
                 color = colors[1].first,
                 textColor = colors[1].second,
@@ -172,7 +201,7 @@ fun GiftBattleBar(
                 modifier = Modifier.weight(1f),
             )
         }
-        SplitBar(model.pct, colors[0].first, colors[1].first, theme, model.isFinal, still)
+        if (!multi) SplitBar(model.pct, colors[0].first, colors[1].first, theme, model.isFinal, still)
         if (model.banner.isNotEmpty()) {
             BasicText(
                 model.banner,
@@ -192,7 +221,7 @@ fun GiftBattleBar(
     room: GiftRoom,
     modifier: Modifier = Modifier,
     users: Map<String, BattleBarUser> = emptyMap(),
-    sideColors: Pair<Color, Color>? = null,
+    sideColors: List<Color>? = null,
     reducedMotion: Boolean? = null,
     theme: GiftingTheme = GiftingTheme(),
     labels: BattleBarLabels = BattleBarLabels(),
@@ -211,6 +240,42 @@ fun GiftBattleBar(
     GiftBattleBar(view, modifier, users, sideColors, reducedMotion, theme, labels)
 }
 
+/** The two-colour form of the bar of a view: `sideColors = a to b` keeps working. */
+@Composable
+fun GiftBattleBar(
+    view: BattleView?,
+    sideColors: Pair<Color, Color>,
+    modifier: Modifier = Modifier,
+    users: Map<String, BattleBarUser> = emptyMap(),
+    reducedMotion: Boolean? = null,
+    theme: GiftingTheme = GiftingTheme(),
+    labels: BattleBarLabels = BattleBarLabels(),
+) = GiftBattleBar(view, modifier, users, listOf(sideColors.first, sideColors.second), reducedMotion, theme, labels)
+
+/** The two-colour form of the bar of a room: `sideColors = a to b` keeps working. */
+@Composable
+fun GiftBattleBar(
+    room: GiftRoom,
+    sideColors: Pair<Color, Color>,
+    modifier: Modifier = Modifier,
+    users: Map<String, BattleBarUser> = emptyMap(),
+    reducedMotion: Boolean? = null,
+    theme: GiftingTheme = GiftingTheme(),
+    labels: BattleBarLabels = BattleBarLabels(),
+    tickMs: Long = 1_000,
+) = GiftBattleBar(room, modifier, users, listOf(sideColors.first, sideColors.second), reducedMotion, theme, labels, tickMs)
+
+/**
+ * The colour and its text colour of every side: the app's, else the default palette (SPEC 18.7):
+ * the theme's accent, its coin colour, teal and pink, then the same four again.
+ */
+private fun sidePalette(theme: GiftingTheme, count: Int, over: List<Color>?): List<Pair<Color, Color>> {
+    val defaults =
+        listOf(theme.accent to theme.accentText, theme.coin to theme.coinText) +
+            BATTLE_EXTRA_COLORS.map { hex -> tokenColor(hex) to (if (battleReadableOn(hex) == "#ffffff") Color.White else Color.Black) }
+    return List(count) { i -> over?.getOrNull(i)?.let { it to hexText(it) } ?: defaults[i % defaults.size] }
+}
+
 /** `#rrggbb` text colour that reads on [c]: black or white, whichever contrasts more. */
 private fun hexText(c: Color): Color {
     val hex = "#" + (c.toArgb() and 0xFFFFFF).toString(16).padStart(6, '0')
@@ -221,10 +286,11 @@ private fun hexText(c: Color): Color {
 private class PulseTracker {
     private var round: String? = null
     private var last: List<Long>? = null
-    private val counts = intArrayOf(0, 0)
+    private var counts = IntArray(0)
 
     fun update(view: BattleView?): List<Int> {
-        val units = view?.sides?.take(2)?.map { it.units } ?: emptyList()
+        val units = view?.sides?.map { it.units } ?: emptyList()
+        if (counts.size < units.size) counts = counts.copyOf(units.size)
         val before = if (view != null && view.round == round) last else null
         val gains = battleGains(before, units)
         for (i in gains.indices) if (gains[i]) counts[i]++
@@ -241,6 +307,9 @@ private class PulseTracker {
 @Composable
 private fun BattleSideView(
     side: BattleBarSide,
+    index: Int,
+    /** Three or more sides: the avatar's size; the side is a centred cell (avatar over name over score). Null: the versus layout. */
+    cell: Dp? = null,
     right: Boolean,
     color: Color,
     textColor: Color,
@@ -264,17 +333,19 @@ private fun BattleSideView(
     val shown = if (abs(count - side.units) < 1f) side.units else count.roundToLong()
     val ring = if (side.won) GOLD else color
     val url = user?.avatarUrl
+    val size = cell ?: AVATAR
+    val crowded = cell != null && cell < 36.dp
 
     val avatar: @Composable () -> Unit = {
         Box {
-            Box(Modifier.size(AVATAR + 8.dp).border(2.dp, ring, CircleShape).padding(4.dp).clearAndSetSemantics {}) {
+            Box(Modifier.size(size + 8.dp).border(2.dp, ring, CircleShape).padding(4.dp).clearAndSetSemantics {}) {
                 if (url != null) {
-                    Box(Modifier.size(AVATAR).clip(CircleShape).background(theme.border)) { GiftPicture(url, Modifier.size(AVATAR), loader) }
+                    Box(Modifier.size(size).clip(CircleShape).background(theme.border)) { GiftPicture(url, Modifier.size(size), loader) }
                 } else {
-                    Box(Modifier.size(AVATAR).clip(CircleShape).background(color), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(size).clip(CircleShape).background(color), contentAlignment = Alignment.Center) {
                         BasicText(
                             initialOf(side.name),
-                            style = TextStyle(color = textColor, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold),
+                            style = TextStyle(color = textColor, fontSize = if (cell == null) 18.sp else (size.value * 0.45f).sp, fontWeight = FontWeight.ExtraBold),
                         )
                     }
                 }
@@ -282,28 +353,51 @@ private fun BattleSideView(
             if (side.won) {
                 BasicText(
                     "♛",
-                    modifier = Modifier.align(if (right) Alignment.TopEnd else Alignment.TopStart).offset(x = if (right) (-2).dp else 2.dp, y = (-14).dp).testTag("gift-battle-crown"),
+                    modifier =
+                        Modifier.align(if (cell != null) Alignment.TopCenter else if (right) Alignment.TopEnd else Alignment.TopStart)
+                            .offset(x = if (cell != null) 0.dp else if (right) (-2).dp else 2.dp, y = (-14).dp)
+                            .testTag("gift-battle-crown"),
                     style = TextStyle(color = GOLD, fontSize = 18.sp),
                 )
             }
         }
     }
     val who: @Composable (Modifier) -> Unit = { m ->
-        Column(m, horizontalAlignment = if (right) Alignment.End else Alignment.Start) {
+        Column(m, horizontalAlignment = if (cell != null) Alignment.CenterHorizontally else if (right) Alignment.End else Alignment.Start) {
             BasicText(
                 side.name,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = TextStyle(color = theme.text, fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                style = TextStyle(color = theme.text, fontSize = if (cell == null) 13.sp else if (crowded) 11.sp else 12.sp, fontWeight = FontWeight.Bold),
             )
             BasicText(
                 formatBattleScore(shown, labels),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.testTag("gift-battle-score-${if (right) 1 else 0}"),
-                style = TextStyle(color = theme.text, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = TABULAR_NUMBERS),
+                modifier = Modifier.testTag("gift-battle-score-$index"),
+                style =
+                    TextStyle(
+                        color = theme.text,
+                        fontSize = if (cell == null) 20.sp else if (crowded) 14.sp else 17.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFeatureSettings = TABULAR_NUMBERS,
+                    ),
             )
         }
+    }
+    if (cell != null) {
+        Column(
+            modifier.alpha(if (side.lost) 0.5f else 1f).graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+            },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            avatar()
+            who(Modifier)
+        }
+        return
     }
     Row(
         modifier.alpha(if (side.lost) 0.5f else 1f).graphicsLayer {
@@ -319,6 +413,25 @@ private fun BattleSideView(
         } else {
             avatar()
             who(Modifier.weight(1f, fill = false))
+        }
+    }
+}
+
+/**
+ * The 16 dp bar of three or more sides: one segment per side, side `i` in `colors[i]` with the
+ * width `pcts[i]` percent, 2 dp white lines between them. Every width slides (800 ms, ease out
+ * cubic) unless [still].
+ */
+@Composable
+private fun MultiBar(pcts: List<Double>, colors: List<Color>, theme: GiftingTheme, still: Boolean) {
+    val shape = RoundedCornerShape(8.dp)
+    Row(
+        Modifier.fillMaxWidth().height(16.dp).clip(shape).border(1.dp, theme.border, shape).testTag("gift-battle-track"),
+    ) {
+        pcts.forEachIndexed { i, pct ->
+            val p by animateFloatAsState(pct.toFloat(), if (still) snap() else tween(SLIDE_MS, easing = EaseOutCubic), label = "gift-battle-segment-$i")
+            if (i > 0) Box(Modifier.fillMaxHeight().width(2.dp).background(Color.White))
+            Box(Modifier.fillMaxHeight().weight(maxOf(p, 0.0001f)).background(colors[i]).testTag("gift-battle-segment-$i"))
         }
     }
 }

@@ -69,9 +69,12 @@ data class BattleBarSide(
 
 /** The bar for one [BattleView]. */
 data class BattleBarModel(
+    /** Every side, in the server's order: two or more (up to the API's 8). */
     val sides: List<BattleBarSide>,
-    /** The first side's part of the bar, percent, kept inside the visible band. */
+    /** The first side's part of the bar, percent, kept inside the visible band (`pcts[0]`). */
     val pct: Double,
+    /** Every side's part of the bar, percent, summing to 100; none under [BATTLE_MIN_SHARE_PCT] (see [battleSegmentPcts]). */
+    val pcts: List<Double>,
     /** `m:ss`, or the `final` label once the round ended. */
     val clock: String,
     /** Under [BATTLE_URGENT_SECONDS] and still open. */
@@ -87,8 +90,37 @@ data class BattleBarModel(
 )
 
 /**
+ * Every side's part of a bar, percent (SPEC 18.7): `share x 100`, but no side under
+ * [BATTLE_MIN_SHARE_PCT]: such a side is held at the minimum and the rest share what is left in
+ * proportion to their shares, repeated until every part is visible. Sums to 100.
+ */
+fun battleSegmentPcts(shares: List<Double>): List<Double> {
+    val n = shares.size
+    val pinned = BooleanArray(n)
+    val out = DoubleArray(n)
+    while (true) {
+        val free = (0 until n).filter { !pinned[it] }
+        val left = 100.0 - BATTLE_MIN_SHARE_PCT * (n - free.size)
+        val sum = free.sumOf { shares[it] }
+        var again = false
+        for (i in free) {
+            out[i] = if (sum > 0) shares[i] / sum * left else left / free.size
+            if (out[i] < BATTLE_MIN_SHARE_PCT) {
+                pinned[i] = true
+                again = true
+            }
+        }
+        if (!again) break
+        for (i in 0 until n) if (pinned[i]) out[i] = BATTLE_MIN_SHARE_PCT
+    }
+    for (i in 0 until n) if (pinned[i]) out[i] = BATTLE_MIN_SHARE_PCT
+    return out.toList()
+}
+
+/**
  * The bar for [view], or null when it has fewer than two sides (a round with one receiver has
- * nothing to compare). Extra sides beyond two are ignored: the bar is a versus.
+ * nothing to compare). Every side is a cell of the bar (a free-for-all of up to 8); two sides look
+ * exactly as the versus always did.
  */
 fun battleBarModel(
     view: BattleView?,
@@ -111,13 +143,15 @@ fun battleBarModel(
             lost = ended && view.leader != null && view.leader != s.id,
         )
     }
-    val a = side(view.sides[0])
-    val b = side(view.sides[1])
+    val sides = view.sides.map(::side)
     val secs = ceilSeconds(view.remainingMs)
     val winner = if (ended) view.leader else null
+    val pct = minOf(100 - BATTLE_MIN_SHARE_PCT, maxOf(BATTLE_MIN_SHARE_PCT, view.sides[0].share * 100))
+    val pcts = if (sides.size == 2) listOf(pct, 100 - pct) else battleSegmentPcts(view.sides.map { it.share })
     return BattleBarModel(
-        sides = listOf(a, b),
-        pct = minOf(100 - BATTLE_MIN_SHARE_PCT, maxOf(BATTLE_MIN_SHARE_PCT, view.sides[0].share * 100)),
+        sides = sides,
+        pct = if (sides.size == 2) pct else pcts[0],
+        pcts = pcts,
         clock = if (ended) labels.finalText else formatBattleClock(view.remainingMs),
         urgent = !ended && secs <= BATTLE_URGENT_SECONDS,
         isFinal = ended,
@@ -125,10 +159,16 @@ fun battleBarModel(
         banner =
             when {
                 !ended -> ""
-                winner != null -> fillText(labels.wins, mapOf("name" to if (winner == a.id) a.name else b.name))
+                winner != null -> fillText(labels.wins, mapOf("name" to (sides.firstOrNull { it.id == winner }?.name ?: winner)))
                 else -> labels.draw
             },
-        spoken = fillText(labels.spoken, mapOf("a" to a.spoken, "b" to b.spoken)),
+        // Two sides: the `spoken` label (`{a}, {b}`); more: every side's text joined by ", ".
+        spoken =
+            if (sides.size == 2) {
+                fillText(labels.spoken, mapOf("a" to sides[0].spoken, "b" to sides[1].spoken))
+            } else {
+                sides.joinToString(", ") { it.spoken }
+            },
     )
 }
 
@@ -139,16 +179,29 @@ data class SideColor(val color: String, val text: String)
 fun battleReadableOn(hex: String): String =
     if (parseHex(hex) == null || contrastRatio("#ffffff", hex) >= contrastRatio("#000000", hex)) "#ffffff" else "#000000"
 
+/** The third and fourth side colour of the default palette (teal, pink); the fifth side starts over with the theme's accent. */
+val BATTLE_EXTRA_COLORS = listOf("#2ec4b6", "#ff5d8f")
+
 /**
- * The two side colours: the theme's accent against its coin colour (each with the theme's own text
- * colour on it, already 4.5:1 in both presets), or [override] (text picked by contrast).
+ * The colour of every side of a bar or notice (SPEC 18.7, 7.4): side `i` takes `override[i]` when the app gave one
+ * (text picked by contrast), else the default palette: the theme's accent, its coin colour (each with the theme's
+ * own text colour on it, already 4.5:1 in both presets), then [BATTLE_EXTRA_COLORS], then the same four again.
  */
-fun battleSideColors(theme: GiftThemeTokens, override: Pair<String, String>? = null): List<SideColor> =
-    if (override != null) {
-        listOf(SideColor(override.first, battleReadableOn(override.first)), SideColor(override.second, battleReadableOn(override.second)))
-    } else {
-        listOf(SideColor(theme.accent, theme.accentText), SideColor(theme.coin, theme.coinText))
+fun battleSidePalette(theme: GiftThemeTokens, count: Int, override: List<String>? = null): List<SideColor> {
+    val defaults =
+        listOf(SideColor(theme.accent, theme.accentText), SideColor(theme.coin, theme.coinText)) +
+            BATTLE_EXTRA_COLORS.map { SideColor(it, battleReadableOn(it)) }
+    return List(count) { i ->
+        val own = override?.getOrNull(i)?.takeIf { it.isNotEmpty() }
+        if (own != null) SideColor(own, battleReadableOn(own)) else defaults[i % defaults.size]
     }
+}
+
+/**
+ * The two side colours: the theme's accent against its coin colour (each with the theme's own text colour on it,
+ * already 4.5:1 in both presets), or [override] (text picked by contrast). [battleSidePalette] for any number of sides.
+ */
+fun battleSideColors(theme: GiftThemeTokens, override: List<String>? = null): List<SideColor> = battleSidePalette(theme, 2, override)
 
 /** Which sides gained score since [before] (to pulse them). [before] null: nobody pulses. */
 fun battleGains(before: List<Long>?, after: List<Long>): List<Boolean> =

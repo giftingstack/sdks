@@ -14,11 +14,11 @@ post, spec 14), a "while you were away" card with an effect replay (15) and a le
 
 ## Install
 
-The coordinates are `com.giftingstack:giftingstack:0.1.2` on Maven Central:
+The coordinates are `com.giftingstack:giftingstack:0.1.3` on Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("com.giftingstack:giftingstack:0.1.2")
+    implementation("com.giftingstack:giftingstack:0.1.3")
 }
 ```
 
@@ -202,12 +202,14 @@ GiftBattleBar(
         "mateo" to BattleBarUser("Mateo"),
     ),
     theme = GiftingTheme.Dark,                    // accent against coin colour, 4.5:1 text on both
-    sideColors = Color(0xFFE0457B) to Color(0xFF3A8DFF), // optional override
+    sideColors = listOf(Color(0xFFE0457B), Color(0xFF3A8DFF)), // optional: one colour per side (a pair `a to b` works too)
     labels = BattleBarLabels(finalText = "Bitti", wins = "{name} kazandı"),
     reducedMotion = null,                         // null: follows the system "Remove animations"
 )
 // Or draw a view you hold yourself: GiftBattleBar(room.battleView(), ...)
 ```
+
+The gift notice of a battle says who got the gift: `sent Rose to Mia`, with a 2 px border in the side's colour (accent for the first side, coin colour for the second). Pass the same colours to the room as to the bar, and the names from `resolveName`: `rememberGiftRoom(sideColors = listOf(Color(0xFFE0457B), Color(0xFF3A8DFF)), resolveName = ...)`. Outside battles nothing changes. The user's own gift says who got it too when the tray knows the room: `rememberGiftTrayHolder(receiverOf = room::receiverFor, ...)`. An app that plays its own events can set `GiftEffectEvent(receiver = GiftEffectReceiver(name, side, color))`.
 
 The pure model (`battleBarModel`, `formatBattleScore`, `formatBattleClock`, `battleSideColors`) is in `core`; the numbers are the shared fixture `battle-bar.json`. Reduced motion: no sliding, counting or pulse.
 

@@ -1,4 +1,5 @@
 import {
+  type GiftEffectReceiver,
   type BattleView,
   type EffectTier,
   type Gift,
@@ -47,6 +48,11 @@ export interface JoinRoomOptions {
   thresholds?: Partial<TierThresholds>;
   /** Display name of a sender whose token has no `name`. Default: the effect layer's "Someone". */
   resolveName?: (user: string) => string | null | undefined;
+  /**
+   * The border colours of the two battle sides in the gift notice (SPEC 7.4), the same pair you
+   * give the battle bar. Default: the theme's accent and coin colour.
+   */
+  sideColors?: readonly string[];
   /** Default true: disconnect after the page is hidden for 60 s, reconnect when it is visible. */
   pauseWhenHidden?: boolean;
   /** Default `wss://rt.giftingstack.com`. `ws://` only to localhost, 127.0.0.1, ::1, 10.0.2.2. */
@@ -70,6 +76,11 @@ export interface RoomHandle {
   readonly battle: RoomBattle | null;
   /** `battleView` now (shares, leader, time left), null without a round. */
   battleView(): BattleView | null;
+  /**
+   * The battle side a user is on now (SPEC 18.4): pass it to the tray as `receiverOf` so your own
+   * gift says who got it too. Undefined outside a round.
+   */
+  receiverFor(user: string): GiftEffectReceiver | undefined;
   /** Battle changes; returns the unsubscribe function. */
   onBattle(listener: (battle: RoomBattle | null) => void): () => void;
   /**
@@ -95,6 +106,7 @@ export type RoomLiveOptions = Partial<
     | "maxReplayAgeMs"
     | "thresholds"
     | "resolveName"
+    | "sideColors"
     | "pauseWhenHidden"
   >
 >;
@@ -130,6 +142,7 @@ export function joinRoom(options: JoinRoomOptions): RoomHandle {
     minTier: live.minTier,
     thresholds: live.thresholds,
     resolveName: live.resolveName,
+    sideColors: live.sideColors,
     onEvent: (event) => {
       play(event);
       options.onEvent?.(event);
@@ -189,6 +202,7 @@ export function joinRoom(options: JoinRoomOptions): RoomHandle {
       return room.getBattle();
     },
     battleView: room.getBattleView,
+    receiverFor: room.receiverFor,
     onBattle: (listener) => room.subscribeBattle(() => listener(room.getBattle())),
     setOptions(patch) {
       const clientChanged = "client" in patch && patch.client !== live.client;

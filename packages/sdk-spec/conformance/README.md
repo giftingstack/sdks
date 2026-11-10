@@ -143,15 +143,15 @@ Drives the platform's `EffectScheduler` (spec section 6) directly. No rendering,
 
 Steps:
 
-| step                                                                             | action                                                                                                 |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `{ "atMs": t, "play": { "gift": key, "sender"?, "quantity"? }, "returns"?: id }` | set the clock to `t`, call `play(event)`; it must return `id`. Missing `sender`/`quantity`: not given. |
-| `{ "started": id }`                                                              | `started(id)`: the effect's picture is ready                                                           |
-| `{ "finished": id }`                                                             | `finished(id)`: its animation ran to the end                                                           |
-| `{ "cancel": id }`                                                               | `cancel(id)`                                                                                           |
-| `{ "clear": true }`                                                              | `clear()`                                                                                              |
-| `{ "noticeExpired": true }`                                                      | `noticeExpired()`: the notice timer fired                                                              |
-| `{ "expect": {...} }`                                                            | check, then empty the event log                                                                        |
+| step                                                                                          | action                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{ "atMs": t, "play": { "gift": key, "sender"?, "quantity"?, "receiver"? }, "returns"?: id }` | set the clock to `t`, call `play(event)`; it must return `id`. Missing `sender`/`quantity`/`receiver`: not given. `receiver` is `{ name, side?, color? }` (7.4). |
+| `{ "started": id }`                                                                           | `started(id)`: the effect's picture is ready                                                                                                                     |
+| `{ "finished": id }`                                                                          | `finished(id)`: its animation ran to the end                                                                                                                     |
+| `{ "cancel": id }`                                                                            | `cancel(id)`                                                                                                                                                     |
+| `{ "clear": true }`                                                                           | `clear()`                                                                                                                                                        |
+| `{ "noticeExpired": true }`                                                                   | `noticeExpired()`: the notice timer fired                                                                                                                        |
+| `{ "expect": {...} }`                                                                         | check, then empty the event log                                                                                                                                  |
 
 The runner records the listener calls in an event log, as strings: `enter:<id>`, `exit:<id>`,
 `end:<id>`, `notice:<notice id>` (the `NoticeData.id`, not the play id), `noticeHide`, `clear`.
@@ -162,8 +162,9 @@ The runner records the listener calls in an event log, as strings: `enter:<id>`,
 - `active`: ids of effects on screen, in the order they entered. `activeTiers`: their tiers.
 - `queued`: ids of waiting large effects, oldest first.
 - `ended`: every id passed to `end` so far in this scenario, in order.
-- `notice`: the last notice written, deep equal: `{ id, senderName, giftName, image, count, big }`,
-  or `null` when none has been written yet. The data stays after the notice hides.
+- `notice`: the last notice written, deep equal: `{ id, senderName, giftName, image, count, big }`
+  plus `receiver: { name, side, color }` (`color` null when none was given) only for a play with a
+  receiver, or `null` when none has been written yet. The data stays after the notice hides.
 - `noticeVisible`, `noticeOwner` (the play id that wrote the notice; 0 before any),
   `noticeDurationMs` (the duration passed with the most recent `notice` call).
 
@@ -310,6 +311,8 @@ The dim behind the sheet and the open state (spec section 9.4). Pure functions a
 - `constants`: `SCRIM_FADE_MS` and `SCRIM_OPACITY` must equal them.
 - `visible[]`: `scrimVisible({ scrim, open, snap, placed })` must equal `expect` (all 24
   combinations of the four inputs, `snap` is `"peek"`, `"default"` or `"expanded"`).
+- `takesTouches[]`: `scrimTakesTouches({ scrim, open, placed })` must equal `expect` (all 8
+  combinations; the snap does not matter: a peeking sheet still takes the tap).
 - `fade[]`: `scrimFadeMs(reducedMotion)` must equal `ms`.
 - `tap[]`: `scrimTapOutcome({ scrim, scrimTap, open, snap })` must equal `expect` (`"ignored"`,
   `"lower"` or `"dismiss"`). `scrimTap` may be missing: the default `"lower"`.
@@ -491,7 +494,10 @@ serverNow)`, then the bar model with `nameOf(id) = names[id] ?? id` and `labels`
 means no model (fewer than two sides); otherwise every key given in `expect` must equal the model
 field (`pct` within 1e-6; `sides[i]` compares only the keys given). `gains[]`: `battleGains(before,
 after)`. `colors[]`: `battleSideColors(theme, override)` with `theme` the `dark`, `light` or
-`default` preset (`override` missing: the theme's accent and coin pair); deep-equal `expect`.
+`default` preset (`override` missing: the theme's accent and coin pair); deep-equal `expect`. `palette[]`: `battleSidePalette(theme, count, override)` (`override` an optional list of colour
+strings, shorter or longer than `count`) deep-equals `expect`, a list of `{ color, text }`. A model
+`expect` may also give `pcts` (every part within 1e-6, summing to 100); when it gives `sides`, the model
+must have exactly that many.
 
 ## Rooms fixtures: rooms-protocol, rooms-reconnect, rooms-filter, rooms-mapping, rooms-session
 
@@ -531,8 +537,10 @@ with `options` and runs its steps; `at` is the local clock of the step:
 `expect` (each key optional): `passed` (`tx` of the gifts the step let through, in order), `last`,
 `gap` (of this step's result).
 
-**rooms-mapping.json.** `cases[]`: `roomGiftToEffect(event, { catalog, resolveName, replayed })`
-deep-equals `expect` (a missing `sender` key means absent). `catalog: true` passes the file's
+**rooms-mapping.json.** `cases[]`: `roomGiftToEffect(event, { catalog, resolveName, replayed, battle, sideColors })` (`sideColors`: a list of any length; `battle` any number of sides)
+deep-equals `expect` (a missing `sender` or `receiver` key means absent). `battle` (optional) is a
+`RoomBattle` `{ round, started, ends, scores: [{ id, units, gifts }] }`; `sideColors` (optional) a
+pair of colour strings; both missing: not given. `catalog: true` passes the file's
 `catalog`; `names` given: `resolveName(id) = names[id]` (missing = nothing); `replayed` missing:
 not given.
 

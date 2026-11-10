@@ -27,6 +27,8 @@ export interface UseGiftTrayOptions {
   reference?: string;
   /** Room on screen (see `useGiftRoom`): every send names it, so the room's viewers see it. */
   roomId?: string;
+  /** In a battle: `room.controller.receiverFor`, so your own gift says who got it (SPEC 18.4). */
+  receiverOf?: GiftTrayControllerOptions["receiverOf"];
   onSent?: (transaction: GiftTransaction) => void;
   /** Called for every failed send. `error.insufficientBalance` means: open your coin store. */
   onError?: (error: GiftingError) => void;
@@ -63,13 +65,15 @@ export interface UseGiftTray {
 }
 
 function controllerOptions(options: UseGiftTrayOptions): GiftTrayControllerOptions {
-  const { client, receiver, effects, playOn, reference, roomId, onSent, onError } = options;
+  const { client, receiver, effects, playOn, reference, roomId, receiverOf, onSent, onError } =
+    options;
   return {
     client,
     receiver,
     playOn,
     reference,
     roomId,
+    receiverOf,
     onSent,
     onError,
     effects: () => effects?.current,

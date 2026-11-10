@@ -26,14 +26,25 @@ public struct NoticeData: Sendable, Equatable, Hashable {
     /// Gifts in a row, 1 for a single gift.
     public let count: Int
     public let big: Bool
+    /// Only in a battle (SPEC 7.4): who got the gift and the side's colour.
+    public let receiver: GiftEffectReceiver?
 
-    public init(id: Int, senderName: String, giftName: String, image: String?, count: Int, big: Bool) {
+    public init(
+        id: Int,
+        senderName: String,
+        giftName: String,
+        image: String?,
+        count: Int,
+        big: Bool,
+        receiver: GiftEffectReceiver? = nil
+    ) {
         self.id = id
         self.senderName = senderName
         self.giftName = giftName
         self.image = image
         self.count = count
         self.big = big
+        self.receiver = receiver
     }
 }
 
@@ -148,7 +159,9 @@ public final class EffectScheduler {
         let quantity = event.quantity ?? 1
         let id = nextId
         nextId += 1
-        let run = combo.hit(sender: sender, giftId: event.gift.id, now: now())
+        // A combo counts per receiver too: gifts to two hosts of a battle are two runs.
+        let rkey = EffectScheduler.receiverKey(event.receiver)
+        let run = combo.hit(sender: sender, giftId: rkey == nil ? event.gift.id : "\(event.gift.id)\u{0}\(rkey!)", now: now())
         let count = quantity > 1 ? quantity : run
         let item = ScheduledEffect(id: id, event: event, recipe: recipe, count: count)
         // Without an effect the notice shows now; with one, it shows when the effect starts.
@@ -263,10 +276,22 @@ public final class EffectScheduler {
         }
     }
 
+    /// What tells two receivers apart for the combo and the notice key: the side and the name (two hosts
+    /// with one display name still sit on different sides). nil without a receiver.
+    private static func receiverKey(_ receiver: GiftEffectReceiver?) -> String? {
+        guard let receiver = receiver else {
+            return nil
+        }
+        return "\(receiver.side.map(String.init) ?? ""):\(receiver.name)"
+    }
+
     private func showNotice(_ item: ScheduledEffect) {
         let event = item.event
         let sender = event.sender ?? GiftingSpec.defaultSenderName
-        let key = "\(sender)|\(event.gift.id)"
+        let receiver = event.receiver
+        // The receiver is part of the key: a combo to one host and one to the other are two notices.
+        let rkey = EffectScheduler.receiverKey(receiver)
+        let key = rkey == nil ? "\(sender)|\(event.gift.id)" : "\(sender)|\(event.gift.id)|\(rkey!)"
         noticeOwner = item.id
         // Every pair keeps its own id while it is remembered, so a combo returns to its own line
         // even when other people sent gifts in between.
@@ -289,7 +314,8 @@ public final class EffectScheduler {
             giftName: event.gift.name,
             image: event.gift.icon ?? event.gift.image,
             count: item.count,
-            big: item.recipe.noticeBig
+            big: item.recipe.noticeBig,
+            receiver: receiver
         )
         noticeData = data
         noticeVisible = true

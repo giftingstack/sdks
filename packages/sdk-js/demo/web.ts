@@ -63,6 +63,39 @@ const THEMES: Record<DemoTheme, GiftTheme> = {
   light: lightTheme,
   pink: themeFromAccent("#ff4f9a", "dark"),
 };
+/**
+ * Keeps `el` in sight by scrolling only this page. `scrollIntoView` also scrolls every parent
+ * page, so inside the iframe on giftingstack.com it dragged the whole site down to the demo.
+ */
+function keepInView(el: HTMLElement): void {
+  let box: HTMLElement | null = el.parentElement;
+  while (box && box !== document.body && box !== document.documentElement) {
+    if (
+      box.scrollHeight > box.clientHeight &&
+      /(auto|scroll)/.test(getComputedStyle(box).overflowY)
+    )
+      break;
+    box = box.parentElement;
+  }
+  const own = box && box !== document.body && box !== document.documentElement ? box : null;
+  const rect = own ? own.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+  // Like scrollIntoView: the scroller's scroll-padding is room that is covered (the open sheet).
+  const pad = own ? getComputedStyle(own) : null;
+  const bounds = {
+    top: rect.top + (Number.parseFloat(pad?.scrollPaddingTop ?? "") || 0),
+    bottom: rect.bottom - (Number.parseFloat(pad?.scrollPaddingBottom ?? "") || 0),
+  };
+  const r = el.getBoundingClientRect();
+  const delta =
+    r.bottom > bounds.bottom
+      ? r.bottom - bounds.bottom
+      : r.top < bounds.top
+        ? r.top - bounds.top
+        : 0;
+  if (delta === 0) return;
+  (own ?? window).scrollBy({ top: delta, behavior: "smooth" });
+}
+
 const fmt = (n: number): string => n.toLocaleString("en-US");
 const esc = (s: string): string =>
   s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
@@ -228,6 +261,8 @@ async function main(): Promise<void> {
       receiver: post.author,
       reference: post.id,
       roomId,
+      // In a battle your own gift says who got it too (the room knows the sides).
+      receiverOf: (u) => room?.receiverFor(u),
       effects,
       theme,
       anchor,
@@ -237,7 +272,7 @@ async function main(): Promise<void> {
         effects.setOptions({ noticeBottom: px > 0 ? px + 16 : baseNotice() });
         // The page keeps its Gift button above the sheet: room for the sheet, and the button in view.
         app.style.setProperty("--tray-inset", `${sheet ? px : 0}px`);
-        if (sheet && px > 0) anchor.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        if (sheet && px > 0) keepInView(anchor);
       },
       // A pick makes the tray small everywhere; the SDK draws the dim and closes on a tap on it.
       collapseOnSelect: true,
@@ -295,6 +330,8 @@ async function main(): Promise<void> {
   // server starts each round (`POST /v1/rooms/{room_id}/battle`); the SDK only shows the scores.
   const LIVE_HOST = "mia";
   const LIVE_RIVAL = "theo";
+  // "Battle 4+": a free-for-all of four sides, round after round (the bar draws one cell per side).
+  const LIVE_FFA = [LIVE_HOST, LIVE_RIVAL, "sofia", "kai"];
   const livePost: Post = {
     id: "live-1",
     author: LIVE_HOST,
@@ -303,8 +340,8 @@ async function main(): Promise<void> {
     ago: "live",
     likes: 0,
   };
-  const rivalPost: Post = { ...livePost, author: LIVE_RIVAL };
-  const watchers = SENDERS.filter((id) => id !== LIVE_HOST && id !== LIVE_RIVAL);
+  const postOf = (id: string): Post => ({ ...livePost, author: id });
+  const watchers = SENDERS.filter((id) => !LIVE_FFA.includes(id));
   const rooms = {
     live: {
       id: "pixel-live",
@@ -319,7 +356,18 @@ async function main(): Promise<void> {
         battle: { receivers: [LIVE_HOST, LIVE_RIVAL] },
       }),
     },
+    battle4: {
+      id: "pixel-battle4",
+      socket: fakeRoomSocket({
+        gifts,
+        senders: watchers,
+        nameOf: displayName,
+        battle: { receivers: LIVE_FFA },
+      }),
+    },
   } as const;
+  // The rooms with a score bar.
+  const BATTLES = ["battle", "battle4"] as const;
   type RoomMode = keyof typeof rooms;
   // What the API does after a send with `room_id` (the demo has no server): the room gets it.
   const sendToApi = client.sendGift.bind(client);
@@ -339,6 +387,7 @@ async function main(): Promise<void> {
     <div class="seg" role="group" aria-label="Stream">
       <button type="button" data-mode="live" aria-pressed="true">Live room</button>
       <button type="button" data-mode="battle" aria-pressed="false">Battle</button>
+      <button type="button" data-mode="battle4" aria-pressed="false">Battle 4+</button>
     </div>
     <article class="card" data-block="live">
       ${stage()}
@@ -354,25 +403,43 @@ async function main(): Promise<void> {
       <p class="live-state">Connecting...</p>
       <div class="post-actions">${sideButton(LIVE_HOST)}${sideButton(LIVE_RIVAL)}</div>
       <ul class="room-feed"></ul>
+    </article>
+    <article class="card" data-block="battle4" hidden>
+      ${stage()}
+      <div class="post-head">${avatar(LIVE_HOST)}<div><b>${LIVE_FFA.map((id) => esc(firstName(id))).join(", ")}</b><small>Four creators in one round: every side has its own colour</small></div></div>
+      <div class="battle"></div>
+      <p class="live-state">Connecting...</p>
+      <div class="post-actions">${LIVE_FFA.map(sideButton).join("")}</div>
+      <ul class="room-feed"></ul>
     </article>`;
   const block = (mode: RoomMode): HTMLElement => q(panels.live!, `[data-block="${mode}"]`);
   for (const mode of Object.keys(rooms) as RoomMode[]) {
     for (const b of block(mode).querySelectorAll<HTMLButtonElement>("[data-side]")) {
-      const post = b.dataset.side === LIVE_RIVAL ? rivalPost : livePost;
+      const post = postOf(b.dataset.side!);
       b.addEventListener("click", () => openTray(post, b, undefined, rooms[mode].id));
     }
   }
   let room: RoomHandle | null = null;
-  let liveMode: RoomMode = opts.get("mode") === "battle" ? "battle" : "live";
-  // The score bar is the SDK's: it follows the joined room by itself.
-  const battleBar = new GiftBattleBar(q(block("battle"), ".battle"), {
-    resolveUsers: resolveDemoUsers,
-    reducedMotion: reduced,
-    theme,
-  });
+  const modeParam = opts.get("mode");
+  let liveMode: RoomMode = (Object.keys(rooms) as RoomMode[]).includes(modeParam as RoomMode)
+    ? (modeParam as RoomMode)
+    : "live";
+  // The score bars are the SDK's: each follows the joined room by itself.
+  const bars = Object.fromEntries(
+    BATTLES.map((m) => [
+      m,
+      new GiftBattleBar(q(block(m), ".battle"), {
+        resolveUsers: resolveDemoUsers,
+        reducedMotion: reduced,
+        theme,
+      }),
+    ]),
+  ) as Record<(typeof BATTLES)[number], GiftBattleBar>;
   const leaveRoom = (): void => {
-    battleBar.update({ room: undefined });
-    battleBar.setView(null);
+    for (const bar of Object.values(bars)) {
+      bar.update({ room: undefined });
+      bar.setView(null);
+    }
     room?.leave();
     room = null;
   };
@@ -403,7 +470,7 @@ async function main(): Promise<void> {
       WebSocket: rooms[mode].socket,
       onEvent: (e) => {
         const li = document.createElement("li");
-        const to = e.receiverId && mode === "battle" ? ` to ${esc(firstName(e.receiverId))}` : "";
+        const to = e.receiverId && mode !== "live" ? ` to ${esc(firstName(e.receiverId))}` : "";
         li.innerHTML = `<b>${esc(e.sender ?? "Someone")}</b> sent ${e.quantity > 1 ? `${e.quantity} x ` : ""}${esc(e.gift.name)}${to}`;
         feed.prepend(li);
         while (feed.children.length > 30) feed.lastElementChild?.remove();
@@ -411,7 +478,7 @@ async function main(): Promise<void> {
       onViewers: show,
       onState: show,
     });
-    if (mode === "battle") battleBar.update({ room });
+    if (mode !== "live") bars[mode].update({ room });
     show();
   };
   const showMode = (mode: RoomMode): void => {
@@ -506,7 +573,7 @@ async function main(): Promise<void> {
   });
 
   // ---- address options, for pages that embed the demo (giftingstack.com shows each feature):
-  // ?tab=feed|live|top|inbox|me opens that tab (?mode=battle: the Live tab shows the battle), ?away=1 shows the away card now (0: never),
+  // ?tab=feed|live|top|inbox|me opens that tab (?mode=battle|battle4: the Live tab shows the battle, or the four-way battle), ?away=1 shows the away card now (0: never),
   // ?tray=1 opens the gift tray on the first post, ?embed=1 hides the demo's footer.
   if (opts.get("embed") === "1") document.documentElement.classList.add("embed");
   const TABS = ["feed", "live", "top", "inbox", "me"];
@@ -788,13 +855,13 @@ async function main(): Promise<void> {
       board.update({ theme });
       inbox.update({ theme });
       awayUi.update({ theme });
-      battleBar.update({ theme });
+      for (const bar of Object.values(bars)) bar.update({ theme });
     },
     setMotion: (m) => {
       reduced = m === "reduced" ? true : undefined;
       effects.setOptions({ reducedMotion: reduced });
       awayUi.update({ reducedMotion: reduced });
-      battleBar.update({ reducedMotion: reduced });
+      for (const bar of Object.values(bars)) bar.update({ reducedMotion: reduced });
     },
     reset: () => {
       closeTray();

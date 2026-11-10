@@ -25,6 +25,31 @@ const text = (id: string) => screen.getByTestId(id).textContent;
 describe("React Native BattleBar", () => {
   afterEach(cleanup);
 
+  it("draws three sides as cells with their scores and one spoken sentence", () => {
+    const view = battleView(
+      {
+        round: "r3",
+        started: 0,
+        ends: 60_000,
+        scores: [
+          { id: "mia", units: 300, gifts: 1 },
+          { id: "theo", units: 100, gifts: 1 },
+          { id: "noor", units: 100, gifts: 1 },
+        ],
+      },
+      1_000,
+    );
+    render(bar({ view, users: { noor: { name: "Noor" } } }));
+    expect(text("battle-score-0")).toBe("300");
+    expect(text("battle-score-1")).toBe("100");
+    expect(text("battle-score-2")).toBe("100");
+    expect(screen.getByText("Noor")).toBeTruthy();
+    expect(screen.getByTestId("battle-bar").getAttribute("aria-label")).toBe(
+      "mia 300, theo 100, Noor 100",
+    );
+    expect(text("battle-clock")).toBe("0:59");
+  });
+
   it("draws nothing without a round", () => {
     render(bar({ view: null }));
     expect(screen.queryByTestId("battle-bar")).toBeNull();

@@ -1,11 +1,34 @@
 import { useEffect, useRef } from "react";
-import { Animated, Easing, Image, Platform, StyleSheet, Text, View } from "react-native";
-import { type NoticeData, pictureFailed, pictureSrc } from "../core";
+import {
+  Animated,
+  Easing,
+  Image,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+  processColor,
+} from "react-native";
+import { type NoticeData, battleSidePalette, pictureFailed, pictureSrc } from "../core";
 import type { GiftTheme } from "./theme";
 
 export type { NoticeData };
 
 const native = Platform.OS !== "web";
+
+/** The app's colour when the platform can read it, else the side's default. */
+function sideColor(receiver: NonNullable<NoticeData["receiver"]>, theme: GiftTheme): string {
+  const own = receiver.color;
+  if (own) {
+    try {
+      if (processColor(own) != null) return own;
+    } catch {
+      // unreadable: the default below
+    }
+  }
+  const side = receiver.side ?? 0;
+  return battleSidePalette(theme, side + 1)[side]!.color;
+}
 
 /** Up to this many lines at once, newest at the bottom (same on every SDK). */
 export const MAX_NOTICE_LINES = 3;
@@ -80,7 +103,7 @@ export function Notice({
   }, [data, pop]);
 
   if (!data) return null;
-  const { big } = data;
+  const { big, receiver } = data;
   return (
     <Animated.View
       pointerEvents="none"
@@ -92,6 +115,19 @@ export function Notice({
         {
           backgroundColor: big ? theme.noticeBigBackground : theme.noticeBackground,
           paddingVertical: big ? 7 : 5,
+          // A battle gift: a 2 px border in the side colour (SPEC 7.4), accent for the first
+          // side and the coin colour for the second unless the app gave a readable colour of its
+          // own, and inside it a 1 px line in the text colour (below), so the ring shows even when
+          // the side colour is the pill's own. The padding gives the 3 px back: same pill size.
+          ...(receiver
+            ? {
+                borderWidth: 2,
+                borderColor: sideColor(receiver, theme),
+                paddingVertical: (big ? 7 : 5) - 3,
+                paddingLeft: 2,
+                paddingRight: 13,
+              }
+            : null),
           opacity: slide,
           transform: [
             { translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [-260, 0] }) },
@@ -99,6 +135,19 @@ export function Notice({
         },
       ]}
     >
+      {receiver && (
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderWidth: 1,
+              borderRadius: 999,
+              borderColor: big ? theme.noticeBigText : theme.noticeText,
+            },
+          ]}
+        />
+      )}
       <View style={[styles.avatar, big && styles.avatarBig, { backgroundColor: theme.accent }]}>
         <Text style={[styles.avatarText, { color: theme.accentText }]}>
           {data.senderName.slice(0, 1).toUpperCase()}
@@ -109,7 +158,7 @@ export function Notice({
           {data.senderName}
         </Text>
         <Text style={[styles.what, { color: big ? theme.noticeBigText : theme.noticeText }]}>
-          sent {data.giftName}
+          {receiver ? `sent ${data.giftName} to ${receiver.name}` : `sent ${data.giftName}`}
         </Text>
       </View>
       {pictureSrc(data.image) && (

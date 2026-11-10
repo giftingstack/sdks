@@ -197,6 +197,21 @@ data class GiftEffectEvent(
     val sender: String? = null,
     /** How many were sent in this one send. Default 1. */
     val quantity: Int? = null,
+    /**
+     * Who got the gift, for a battle (SPEC 7.4): the notice then reads "sent Rose to Mia" and its
+     * pill gets a border in the side's colour. Leave it out outside battles.
+     */
+    val receiver: GiftEffectReceiver? = null,
+)
+
+/** The receiving side of a battle gift (SPEC 7.4, 18.4). */
+data class GiftEffectReceiver(
+    /** Shown in the notice. */
+    val name: String,
+    /** 0 = first side, 1 = second side (the battle bar's order). Picks the default colour. */
+    val side: Int? = null,
+    /** The border colour as `#rgb`, `#rrggbb` or `rgba(r, g, b, a)`; null: the side's default (accent, coin). */
+    val color: String? = null,
 )
 
 internal fun String?.json(): JsonElement = if (this == null) JsonNull else JsonPrimitive(this)

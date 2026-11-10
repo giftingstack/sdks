@@ -38,6 +38,7 @@ class GiftTrayOptions {
     this.playOn = PlayOn.tap,
     this.reference,
     this.roomId,
+    this.receiverOf,
     this.onSent,
     this.onError,
     this.prefetch,
@@ -61,6 +62,11 @@ class GiftTrayOptions {
   /// Room on screen (SPEC 17.1): every send names it, so the room's viewers
   /// see the gift. Null or empty: no room.
   final String? roomId;
+
+  /// In a battle, the side a receiver is on (`room.receiverFor`, SPEC 18.4):
+  /// the user's own gift then says who got it, like the room's gifts of the
+  /// others. Returns null outside a battle.
+  final GiftEffectReceiver? Function(String receiver)? receiverOf;
 
   /// Called after a successful send.
   final void Function(GiftTransaction transaction)? onSent;
@@ -233,19 +239,29 @@ class GiftTrayController {
     _pending++;
     // Take the coins at once so the number moves with every tap.
     _set(balance: _state.balance - gift.price);
-    int? show(String sender, int quantity) => options.effects?.call()?.play(
-          GiftEffectEvent(
-            gift: GiftEffectGift(
-              id: gift.id,
-              name: gift.name,
-              price: gift.price,
-              image: gift.animationUrl ?? gift.iconUrl,
-              icon: gift.iconUrl,
+    int? show(String sender, int quantity) {
+      GiftEffectReceiver? battleReceiver;
+      try {
+        battleReceiver = options.receiverOf?.call(options.receiver);
+      } on Object {
+        battleReceiver = null; // app code: never let it break a send
+      }
+      return options.effects?.call()?.play(
+            GiftEffectEvent(
+              gift: GiftEffectGift(
+                id: gift.id,
+                name: gift.name,
+                price: gift.price,
+                image: gift.animationUrl ?? gift.iconUrl,
+                icon: gift.iconUrl,
+              ),
+              sender: sender,
+              quantity: quantity,
+              receiver: battleReceiver,
             ),
-            sender: sender,
-            quantity: quantity,
-          ),
-        );
+          );
+    }
+
     final early = options.playOn == PlayOn.tap;
     final int? shownId = early ? show(user ?? 'You', 1) : null;
     try {

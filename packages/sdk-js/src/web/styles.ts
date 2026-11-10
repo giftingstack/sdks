@@ -161,9 +161,18 @@ export const CSS: string = `
   font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 @media (prefers-reduced-motion: reduce) { .gs-sheet-body { transition: none; } }
+/* Entrance (SPEC 9.4, same values as Flutter and iOS): fades in over 200 ms while rising from 3 % of its
+   height below its place over 220 ms. Set once the sheet is placed, removed when it has played. */
+@keyframes gs-sheet-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gs-sheet-rise { from { transform: translateY(3%); } to { transform: none; } }
+.gs-tray.gs-sheet[data-gs-entering] {
+  animation: gs-sheet-fade 200ms ease-out both, gs-sheet-rise 220ms cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+@media (prefers-reduced-motion: reduce) { .gs-tray.gs-sheet[data-gs-entering] { animation: none; } }
 
 .gs-scrim { position: absolute; inset: 0; z-index: 1; background: #000; opacity: 0; pointer-events: none; transition: opacity 200ms ease-out; }
-.gs-scrim[data-gs-visible] { opacity: 0.4; pointer-events: auto; }
+.gs-scrim[data-gs-visible] { opacity: 0.4; }
+.gs-scrim[data-gs-active] { pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { .gs-scrim { transition: none; } }
 .gs-tray[hidden], .gs-tray [hidden] { display: none !important; }
 .gs-tray.gs-popover, .gs-tray.gs-inline { gap: 0; padding: 0; overflow: hidden; }
@@ -217,8 +226,21 @@ export const CSS: string = `
 .gs-vs-a { border-radius: 8px 0 0 8px; background: linear-gradient(90deg, color-mix(in srgb, var(--gs-side-a) 55%, #000), var(--gs-side-a)); }
 .gs-vs-b { border-radius: 0 8px 8px 0; background: linear-gradient(270deg, color-mix(in srgb, var(--gs-side-b) 55%, #000), var(--gs-side-b)); }
 .gs-vs-spark { position: absolute; top: 50%; left: 50%; width: 4px; height: 26px; border-radius: 2px; background: #fff; box-shadow: 0 0 6px 2px #fff, 0 0 16px 6px color-mix(in srgb, var(--gs-accent) 70%, #fff); transform: translate(-50%, -50%); transition: left 0.8s var(--gs-ease); }
+.gs-vs-multi .gs-vs-cells { display: grid; grid-template-columns: repeat(var(--gs-vs-n), minmax(0, 1fr)); gap: 6px; }
+.gs-vs-multi .gs-vs-side { flex-direction: column; justify-content: flex-start; gap: 4px; text-align: center; }
+.gs-vs-multi .gs-vs-avatar { width: 36px; height: 36px; font-size: 16px; background: var(--gs-side); color: var(--gs-side-text); box-shadow: 0 0 0 2px var(--gs-surface), 0 0 0 4px var(--gs-side); }
+.gs-vs-multi[data-gs-sides="many"] .gs-vs-avatar { width: 30px; height: 30px; font-size: 13px; }
+.gs-vs-multi .gs-vs-crown { left: 50%; top: -14px; margin-left: -9px; }
+.gs-vs-multi .gs-vs-who { justify-items: center; width: 100%; }
+.gs-vs-multi .gs-vs-name { max-width: 100%; font-size: 12px; }
+.gs-vs-multi .gs-vs-score { max-width: 100%; font-size: 17px; }
+.gs-vs-multi[data-gs-sides="many"] .gs-vs-name { font-size: 11px; }
+.gs-vs-multi[data-gs-sides="many"] .gs-vs-score { font-size: 14px; }
+.gs-vs-multi .gs-vs-bar { overflow: hidden; }
+.gs-vs-seg { display: block; width: 0; height: 100%; background: linear-gradient(90deg, color-mix(in srgb, var(--gs-side) 55%, #000), var(--gs-side)); transition: width 0.8s var(--gs-ease); }
+.gs-vs-seg + .gs-vs-seg { border-left: 2px solid #fff; }
 .gs-vs-side.gs-pulse { animation: gs-vs-pop 0.5s var(--gs-ease); }
-.gs-vs-a.gs-pulse, .gs-vs-b.gs-pulse { animation: gs-vs-flash 0.6s ease-out; }
+.gs-vs-a.gs-pulse, .gs-vs-b.gs-pulse, .gs-vs-seg.gs-pulse { animation: gs-vs-flash 0.6s ease-out; }
 .gs-vs-side.gs-lose { opacity: 0.5; filter: saturate(0.5); }
 .gs-vs-side.gs-win .gs-vs-crown { display: block; }
 .gs-vs-side.gs-win .gs-vs-avatar { box-shadow: 0 0 0 2px var(--gs-surface), 0 0 0 4px #ffc83d, 0 0 18px 2px rgba(255, 200, 61, 0.55); }

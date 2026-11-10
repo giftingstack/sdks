@@ -44,6 +44,7 @@ public final class GiftTrayModel: ObservableObject {
         playOn: PlayOn = .tap,
         reference: String? = nil,
         roomId: String? = nil,
+        receiverOf: ((String) -> GiftEffectReceiver?)? = nil,
         onSent: ((GiftTransaction) -> Void)? = nil,
         onError: ((GiftingError) -> Void)? = nil,
         open: Bool = true,
@@ -59,6 +60,7 @@ public final class GiftTrayModel: ObservableObject {
             playOn: playOn,
             reference: reference,
             roomId: roomId,
+            receiverOf: receiverOf,
             onSent: onSent,
             onError: onError,
             prefetch: { url in

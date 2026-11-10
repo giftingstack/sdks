@@ -281,13 +281,16 @@ describe("GiftTray scrim, open and close (React Native, spec 9.4)", () => {
     expect(takesTouches()).toBe(true);
   });
 
-  it("is hidden at peek and takes no touches there", async () => {
-    await mount({ scrim: true });
+  it("is hidden at peek but still takes the tap there, and a tap dismisses", async () => {
+    const onDismiss = vi.fn();
+    await mount({ scrim: true, onDismiss });
     await advance(1000);
     fireEvent.click(handle());
     await advance(1000);
     expect(dimOpacity()).toBeCloseTo(0, 2);
-    expect(takesTouches()).toBe(false);
+    expect(takesTouches()).toBe(true);
+    fireEvent.click(screen.getByTestId("gift-scrim-press"));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
   it("scrimTap lower (default): a tap lowers the sheet to peek, no dismissal", async () => {

@@ -89,9 +89,13 @@ public struct BattleBarSide: Sendable, Equatable, Hashable {
 
 /// The bar for one `BattleView`.
 public struct BattleBarModel: Sendable, Equatable, Hashable {
+    /// Every side, in the server's order: two or more (up to the API's 8).
     public var sides: [BattleBarSide]
-    /// The first side's part of the bar, percent, kept inside the visible band.
+    /// The first side's part of the bar, percent, kept inside the visible band (`pcts[0]`).
     public var pct: Double
+    /// Every side's part of the bar, percent, summing to 100; none under `battleMinSharePct`
+    /// (see `battleSegmentPcts`).
+    public var pcts: [Double]
     /// `m:ss`, or the `finalText` label once the round ended.
     public var clock: String
     /// Under `battleUrgentSeconds` and still open.
@@ -106,8 +110,41 @@ public struct BattleBarModel: Sendable, Equatable, Hashable {
     public var spoken: String
 }
 
+/// Every side's part of a bar, percent (SPEC 18.7): `share x 100`, but no side under
+/// `battleMinSharePct`: such a side is held at the minimum and the rest share what is left in
+/// proportion to their shares, repeated until every part is visible. Sums to 100.
+public func battleSegmentPcts(_ shares: [Double]) -> [Double] {
+    let n = shares.count
+    var pinned = [Bool](repeating: false, count: n)
+    var out = [Double](repeating: 0, count: n)
+    while true {
+        let free = (0..<n).filter { !pinned[$0] }
+        let left = 100 - battleMinSharePct * Double(n - free.count)
+        let sum = free.reduce(0.0) { $0 + shares[$1] }
+        var again = false
+        for i in free {
+            out[i] = sum > 0 ? shares[i] / sum * left : left / Double(free.count)
+            if out[i] < battleMinSharePct {
+                pinned[i] = true
+                again = true
+            }
+        }
+        if !again {
+            break
+        }
+        for i in 0..<n where pinned[i] {
+            out[i] = battleMinSharePct
+        }
+    }
+    for i in 0..<n where pinned[i] {
+        out[i] = battleMinSharePct
+    }
+    return out
+}
+
 /// The bar for `view`, or nil when it has fewer than two sides (a round with one receiver has
-/// nothing to compare). Extra sides beyond two are ignored: the bar is a versus.
+/// nothing to compare). Every side is a cell of the bar (a free-for-all of up to 8); two sides look
+/// exactly as the versus always did.
 public func battleBarModel(
     _ view: BattleView?,
     nameOf: (String) -> String = { $0 },
@@ -130,27 +167,33 @@ public func battleBarModel(
             lost: ended && view.leader != nil && view.leader != s.id
         )
     }
-    let a = side(view.sides[0])
-    let b = side(view.sides[1])
+    let sides = view.sides.map(side)
     let secs = battleCeilSeconds(view.remainingMs)
     let winner = ended ? view.leader : nil
     var banner = ""
     if ended {
         if let winner = winner {
-            banner = fillLabel(labels.wins, ["name": winner == a.id ? a.name : b.name])
+            banner = fillLabel(labels.wins, ["name": sides.first(where: { $0.id == winner })?.name ?? winner])
         } else {
             banner = labels.draw
         }
     }
+    let pct = min(100 - battleMinSharePct, max(battleMinSharePct, view.sides[0].share * 100))
+    let pcts = sides.count == 2 ? [pct, 100 - pct] : battleSegmentPcts(view.sides.map { $0.share })
+    // Two sides: the `spoken` label (`{a}, {b}`); more: every side's text joined by ", ".
+    let spoken = sides.count == 2
+        ? fillLabel(labels.spoken, ["a": sides[0].spoken, "b": sides[1].spoken])
+        : sides.map { $0.spoken }.joined(separator: ", ")
     return BattleBarModel(
-        sides: [a, b],
-        pct: min(100 - battleMinSharePct, max(battleMinSharePct, view.sides[0].share * 100)),
+        sides: sides,
+        pct: sides.count == 2 ? pct : pcts[0],
+        pcts: pcts,
         clock: ended ? labels.finalText : formatBattleClock(view.remainingMs),
         urgent: !ended && secs <= battleUrgentSeconds,
         isFinal: ended,
         winner: winner,
         banner: banner,
-        spoken: fillLabel(labels.spoken, ["a": a.spoken, "b": b.spoken])
+        spoken: spoken
     )
 }
 
@@ -173,19 +216,33 @@ public func battleReadableOn(_ hex: String) -> String {
     return readableOn(hex)
 }
 
-/// The two side colours: the theme's accent against its coin colour (each with the theme's own
-/// text colour on it, already 4.5:1 in both presets), or `override` (text picked by contrast).
-public func battleSideColors(_ theme: GiftTheme, override: [String]? = nil) -> [SideColor] {
-    if let o = override, o.count >= 2 {
-        return [
-            SideColor(color: o[0], text: battleReadableOn(o[0])),
-            SideColor(color: o[1], text: battleReadableOn(o[1])),
-        ]
+/// The third and fourth side colour of the default palette (teal, pink); the fifth side starts over
+/// with the theme's accent.
+public let battleExtraColors = ["#2ec4b6", "#ff5d8f"]
+
+/// The colour of every side of a bar or notice (SPEC 18.7, 7.4): side `i` takes `override[i]` when the
+/// app gave one (text picked by contrast), else the default palette: the theme's accent, its coin colour
+/// (each with the theme's own text colour on it, already 4.5:1 in both presets), then
+/// `battleExtraColors`, then the same four again.
+public func battleSidePalette(_ theme: GiftTheme, count: Int, override: [String]? = nil) -> [SideColor] {
+    let defaults =
+        [
+            SideColor(color: theme.accent, text: theme.accentText),
+            SideColor(color: theme.coin, text: theme.coinText),
+        ] + battleExtraColors.map { SideColor(color: $0, text: battleReadableOn($0)) }
+    return (0..<count).map { i in
+        if let o = override, i < o.count, !o[i].isEmpty {
+            return SideColor(color: o[i], text: battleReadableOn(o[i]))
+        }
+        return defaults[i % defaults.count]
     }
-    return [
-        SideColor(color: theme.accent, text: theme.accentText),
-        SideColor(color: theme.coin, text: theme.coinText),
-    ]
+}
+
+/// The two side colours: the theme's accent against its coin colour (each with the theme's own text
+/// colour on it, already 4.5:1 in both presets), or `override` (text picked by contrast).
+/// `battleSidePalette` for any number of sides.
+public func battleSideColors(_ theme: GiftTheme, override: [String]? = nil) -> [SideColor] {
+    battleSidePalette(theme, count: 2, override: override)
 }
 
 /// Which sides gained score since `before` (to pulse them). `before` nil: nobody pulses.

@@ -812,4 +812,9 @@ p {
   margin-left: 0;
   justify-content: center;
   padding: 10px 14px;
+  white-space: nowrap;
+}
+/* Three or more sides: two columns, so a name never wraps in a squeezed round button. */
+[data-block] .post-actions:has(.pill.gift:nth-child(3)) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }

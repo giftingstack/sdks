@@ -234,6 +234,78 @@ void main() {
     });
   });
 
+  group('GiftBattleBar with three sides (SPEC 18.7)', () {
+    BattleView three(int a, int b, int c, {int remainingMs = 61000}) {
+      final total = a + b + c;
+      double share(int u) => total > 0 ? u / total : 1 / 3;
+      final top = [a, b, c].reduce((x, y) => x > y ? x : y);
+      final ids = <String>['mia', 'theo', 'noor'];
+      final units = <int>[a, b, c];
+      final leaders = [
+        for (var i = 0; i < 3; i++)
+          if (units[i] == top) i
+      ];
+      return BattleView(
+        round: 'r3',
+        open: remainingMs > 0,
+        remainingMs: remainingMs,
+        total: total,
+        sides: <BattleSide>[
+          for (var i = 0; i < 3; i++)
+            BattleSide(
+                id: ids[i], units: units[i], gifts: 1, share: share(units[i])),
+        ],
+        leader: leaders.length == 1 ? ids[leaders.first] : null,
+      );
+    }
+
+    testWidgets('draws a cell and a segment per side, proportional',
+        (tester) async {
+      await pumpBar(tester, three(300, 100, 100), reducedMotion: true);
+      expect(find.text('Mia'), findsOneWidget);
+      expect(find.text('Theo'), findsOneWidget);
+      expect(find.text('noor'), findsOneWidget);
+      expect(textOf(tester, _score(0)), '300');
+      expect(textOf(tester, _score(2)), '100');
+      final track = tester.getSize(find.byKey(_track)).width - 2;
+      double seg(int i) => tester
+          .getSize(find.byKey(ValueKey<String>('gift-battle-segment-$i')))
+          .width;
+      expect(seg(0), closeTo(track * 0.6, 0.5));
+      expect(seg(1), closeTo(track * 0.2, 0.5));
+      expect(seg(2), closeTo(track * 0.2, 0.5));
+      expect(find.byKey(_fill), findsNothing, reason: 'no versus fill');
+    });
+
+    testWidgets('a bar that gets narrower does not overflow while it slides',
+        (tester) async {
+      final images = await loadedImages(tester);
+      Widget bar(double width) => hostApp(
+            SizedBox(
+              width: width,
+              child: GiftBattleBar(
+                view: three(300, 100, 100),
+                users: users,
+                imageProvider: images.call,
+              ),
+            ),
+          );
+      await tester.pumpWidget(bar(358));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(bar(200));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.takeException(), isNull);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('names the winner of any number of sides', (tester) async {
+      await pumpBar(tester, three(100, 100, 300, remainingMs: 0),
+          reducedMotion: true);
+      expect(textOf(tester, _banner), 'noor wins the round');
+      expect(textOf(tester, _clock), 'Final');
+    });
+  });
+
   group('GiftBattleBar with a GiftRoom', () {
     testWidgets('follows the room: welcome round, then a scores frame',
         (tester) async {

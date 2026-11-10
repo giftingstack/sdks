@@ -621,9 +621,12 @@ class RoomGiftEvent(
     val receiverId: String?,
     /** Came in the `welcome` replay after a (re)connect, not live. */
     val replayed: Boolean,
+    /** Only in a battle (SPEC 18.4): the receiving side, null otherwise. */
+    val receiver: GiftEffectReceiver? = null,
 ) {
     /** What to pass to the effect layer's `play`. */
-    fun toEffect(): GiftEffectEvent = GiftEffectEvent(gift, sender, quantity.coerceIn(1, Int.MAX_VALUE.toLong()).toInt())
+    fun toEffect(): GiftEffectEvent =
+        GiftEffectEvent(gift, sender, quantity.coerceIn(1, Int.MAX_VALUE.toLong()).toInt(), receiver)
 }
 
 class RoomMappingOptions(
@@ -632,13 +635,19 @@ class RoomMappingOptions(
     /** Display name of a sender without a name claim. Return null for the default. */
     val resolveName: ((String) -> String?)? = null,
     val replayed: Boolean = false,
+    /** The room's current battle; with two or more sides and a receiver that is one of them, the event gets a `receiver`. */
+    val battle: RoomBattle? = null,
+    /** The bar's two side colours (`#rgb`, `#rrggbb`, `rgba()` strings). Null: the theme's accent and coin colour. */
+    val sideColors: List<String>? = null,
 )
 
 /**
  * Turns a room gift into what the effect layer plays (SPEC 18.4): name and price from the event
  * (the price at send time drives the tier); `image` = the catalog gift's `animation_url`, else
  * its `icon_url`, else the event's `icon_url`; `icon` = the event's `icon_url`, else the
- * catalog's; `sender` = the name claim, else `resolveName(sender id)`, else absent.
+ * catalog's; `sender` = the name claim, else `resolveName(sender id)`, else absent. In a battle
+ * (`options.battle` with two or more sides, the receiver one of them) `receiver` = name
+ * (`resolveName`, else the id), side, colour (`sideColors`).
  */
 fun roomGiftToEffect(msg: RoomGiftMessage, options: RoomMappingOptions = RoomMappingOptions()): RoomGiftEvent {
     val known = options.catalog?.firstOrNull { it.id == msg.gift.id }
@@ -665,7 +674,34 @@ fun roomGiftToEffect(msg: RoomGiftMessage, options: RoomMappingOptions = RoomMap
         senderName = senderName,
         receiverId = msg.receiver,
         replayed = options.replayed,
+        receiver = battleReceiver(msg.receiver, msg.at, options.battle, options.resolveName, options.sideColors),
     )
+}
+
+/**
+ * The receiving side of a gift in a battle (SPEC 18.4), or null. Only a gift of the round itself
+ * counts: `battle.started <= at < battle.ends` (a replayed gift from before the round, or one at the
+ * end or later, is no battle gift), the battle has two or more sides and [id] is one of them (any of the up to 8).
+ * `RoomClient.receiverFor` is this for "now"; the tray uses it for the user's own gifts.
+ */
+fun battleReceiver(
+    id: String?,
+    at: Long,
+    battle: RoomBattle?,
+    resolveName: ((String) -> String?)?,
+    sideColors: List<String>?,
+): GiftEffectReceiver? {
+    val scores = battle?.scores
+    if (id.isNullOrEmpty() || battle == null || scores == null || scores.size < 2 || at < battle.started || at >= battle.ends) return null
+    val side = scores.indexOfFirst { it.id == id }
+    if (side < 0) return null
+    val name =
+        try {
+            resolveName?.invoke(id)?.takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            null
+        }
+    return GiftEffectReceiver(name ?: id, side, sideColors?.getOrNull(side))
 }
 
 // ---------------------------------------------------------------- session
@@ -736,6 +772,8 @@ class RoomClientOptions(
     /** The catalog, read at each event (wins over [catalog]). */
     val getCatalog: (() -> List<Gift>?)? = null,
     val resolveName: ((String) -> String?)? = null,
+    /** The border colours of the two battle sides in the gift notice (the bar's pair, as colour strings). */
+    val sideColors: List<String>? = null,
     val onEvent: ((RoomGiftEvent) -> Unit)? = null,
     val onViewers: ((Long) -> Unit)? = null,
     val onGap: (() -> Unit)? = null,
@@ -811,6 +849,14 @@ class RoomClient(options: RoomClientOptions) {
 
     /** Server time now (from the last welcome), null before the first welcome. */
     fun serverNow(): Long? = filter.serverNow(now())
+
+    /**
+     * The battle side [user] is on right now (SPEC 18.4), for the gifts this app plays itself: give it
+     * to the tray as `receiverOf` so the user's own gift says who got it too. Null outside a round or
+     * when [user] is no side.
+     */
+    fun receiverFor(user: String): GiftEffectReceiver? =
+        battleReceiver(user, serverNow() ?: now(), _battle.value, options.resolveName, options.sideColors)
 
     /** [battleView] of the current round at the server's time now, null without a round. */
     fun getBattleView(): BattleView? = _battle.value?.let { battleView(it, serverNow()) }
@@ -1054,7 +1100,11 @@ class RoomClient(options: RoomClientOptions) {
         for (e in events) {
             if (gen != this.gen) return
             val o = options
-            val event = roomGiftToEffect(e, RoomMappingOptions(o.getCatalog?.invoke() ?: o.catalog, o.resolveName, replayed))
+            val event =
+                roomGiftToEffect(
+                    e,
+                    RoomMappingOptions(o.getCatalog?.invoke() ?: o.catalog, o.resolveName, replayed, _battle.value, o.sideColors),
+                )
             safe { o.onEvent?.invoke(event) }
             for (l in eventListeners.toList()) safe { l(event) }
         }

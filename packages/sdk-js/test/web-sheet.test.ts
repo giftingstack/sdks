@@ -368,6 +368,51 @@ describe("web sheet: touch-action and reduced motion", () => {
   });
 });
 
+describe("web sheet: entrance (SPEC 9.4: fade 200 ms, rise from 3 % over 220 ms)", () => {
+  const animationEnd = (name: string) => {
+    const ev = new Event("animationend", { bubbles: true });
+    Object.assign(ev, { animationName: name });
+    root().dispatchEvent(ev);
+  };
+
+  it("the CSS fades in over 200 ms and rises from 3 % over 220 ms, and is off for reduced motion", () => {
+    mk();
+    const css = document.querySelector("style[data-giftingstack]")!.textContent!;
+    expect(css).toMatch(
+      /\.gs-tray\.gs-sheet\[data-gs-entering\] \{[^}]*gs-sheet-fade 200ms ease-out[^}]*gs-sheet-rise 220ms cubic-bezier\(0\.215, 0\.61, 0\.355, 1\)/,
+    );
+    expect(css).toMatch(/@keyframes gs-sheet-rise \{ from \{ transform: translateY\(3%\); \}/);
+    expect(css).toMatch(
+      /prefers-reduced-motion: reduce\) \{ \.gs-tray\.gs-sheet\[data-gs-entering\] \{ animation: none/,
+    );
+  });
+
+  it("starts when the sheet is placed and ends with the rise", () => {
+    mk();
+    expect(root().hasAttribute("data-gs-entering")).toBe(true);
+    animationEnd("gs-sheet-fade"); // the shorter one ends first: still entering
+    expect(root().hasAttribute("data-gs-entering")).toBe(true);
+    animationEnd("gs-sheet-rise");
+    expect(root().hasAttribute("data-gs-entering")).toBe(false);
+  });
+
+  it("plays again when the tray is opened again, not while it is closed", () => {
+    const tray = mk();
+    animationEnd("gs-sheet-rise");
+    tray.close();
+    expect(root().hasAttribute("data-gs-entering")).toBe(false);
+    tray.open();
+    vi.advanceTimersByTime(40);
+    expect(root().hasAttribute("data-gs-entering")).toBe(true);
+  });
+
+  it("reduced motion: no entrance", () => {
+    env.setReducedMotion(true);
+    mk();
+    expect(root().hasAttribute("data-gs-entering")).toBe(false);
+  });
+});
+
 /** A wheel tick; returns whether the sheet stopped the page from scrolling (preventDefault). */
 function wheel(target: Element, deltaY: number, deltaX = 0): boolean {
   const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY, deltaX });
@@ -497,6 +542,20 @@ describe("web sheet: scrim, toggle, open and close (spec 9.4)", () => {
     expect(shown()).toBe(false);
     tray.snapTo("expanded");
     expect(shown()).toBe(true);
+  });
+
+  it("at peek the dim is hidden but still takes the tap, and a tap there closes the tray", () => {
+    const dismissed = vi.fn();
+    const tray = mk({ scrim: true, onDismiss: dismissed });
+    settle();
+    tray.snapTo("peek");
+    expect(shown()).toBe(false);
+    expect(scrim()!.hasAttribute("data-gs-active")).toBe(true);
+    scrim()!.click();
+    expect(dismissed).toHaveBeenCalledTimes(1);
+    expect(tray.isOpen()).toBe(false);
+    // Closed: no touches taken any more.
+    expect(scrim()!.hasAttribute("data-gs-active")).toBe(false);
   });
 
   it("scrimTap lower (default): a tap lowers the sheet to peek; the dim goes away", () => {

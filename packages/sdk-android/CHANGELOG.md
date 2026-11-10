@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3
+
+- With `scrim` on, a tap on the empty space beside a tray at peek (the small state) now closes it: the dim stays hidden there, but it takes the tap (SPEC 9.4, `scrimTakesTouches`; a tall tray still lowers to peek first with `scrimTap` "lower"). The page behind a peeking tray is no longer touchable while the tray is open; leave `scrim` off for that.
+- A battle can have three to eight sides (SPEC 18.7, a free-for-all: everybody races on their own; teams are not part of it). The battle bar draws every side: two sides look exactly as before, three or more get a row of cells (avatar, name, score) with the clock above and a bar of proportional segments (each side in its colour, none under 6 %, white lines between them); the winner, the banner and the spoken sentence cover every side. `sideColors` is a list with one colour per side (`GiftBattleBar(sideColors = listOf(...))`, `rememberGiftRoom`; the pair form `sideColors = a to b` of the bar still works) (a shorter list keeps the default for the sides it does not name; the default palette is the theme's accent, its coin colour, then teal `#2ec4b6` and pink `#ff5d8f`, then the same four again). The gift notice of a battle names the receiver and borders its pill for every side, not only the first two. New: `battleSidePalette`, `battleSegmentPcts`, `BattleBarModel.pcts`.
+
+- The gift notice of a battle says who got the gift (SPEC 7.4, 18.4): line two reads `sent Rose to Mia` and the pill has a 2 px border in the receiving side's colour (the bar's accent / coin colour, or the new `rememberGiftRoom(sideColors = ...)`, the same pair you give `GiftBattleBar`). Only in a battle with two sides; every other notice looks as before. `GiftEffectEvent.receiver` is new for apps that play their own events. The user's own gift says who got it too: `rememberGiftTrayHolder(receiverOf = room::receiverFor)` (new `RoomClient.receiverFor`, `GiftRoom.receiverFor`). The border is a 2 px ring in the side colour plus a 1 px line in the text colour inside it, so it shows on a pill of the same colour; a gift only counts as a battle gift inside the round; a combo counts per receiver.
+
 ## 0.1.2
 
 No code change. The shared version moved with the web, React Native and iOS trays, whose "Test mode"

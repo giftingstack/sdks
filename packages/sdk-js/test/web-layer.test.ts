@@ -317,6 +317,30 @@ describe("web GiftEffectLayer: notice", () => {
     expect(notice.querySelector("[data-gs-combo]")).toBeNull();
   });
 
+  it("a battle gift names the receiver and borders the pill in the side colour", async () => {
+    const layer = makeLayer();
+    layer.play({ ...rose("ayla"), receiver: { name: "Mia", side: 1, color: "#00aa88" } });
+    await advance(0);
+    const notice = noticeEl()!;
+    expect(notice.querySelector(".gs-notice-what")!.textContent).toBe("sent Rose to Mia");
+    expect(notice.style.boxShadow.toLowerCase()).toMatch(/00aa88|0, 170, 136/);
+    expect(notice.style.boxShadow).toContain("2px");
+  });
+
+  it("an unreadable side colour falls back to the side's default", async () => {
+    const layer = makeLayer();
+    layer.play({ ...rose("ayla"), receiver: { name: "Mia", side: 1, color: "not a colour" } });
+    await advance(0);
+    expect(noticeEl()!.style.boxShadow).toContain("var(--gs-coin)");
+  });
+
+  it("without a receiver the pill has no border", async () => {
+    const layer = makeLayer();
+    layer.play(rose("ayla"));
+    await advance(0);
+    expect(noticeEl()!.style.boxShadow).toBe("");
+  });
+
   it("counts a combo and keeps one notice element for the run", async () => {
     const layer = makeLayer();
     layer.play(rose());

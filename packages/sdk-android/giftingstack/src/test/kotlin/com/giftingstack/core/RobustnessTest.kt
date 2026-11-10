@@ -97,6 +97,32 @@ class RobustnessTest {
         assertEquals(0, errors)
     }
 
+    private class Recorder : EffectPlayer {
+        val played = ArrayList<GiftEffectEvent>()
+
+        override fun play(event: GiftEffectEvent): Int {
+            played.add(event)
+            return played.size
+        }
+
+        override fun cancel(id: Int) {}
+    }
+
+    @Test
+    fun theUsersOwnGiftInABattleSaysWhoGotItAndAThrowingReceiverOfCountsAsNone() = runTest {
+        val api = Api()
+        val rec = Recorder()
+        val c = GiftTrayController(GiftTrayOptions(api, "bob", effects = { rec }, receiverOf = { r -> GiftEffectReceiver("Bob", 1, null).takeIf { r == "bob" } }))
+        c.refresh()
+        c.send(api.gift)
+        assertEquals(GiftEffectReceiver("Bob", 1, null), rec.played.single().receiver)
+        val plain = Recorder()
+        val bad = GiftTrayController(GiftTrayOptions(api, "bob", effects = { plain }, receiverOf = { throw IllegalStateException("app bug") }))
+        bad.refresh()
+        bad.send(api.gift)
+        assertNull(plain.played.single().receiver)
+    }
+
     @Test
     fun aThrowingOnErrorIsIgnoredAndTheRefundStillHappens() = runTest {
         val api = Api().also { it.fail = true }

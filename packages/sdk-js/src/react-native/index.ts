@@ -44,5 +44,10 @@ export { defaultLabels, resolveLabels } from "./labels";
 export type { GiftLabels, GiftLabelsInput } from "./labels";
 export { BattleBar } from "./BattleBar";
 export type { BattleBarProps, BattleBarUser } from "./BattleBar";
-export { battleBarModel, battleSideColors, defaultBattleBarLabels } from "../core";
+export {
+  battleBarModel,
+  battleSidePalette,
+  battleSideColors,
+  defaultBattleBarLabels,
+} from "../core";
 export type { BattleBarLabels, BattleBarLabelsInput, BattleBarModel } from "../core";

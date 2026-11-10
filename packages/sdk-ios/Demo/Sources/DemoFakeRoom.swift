@@ -30,7 +30,13 @@ final class DemoFakeRoom {
     private var scoresTask: Task<Void, Never>?
     private var lastScoresAt = 0
 
-    init(gifts: [Gift], senders: [String], receivers: [String], roundMs: Int = 90_000, breakMs: Int = 8_000) {
+    init(
+        gifts: [Gift],
+        senders: [String],
+        receivers: [String],
+        roundMs: Int = 90_000,
+        breakMs: Int = 8_000
+    ) {
         self.gifts = gifts
         self.senders = senders
         self.receivers = receivers
@@ -97,7 +103,7 @@ final class DemoFakeRoom {
         guard let sender = senders.randomElement(), let gift = pool.randomElement(), drives(socket) else {
             return
         }
-        let receiver = receivers.randomElement() ?? "mia"
+        let receiver = (battle?.scores.map { $0.id } ?? receivers).randomElement() ?? "mia"
         if Double.random(in: 0..<1) < 1.0 / 12.0 {
             for i in 0..<5 {
                 socket.later(i * 250) { [weak self] in

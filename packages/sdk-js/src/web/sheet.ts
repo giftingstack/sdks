@@ -16,6 +16,11 @@ export const SHEET_SLOP = 6;
 /** The longest the tray stays invisible while it waits for its first measurements, ms. */
 const SHEET_READY_MAX_MS = 700;
 
+/** Takes the entrance attribute off (SPEC 9.4): the animation is over, or the sheet closed. */
+function leaveEntrance(root: HTMLElement): void {
+  root.removeAttribute("data-gs-entering");
+}
+
 /** After a wheel step the next ticks are ignored this long (one state per flick, trackpad inertia). */
 const WHEEL_LOCK_MS = 400;
 
@@ -116,6 +121,14 @@ export class SheetView {
     const { body, handle, grid, root } = elements;
     // The tray's elements outlive the sheet when its placement changes: one signal removes all.
     const signal = this.listeners.signal;
+    // The entrance is over when its longer animation (the rise) ended.
+    root.addEventListener(
+      "animationend",
+      (e) => {
+        if (e.target === root && e.animationName === "gs-sheet-rise") leaveEntrance(root);
+      },
+      { signal },
+    );
     handle.addEventListener(
       "click",
       () => {
@@ -204,6 +217,7 @@ export class SheetView {
     if (open === !this.closed) return;
     this.closed = !open;
     clearTimeout(this.phaseTimer);
+    this.leave();
     this.endGesture();
     this.e.root.hidden = this.closed;
     this.phase = "measuring";
@@ -228,6 +242,7 @@ export class SheetView {
     clearTimeout(this.phaseTimer);
     this.phase = "placing";
     this.paint();
+    this.enter();
     const win = this.doc.defaultView;
     const next = (): void => {
       if (this.phase !== "placing") return;
@@ -239,9 +254,20 @@ export class SheetView {
     else this.phaseTimer = setTimeout(next, 32);
   }
 
+  /** The entrance (SPEC 9.4): a CSS animation, switched on by an attribute and off when it ended. */
+  private enter(): void {
+    if (this.reduced()) return;
+    this.e.root.setAttribute("data-gs-entering", "");
+  }
+
+  private leave(): void {
+    leaveEntrance(this.e.root);
+  }
+
   /** Stops listening and takes back every style and attribute it put on the tray's elements. */
   destroy(): void {
     clearTimeout(this.phaseTimer);
+    this.leave();
     this.phase = "live";
     this.closed = false;
     this.e.root.hidden = false;

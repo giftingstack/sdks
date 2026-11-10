@@ -90,4 +90,30 @@ describe("demo fake room", () => {
     expect(room.battleView()).toMatchObject({ round: "demo_r2", open: true, total: 0 });
     room.leave();
   });
+
+  it("a battle of four receivers has four sides in every round", async () => {
+    const Socket = fakeRoomSocket({
+      gifts: [gift("rose", 10)],
+      senders: ["mateo"],
+      nameOf: (id) => id,
+      random: () => 0.99,
+      minDelayMs: 60_000,
+      maxDelayMs: 60_000,
+      battle: { receivers: ["mia", "theo", "sofia", "kai"], roundMs: 10_000, breakMs: 2_000 },
+    });
+    const room = joinRoom({
+      room: "pixel-battle4",
+      getToken: async () => demoRoomToken("ava"),
+      WebSocket: Socket,
+    });
+    await vi.advanceTimersByTimeAsync(500);
+    expect(room.battleView()!.sides.map((s) => s.id)).toEqual(["mia", "theo", "sofia", "kai"]);
+    Socket.publish("ava", gift("rose", 10), 2, "kai");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(room.battleView()).toMatchObject({ total: 20, leader: "kai" });
+    await vi.advanceTimersByTimeAsync(12_000);
+    expect(room.battleView()).toMatchObject({ round: "demo_r2" });
+    expect(room.battleView()!.sides).toHaveLength(4);
+    room.leave();
+  });
 });

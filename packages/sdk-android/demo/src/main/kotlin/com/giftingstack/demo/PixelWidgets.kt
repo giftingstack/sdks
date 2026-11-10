@@ -96,10 +96,10 @@ internal fun Pill(label: String, theme: GiftingTheme, filled: Boolean = false, m
             .semantics { role = Role.Button }
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
         icon?.invoke(fg)
-        Txt(label, fg, 14f, bold = true)
+        Txt(label, fg, 14f, bold = true, maxLines = 1)
     }
 }
 

@@ -6,6 +6,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -40,6 +41,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import com.giftingstack.core.BATTLE_EXTRA_COLORS
+import com.giftingstack.core.GiftEffectReceiver
 import com.giftingstack.core.NoticeData
 
 private val EaseOutBack12 = Easing { easeOutBack(it, 1.2f) }
@@ -116,7 +120,9 @@ internal fun Notice(
     }
 
     val big = data.big
+    val receiver = data.receiver
     val textColor = if (big) theme.noticeBigText else theme.noticeText
+    val what = if (receiver == null) "sent ${data.giftName}" else "sent ${data.giftName} to ${receiver.name}"
     val maxWidth = with(LocalDensity.current) { (layerWidthPx * 0.92f).toDp() }
     Row(
         Modifier.widthIn(max = maxWidth)
@@ -127,7 +133,19 @@ internal fun Notice(
             }
             .clip(CircleShape)
             .background(if (big) theme.noticeBigBackground else theme.noticeBackground)
-            .padding(start = 5.dp, end = 16.dp, top = if (big) 7.dp else 5.dp, bottom = if (big) 7.dp else 5.dp)
+            // A battle gift (SPEC 7.4): a 2 px border in the side's colour and, inside it, a 1 px line in the
+            // text colour, so the ring shows even when the side colour is the pill's own. Both sit inside the
+            // pill's edge: the padding is the same 5/16/7 measured from the edge, so the pill keeps its size.
+            .then(
+                if (receiver == null) {
+                    Modifier.padding(start = 5.dp, end = 16.dp, top = if (big) 7.dp else 5.dp, bottom = if (big) 7.dp else 5.dp)
+                } else {
+                    Modifier.border(2.dp, sideColor(receiver, theme), CircleShape)
+                        .padding(2.dp)
+                        .border(1.dp, textColor, CircleShape)
+                        .padding(start = 3.dp, end = 14.dp, top = if (big) 5.dp else 3.dp, bottom = if (big) 5.dp else 3.dp)
+                },
+            )
             .semantics { liveRegion = LiveRegionMode.Polite }
             .testTag(tag),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -149,7 +167,7 @@ internal fun Notice(
                 maxLines = 1,
             )
             BasicText(
-                "sent ${data.giftName}",
+                what,
                 style = TextStyle(color = textColor.copy(alpha = textColor.alpha * 0.92f), fontSize = 12.5.sp, lineHeight = 15.sp),
                 maxLines = 1,
             )
@@ -179,6 +197,17 @@ internal fun Notice(
     }
 }
 
+
+/** The border colour: the colour the app gave (an unreadable string counts as none), else accent for side 0 and coin for side 1. */
+internal fun sideColor(receiver: GiftEffectReceiver, theme: GiftingTheme): Color {
+    receiver.color?.let { c -> runCatching { tokenColor(c) }.getOrNull()?.let { return it } }
+    // The default palette (SPEC 7.4, 18.7): accent, coin, teal, pink, then over again.
+    return when (val i = (receiver.side ?: 0) % (2 + BATTLE_EXTRA_COLORS.size)) {
+        0 -> theme.accent
+        1 -> theme.coin
+        else -> tokenColor(BATTLE_EXTRA_COLORS[i - 2])
+    }
+}
 
 /** A gift picture from the [GiftImageLoader], drawn at once when it is in memory, no fade-in. */
 @Composable

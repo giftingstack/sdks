@@ -39,7 +39,12 @@ class _Wire implements RoomSocket {
 }
 
 class _Session {
-  _Session({void Function()? throwOnBattle}) {
+  _Session({
+    void Function()? throwOnBattle,
+    String? Function(String)? resolveName,
+    List<String>? sideColors,
+    void Function(RoomGiftEvent)? onEvent,
+  }) {
     room = RoomClient(
       RoomClientOptions(
         room: 'live_1',
@@ -50,6 +55,9 @@ class _Session {
         },
         heartbeatMs: 0,
         onBattle: calls.add,
+        resolveName: resolveName,
+        sideColors: sideColors,
+        onEvent: onEvent,
         now: () => clock.now,
         setTimeout: clock.setTimeout,
         clearTimeout: clock.clearTimeout,
@@ -84,7 +92,46 @@ class _Session {
   }
 }
 
+Map<String, Object?> giftFrame(int at, String to) => <String, Object?>{
+      't': 'gift',
+      'id': at,
+      'at': at,
+      'tx': 'gtx_$at',
+      'gift': <String, Object?>{'id': 'rose', 'name': 'Rose', 'price': 10},
+      'quantity': 1,
+      'sender': <String, Object?>{'id': 'u1', 'name': 'Ava'},
+      'receiver': <String, Object?>{'id': to},
+    };
+
 void main() {
+  test('a gift of the round gets the receiver with the room names and colours',
+      () async {
+    final events = <RoomGiftEvent>[];
+    final s = _Session(
+      onEvent: events.add,
+      resolveName: (id) => id == 'mateo' ? 'Mateo' : null,
+      sideColors: <String>['#ff3366', '#00aa88'],
+    );
+    await s.startOpen();
+    expect(s.room.receiverFor('ava'), isNull);
+    s.welcome(now: 5000, battle: battleJson(0, 0));
+    s.send(giftFrame(5000, 'mateo'));
+    s.send(giftFrame(5001, 'ava'));
+    s.send(giftFrame(5002, 'viewer'));
+    expect(events.map((e) => e.receiver?.toJson()), <Object?>[
+      <String, Object?>{'name': 'Mateo', 'side': 1, 'color': '#00aa88'},
+      <String, Object?>{'name': 'ava', 'side': 0, 'color': '#ff3366'},
+      null,
+    ]);
+    // The user's own gift: the same answer for "now".
+    expect(s.room.receiverFor('mateo')!.name, 'Mateo');
+    expect(s.room.receiverFor('viewer'), isNull);
+    s.send(<String, Object?>{'t': 'scores', 'battle': null});
+    s.send(giftFrame(5003, 'mateo'));
+    expect(events[3].receiver, isNull);
+    expect(s.room.receiverFor('mateo'), isNull);
+  });
+
   test(
       'takes the round from welcome, then each scores frame; null when removed',
       () async {

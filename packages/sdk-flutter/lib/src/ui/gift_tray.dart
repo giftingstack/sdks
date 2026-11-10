@@ -317,6 +317,7 @@ class GiftTrayWidgetState extends State<GiftTray>
       onSnapChange: (snap) => widget.onSnapChange?.call(snap),
     );
     _shownOffset = _sheet.state.offset;
+    _lastExpanded = _sheet.state.heights.expanded;
     _y = AnimationController.unbounded(vsync: this, value: _shownOffset);
     _unsubscribe = _sheet.subscribe(_onSheetChanged);
   }
@@ -491,6 +492,15 @@ class GiftTrayWidgetState extends State<GiftTray>
       _y.stop();
       _y.value = st.offset;
     } else if (st.offset != _shownOffset) {
+      // The offset is measured from the top of the sheet's box, and the box is as tall as the
+      // expanded state. When the box grows or shrinks (the gifts arrived after the tray opened),
+      // move the start by the same amount, so the sheet leaves from where it is drawn instead
+      // of from a place that only made sense for the old box (it flashed at the top).
+      final grew = st.heights.expanded - _lastExpanded;
+      if (grew != 0) {
+        _y.stop();
+        _y.value += grew;
+      }
       // Stiffness 320, damping 36, mass 1: no overshoot (as the RN sheet).
       unawaited(
         _y.animateWith(
@@ -504,9 +514,13 @@ class GiftTrayWidgetState extends State<GiftTray>
       );
     }
     _shownOffset = st.offset;
+    _lastExpanded = st.heights.expanded;
     _reportInset();
     if (mounted) setState(() {});
   }
+
+  /// The expanded height (the sheet box's height) when the body was last moved.
+  double _lastExpanded = 0;
 
   void _queueMeasure() {
     if (_measureQueued) return;
@@ -936,7 +950,7 @@ class GiftTrayWidgetState extends State<GiftTray>
         // guess and then jumps: it fades in where it belongs.
         final sheetLayer = AnimatedOpacity(
           opacity: _shown && _open ? 1 : 0,
-          duration: Duration(milliseconds: _reduced ? 0 : 180),
+          duration: Duration(milliseconds: _reduced ? 0 : 200),
           curve: Curves.easeOut,
           child: AnimatedSlide(
             offset: _shown ? Offset.zero : const Offset(0, 0.03),
@@ -1008,7 +1022,8 @@ class GiftTrayWidgetState extends State<GiftTray>
   }
 
   /// The dim behind the sheet (SPEC 9.4): black at 0.4, fades over 200 ms (0
-  /// with reduced motion), takes touches only while it shows.
+  /// with reduced motion). It takes touches in every state, peek included (the
+  /// dim stays hidden there, a tap closes the tray).
   Widget _scrimLayer({required bool placed, required SheetSnap snap}) {
     final on = scrimVisible(
       scrim: widget.scrim,
@@ -1016,10 +1031,15 @@ class GiftTrayWidgetState extends State<GiftTray>
       snap: snap,
       placed: placed,
     );
+    final active = scrimTakesTouches(
+      scrim: widget.scrim,
+      open: _open,
+      placed: placed,
+    );
     return IgnorePointer(
-      ignoring: !on,
+      ignoring: !active,
       child: ExcludeSemantics(
-        excluding: !on,
+        excluding: !active,
         child: Semantics(
           button: true,
           label: 'Close gift tray',

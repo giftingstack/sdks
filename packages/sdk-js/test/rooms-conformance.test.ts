@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type Gift,
+  type RoomBattle,
   RoomClient,
   type RoomClientOptions,
   RoomEventFilter,
@@ -199,6 +200,8 @@ describe("conformance: rooms-mapping.json", () => {
         catalog: c.catalog ? (f.catalog as Gift[]) : undefined,
         resolveName: names ? (u) => names[u] : undefined,
         replayed: c.replayed,
+        battle: (c.battle as RoomBattle | undefined) ?? null,
+        sideColors: c.sideColors as [string, string] | undefined,
       });
       expect(plain(out)).toEqual(c.expect);
     });

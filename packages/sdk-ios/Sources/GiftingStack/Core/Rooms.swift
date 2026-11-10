@@ -839,6 +839,8 @@ public struct RoomGiftEvent: Sendable, Equatable, Hashable {
     public var receiverId: String?
     /// Came in the `welcome` replay after a (re)connect, not live.
     public var replayed: Bool
+    /// Only in a battle (SPEC 18.4): the receiving side, nil otherwise.
+    public var receiver: GiftEffectReceiver?
 
     public init(
         gift: GiftEffectEvent.GiftInfo,
@@ -850,7 +852,8 @@ public struct RoomGiftEvent: Sendable, Equatable, Hashable {
         senderId: String,
         senderName: String?,
         receiverId: String?,
-        replayed: Bool
+        replayed: Bool,
+        receiver: GiftEffectReceiver? = nil
     ) {
         self.gift = gift
         self.sender = sender
@@ -862,11 +865,12 @@ public struct RoomGiftEvent: Sendable, Equatable, Hashable {
         self.senderName = senderName
         self.receiverId = receiverId
         self.replayed = replayed
+        self.receiver = receiver
     }
 
     /// What `GiftEffectController.play` takes.
     public var effectEvent: GiftEffectEvent {
-        GiftEffectEvent(gift: gift, sender: sender, quantity: quantity)
+        GiftEffectEvent(gift: gift, sender: sender, quantity: quantity, receiver: receiver)
     }
 }
 
@@ -874,12 +878,16 @@ public struct RoomGiftEvent: Sendable, Equatable, Hashable {
 /// (the price at send time drives the tier); `image` = the catalog gift's `animationUrl`, else
 /// its `iconUrl`, else the event's `icon_url`; `icon` = the event's `icon_url`, else the
 /// catalog's; `sender` = the name claim, else `resolveName(sender id)` (empty counts as
-/// nothing), else nil (the effect layer then shows "Someone").
+/// nothing), else nil (the effect layer then shows "Someone"). With a `battle` of two or more
+/// sides and the receiver one of the first two, `receiver` = name (`resolveName`, else the id),
+/// side and colour (`sideColors`, the bar's pair as colour strings).
 public func roomGiftToEffect(
     _ msg: RoomGiftMessage,
     catalog: [Gift]? = nil,
     resolveName: ((String) -> String?)? = nil,
-    replayed: Bool = false
+    replayed: Bool = false,
+    battle: RoomBattle? = nil,
+    sideColors: [String]? = nil
 ) -> RoomGiftEvent {
     let known = catalog?.first(where: { $0.id == msg.gift.id })
     let image = known?.animationUrl ?? known?.iconUrl ?? msg.gift.iconUrl
@@ -901,8 +909,30 @@ public func roomGiftToEffect(
         senderId: msg.sender.id,
         senderName: senderName,
         receiverId: msg.receiver?.id,
-        replayed: replayed
+        replayed: replayed,
+        receiver: battleReceiver(msg.receiver?.id, at: msg.at, battle: battle, resolveName: resolveName, sideColors: sideColors)
     )
+}
+
+/// The receiving side of a gift in a battle (SPEC 18.4), or nil. Only a gift of the round itself counts:
+/// `battle.started <= at < battle.ends` (a replayed gift from before the round, or one at the end or later,
+/// is no battle gift), the battle has two or more sides and `id` is one of the first two.
+/// `RoomClient.receiverFor` is this for "now"; the tray uses it for the user's own gifts.
+public func battleReceiver(
+    _ id: String?,
+    at: Int,
+    battle: RoomBattle?,
+    resolveName: ((String) -> String?)?,
+    sideColors: [String]?
+) -> GiftEffectReceiver? {
+    guard let id = id, !id.isEmpty, let round = battle, round.scores.count >= 2,
+          at >= round.started, at < round.ends else { return nil }
+    let scores = round.scores
+    guard let side = scores.firstIndex(where: { $0.id == id }) else { return nil }
+    var name = ""
+    if let resolved = resolveName?(id), !resolved.isEmpty { name = resolved }
+    let color = sideColors.flatMap { side < $0.count ? $0[side] : nil }
+    return GiftEffectReceiver(name: name.isEmpty ? id : name, side: side, color: color)
 }
 
 // MARK: - Session
@@ -1021,6 +1051,9 @@ public final class RoomClient {
     public var getCatalog: (() -> [Gift]?)?
     /// Display name of a sender without a name claim. Return nil for the default.
     public var resolveName: ((String) -> String?)?
+    /// The border colours of the two battle sides in the gift notice (the bar's pair as colour
+    /// strings). nil: the theme's accent and coin colour.
+    public var sideColors: [String]?
     public var onEvent: ((RoomGiftEvent) -> Void)?
     public var onViewers: ((Int) -> Void)?
     public var onGap: (() -> Void)?
@@ -1087,6 +1120,7 @@ public final class RoomClient {
         catalog: [Gift]? = nil,
         getCatalog: (() -> [Gift]?)? = nil,
         resolveName: ((String) -> String?)? = nil,
+        sideColors: [String]? = nil,
         onEvent: ((RoomGiftEvent) -> Void)? = nil,
         onViewers: ((Int) -> Void)? = nil,
         onGap: (() -> Void)? = nil,
@@ -1110,6 +1144,7 @@ public final class RoomClient {
         self.catalog = catalog
         self.getCatalog = getCatalog
         self.resolveName = resolveName
+        self.sideColors = sideColors
         self.onEvent = onEvent
         self.onViewers = onViewers
         self.onGap = onGap
@@ -1186,6 +1221,19 @@ public final class RoomClient {
     /// Server time now (from the last welcome), nil before the first welcome.
     public func serverNow() -> Int? {
         filter.serverNow(localNow: clock.nowMs)
+    }
+
+    /// The battle side `user` is on right now (SPEC 18.4), for the gifts this app plays itself: give it to the
+    /// tray as `receiverOf` so the user's own gift says who got it too. nil outside a round or when `user` is
+    /// no side.
+    public func receiverFor(_ user: String) -> GiftEffectReceiver? {
+        battleReceiver(
+            user,
+            at: serverNow() ?? clock.nowMs,
+            battle: battle,
+            resolveName: resolveName,
+            sideColors: sideColors
+        )
     }
 
     /// `battleView` of the current round at the server's time now, nil without a round.
@@ -1473,7 +1521,9 @@ public final class RoomClient {
                 e,
                 catalog: getCatalog?() ?? catalog,
                 resolveName: resolveName,
-                replayed: replayed
+                replayed: replayed,
+                battle: battle,
+                sideColors: sideColors
             )
             onEvent?(event)
             for entry in eventListeners {

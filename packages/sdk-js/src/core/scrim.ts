@@ -29,6 +29,15 @@ export function scrimVisible(s: ScrimState): boolean {
   return s.scrim && s.open && s.placed && s.snap !== "peek";
 }
 
+/**
+ * The scrim takes touches: asked for, open and in place, in EVERY state including peek (a tap on
+ * the empty space closes a peeking tray, 2026-11-09). The dim itself stays hidden at peek
+ * (`scrimVisible`), so the page stays in sight; only its touches are taken.
+ */
+export function scrimTakesTouches(s: Pick<ScrimState, "scrim" | "open" | "placed">): boolean {
+  return s.scrim && s.open && s.placed;
+}
+
 /** Fade duration in ms: `SCRIM_FADE_MS`, or 0 with reduced motion. */
 export function scrimFadeMs(reducedMotion: boolean): number {
   return reducedMotion ? 0 : SCRIM_FADE_MS;
@@ -40,8 +49,8 @@ export type ScrimTapOutcome = "ignored" | "lower" | "dismiss";
  * A tap on the scrim. `"ignored"`: no scrim or the tray is closed. `"lower"`: move the sheet to
  * peek. `"dismiss"`: call `onDismiss` (and close the tray when it holds its own open state).
  * `scrimTap` "lower" (default) lowers any state above peek and dismisses from peek; "dismiss"
- * dismisses from every state. A hidden scrim takes no touches, so from peek this is only reached
- * by calling it directly.
+ * dismisses from every state. From peek the dim is hidden but still takes the tap
+ * (`scrimTakesTouches`), so a tap on the empty space dismisses a peeking tray.
  */
 export function scrimTapOutcome(s: {
   scrim: boolean;

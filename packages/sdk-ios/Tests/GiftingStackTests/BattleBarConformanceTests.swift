@@ -72,6 +72,13 @@ final class BattleBarConformanceTests: XCTestCase {
                 switch key {
                 case "pct":
                     XCTAssertEqual(m.pct, want.doubleValue ?? -1, accuracy: 1e-6, "\(at) pct")
+                case "pcts":
+                    let list = (want.arrayValue ?? []).compactMap { $0.doubleValue }
+                    XCTAssertEqual(m.pcts.count, list.count, "\(at) pcts count")
+                    for (i, p) in list.enumerated() where i < m.pcts.count {
+                        XCTAssertEqual(m.pcts[i], p, accuracy: 1e-6, "\(at) pcts[\(i)]")
+                    }
+                    XCTAssertEqual(m.pcts.reduce(0, +), 100, accuracy: 1e-6, "\(at) pcts sum")
                 case "clock":
                     XCTAssertEqual(m.clock, want.stringValue, "\(at) clock")
                 case "urgent":
@@ -85,7 +92,8 @@ final class BattleBarConformanceTests: XCTestCase {
                 case "spoken":
                     XCTAssertEqual(m.spoken, want.stringValue, "\(at) spoken")
                 case "sides":
-                    for (i, sideWant) in (want.arrayValue ?? []).enumerated() {
+                    XCTAssertEqual(m.sides.count, want.arrayValue?.count ?? -1, "\(at) sides count")
+                    for (i, sideWant) in (want.arrayValue ?? []).enumerated() where i < m.sides.count {
                         let s = m.sides[i]
                         for (k, v) in sideWant.objectValue ?? [:] {
                             let here = "\(at) sides[\(i)].\(k)"
@@ -116,6 +124,26 @@ final class BattleBarConformanceTests: XCTestCase {
             let after = (c["after"]?.arrayValue ?? []).compactMap { $0.intValue }
             let expected = (c["expect"]?.arrayValue ?? []).compactMap { $0.boolValue }
             XCTAssertEqual(battleGains(before: before, after: after), expected, "gains \(String(describing: before)) -> \(after)")
+        }
+    }
+
+    func testPalette() throws {
+        let f = try Fixtures.conformance("battle-bar.json")
+        XCTAssertGreaterThan(try Fixtures.list(f["palette"], "palette").count, 3)
+        for c in try Fixtures.list(f["palette"], "battle-bar.json palette") {
+            let at = "[battle-bar.json palette] \(c["name"]?.stringValue ?? "?")"
+            let theme: GiftTheme
+            switch c["theme"]?.stringValue {
+            case "dark": theme = GiftTheme.darkTheme
+            case "light": theme = GiftTheme.lightTheme
+            default: theme = GiftTheme.defaultTheme
+            }
+            let over = c["override"]?.arrayValue?.compactMap { $0.stringValue }
+            let got = battleSidePalette(theme, count: c["count"]?.intValue ?? 0, override: over)
+            let want = (c["expect"]?.arrayValue ?? []).map {
+                SideColor(color: $0["color"]?.stringValue ?? "", text: $0["text"]?.stringValue ?? "")
+            }
+            XCTAssertEqual(got, want, at)
         }
     }
 

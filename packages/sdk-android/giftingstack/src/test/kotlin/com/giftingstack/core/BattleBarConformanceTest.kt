@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -95,7 +96,13 @@ class BattleBarModelConformanceTest(private val name: String, private val c: Jso
             )
         for ((k, v) in want) {
             when (k) {
-                "sides" -> Unit
+                "sides" -> assertEquals("$name sides", v.arr().size, m.sides.size)
+                "pcts" -> {
+                    val want = v.arr().map { it.jsonPrimitive.double }
+                    assertEquals("$name pcts size", want.size, m.pcts.size)
+                    want.forEachIndexed { i, p -> assertEquals("$name pcts[$i]", p, m.pcts[i], 1e-6) }
+                    assertEquals("$name pcts sum", 100.0, m.pcts.sum(), 1e-6)
+                }
                 "pct" -> assertEquals("$name pct", v.jsonPrimitive.double, m.pct, 1e-6)
                 else -> assertEquals("$name $k", if (v is JsonNull) null else v.jsonPrimitive.let { p -> if (p.isString) p.content else p.boolean }, got.getValue(k))
             }
@@ -154,8 +161,31 @@ class BattleBarColorsConformanceTest(private val name: String, private val c: Js
                 "light" -> lightThemeTokens
                 else -> defaultThemeTokens
             }
-        val over = c["override"]?.arr()?.map { it.str() }?.let { it[0] to it[1] }
+        val over = c["override"]?.arr()?.map { it.str() }
         val got = battleSideColors(theme, over)
+        val want = c.getValue("expect").arr().map { SideColor(it.obj().string("color"), it.obj().string("text")) }
+        assertEquals(name, want, got)
+    }
+}
+
+@RunWith(Parameterized::class)
+class BattleBarPaletteConformanceTest(private val name: String, private val c: JsonObject) {
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "{0}")
+        fun cases() = arrayParams("battle-bar.json", "palette") { _, o -> o.string("name") }
+    }
+
+    @Test
+    fun palette() {
+        val theme =
+            when (c.string("theme")) {
+                "dark" -> darkThemeTokens
+                "light" -> lightThemeTokens
+                else -> defaultThemeTokens
+            }
+        val over = c["override"]?.arr()?.map { it.str() }
+        val got = battleSidePalette(theme, c.getValue("count").jsonPrimitive.int, over)
         val want = c.getValue("expect").arr().map { SideColor(it.obj().string("color"), it.obj().string("text")) }
         assertEquals(name, want, got)
     }
@@ -170,5 +200,6 @@ class BattleBarFixtureTest {
         assertTrue(f.getValue("model").arr().size > 10)
         assertTrue(f.getValue("gains").arr().size > 3)
         assertTrue(f.getValue("colors").arr().size > 5)
+        assertTrue(f.getValue("palette").arr().size > 3)
     }
 }

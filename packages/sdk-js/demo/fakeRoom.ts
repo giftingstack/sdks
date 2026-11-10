@@ -115,14 +115,16 @@ export function fakeRoomSocket(options: FakeRoomOptions): FakeRoomSocket {
   };
 
   const pickReceiver = (): string => {
-    const r = options.battle?.receivers ?? [];
+    const r = battle ? battle.scores.map((s) => s.id) : (options.battle?.receivers ?? []);
     return r.length > 0 ? r[Math.floor(rand() * r.length)]! : "mira";
   };
   /** Mostly everyday gifts (the cheaper 60%): luxury effects cover the stream, so they are rare. */
   const pickGift = (): Gift | undefined => {
     const all = options.gifts;
     if (all.length === 0) return undefined;
-    const cheap = [...all].sort((a, b) => a.price - b.price).slice(0, Math.max(1, Math.ceil(all.length * 0.6)));
+    const cheap = [...all]
+      .sort((a, b) => a.price - b.price)
+      .slice(0, Math.max(1, Math.ceil(all.length * 0.6)));
     const from = rand() < 0.1 ? all : cheap;
     return from[Math.floor(rand() * from.length)];
   };

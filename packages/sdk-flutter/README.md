@@ -5,7 +5,7 @@ GiftingStack API. Flutter port of
 `@giftingstack/sdk` (React Native), built from the shared contract in `packages/sdk-spec`
 (spec 1.0.0). Dart 3, null-safe. Dependencies: `flutter` and `http`.
 
-Status: 0.1.2, a preview: the API can still change before 1.0 (see `CHANGELOG.md`). The logic is
+Status: 0.1.3, a preview: the API can still change before 1.0 (see `CHANGELOG.md`). The logic is
 machine-checked; how the animations and the sheet drag feel is not checked on a device yet (see
 "Verification"). The newest Flutter demo was not run on a phone or an emulator at all.
 
@@ -19,7 +19,7 @@ or in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  giftingstack: ^0.1.2
+  giftingstack: ^0.1.3
 ```
 
 The pure Dart part (no Flutter imports) is `package:giftingstack/giftingstack_core.dart`. The whole
@@ -292,11 +292,18 @@ GiftBattleBar(
     'mateo': BattleBarUser(name: 'Mateo'),
   },
   theme: darkTheme,                             // accent against coin colour, 4.5:1 text on both
-  sideColors: const [Color(0xFFE0457B), Color(0xFF3A8DFF)], // optional override
+  sideColors: const [Color(0xFFE0457B), Color(0xFF3A8DFF)], // optional: one colour per side
   labels: const BattleBarLabels(finalText: 'Bitti', wins: '{name} kazandı'),
   reducedMotion: null,                          // null: follows MediaQuery.disableAnimations
 );
 ```
+
+The gift notice of a battle says who got the gift: `sent Rose to Mia`, with a 2 px border in the side's
+colour (accent for the first side, coin colour for the second). Pass the same pair to the room as to the
+bar, and the names from `resolveName`: `GiftRoom(sideColors: const [Color(0xFFE0457B), Color(0xFF3A8DFF)], resolveName: ...)`.
+Outside battles nothing changes. The user's own gift says who got it too when the tray knows the room:
+`GiftTrayNotifier(receiverOf: room.receiverFor, ...)`. An app that plays its own events can set
+`GiftEffectEvent.receiver`.
 
 Without a room pass `view: myBattleView`. The pure model (`battleBarModel`, `formatBattleScore`,
 `formatBattleClock`, `battleSideColors`) is in `giftingstack_core.dart`; the numbers are the shared

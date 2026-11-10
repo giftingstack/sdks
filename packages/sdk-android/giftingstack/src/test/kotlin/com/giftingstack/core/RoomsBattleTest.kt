@@ -21,7 +21,13 @@ class RoomsBattleTest {
         override fun close(code: Int, reason: String) {}
     }
 
-    private class Session(scope: TestScope, throwOnBattle: Boolean = false) {
+    private class Session(
+        scope: TestScope,
+        throwOnBattle: Boolean = false,
+        resolveName: ((String) -> String?)? = null,
+        sideColors: List<String>? = null,
+        onEvent: ((RoomGiftEvent) -> Unit)? = null,
+    ) {
         val clock = FakeClock()
         var nowMs = 0L
         val handlers = ArrayList<RoomSocketHandlers>()
@@ -38,6 +44,9 @@ class RoomsBattleTest {
                     scope = scope.backgroundScope,
                     timers = clock.timersApi,
                     heartbeatMs = 0,
+                    resolveName = resolveName,
+                    sideColors = sideColors,
+                    onEvent = onEvent,
                     onBattle = {
                         calls.add(it)
                         if (throwOnBattle) throw IllegalStateException("app bug")
@@ -63,6 +72,32 @@ class RoomsBattleTest {
     private fun welcome(now: Long = 1000, battle: String? = null): String {
         val extra = if (battle != null) ",\"battle\":$battle" else ""
         return """{"t":"welcome","v":1,"viewers":3,"gap":false,"replay":[],"ttl":3600,"now":$now$extra}"""
+    }
+
+    private fun gift(at: Long, to: String) =
+        """{"t":"gift","id":$at,"at":$at,"tx":"gtx_$at","gift":{"id":"rose","name":"Rose","price":10},"quantity":1,"sender":{"id":"u1","name":"Ava"},"receiver":{"id":"$to"}}"""
+
+    @Test
+    fun aGiftOfTheRoundGetsTheReceiverWithTheRoomNamesAndColoursAndReceiverForAnswersForNow() = runTest {
+        val events = ArrayList<RoomGiftEvent>()
+        val s = Session(this, resolveName = { if (it == "mateo") "Mateo" else null }, sideColors = listOf("#ff3366", "#00aa88"), onEvent = { events.add(it) })
+        s.room.start()
+        runCurrent()
+        s.handlers.last().onOpen()
+        assertNull(s.room.receiverFor("ava"))
+        s.send(welcome(now = 5_000, battle = battleJson(0, 0)))
+        s.send(gift(5_000, "mateo"))
+        s.send(gift(5_001, "ava"))
+        s.send(gift(5_002, "viewer"))
+        assertEquals(GiftEffectReceiver("Mateo", 1, "#00aa88"), events[0].receiver)
+        assertEquals(GiftEffectReceiver("ava", 0, "#ff3366"), events[1].receiver)
+        assertNull(events[2].receiver)
+        assertEquals("Mateo", s.room.receiverFor("mateo")?.name)
+        assertNull(s.room.receiverFor("viewer"))
+        s.send("""{"t":"scores","battle":null}""")
+        s.send(gift(5_003, "mateo"))
+        assertNull(events[3].receiver)
+        assertNull(s.room.receiverFor("mateo"))
     }
 
     @Test

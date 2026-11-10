@@ -61,6 +61,9 @@ public final class GiftTrayController {
     public var reference: String?
     /// Room on screen (SPEC 17.1): every send names it, so the room's viewers see the gift.
     public var roomId: String?
+    /// In a battle, the side a receiver is on (`room.receiverFor`, SPEC 18.4): the user's own gift then says
+    /// who got it, like the room's gifts of the others. nil outside a battle.
+    public var receiverOf: ((String) -> GiftEffectReceiver?)?
     public var onSent: ((GiftTransaction) -> Void)?
     public var onError: ((GiftingError) -> Void)?
     /// Starts downloading a picture. Called for every `iconUrl` once the catalog loads (not the big pictures, SPEC 8 step 2).
@@ -87,6 +90,7 @@ public final class GiftTrayController {
         playOn: PlayOn = .tap,
         reference: String? = nil,
         roomId: String? = nil,
+        receiverOf: ((String) -> GiftEffectReceiver?)? = nil,
         onSent: ((GiftTransaction) -> Void)? = nil,
         onError: ((GiftingError) -> Void)? = nil,
         prefetch: ((String) -> Void)? = nil
@@ -97,6 +101,7 @@ public final class GiftTrayController {
         self.playOn = playOn
         self.reference = reference
         self.roomId = roomId
+        self.receiverOf = receiverOf
         self.onSent = onSent
         self.onError = onError
         self.prefetch = prefetch
@@ -170,14 +175,14 @@ public final class GiftTrayController {
 
         var shownId: Int?
         if early {
-            shownId = effects?()?.play(GiftEffectEvent(gift: gift, sender: user ?? "You", quantity: 1))
+            shownId = effects?()?.play(GiftEffectEvent(gift: gift, sender: user ?? "You", quantity: 1, receiver: receiverOf?(receiver)))
         }
         do {
             let tx = try await client.sendGift(SendGiftInput(receiver: receiver, giftId: gift.id, reference: reference, roomId: roomId))
             if alive {
                 state.error = nil
                 if !early {
-                    _ = effects?()?.play(GiftEffectEvent(gift: gift, sender: user ?? tx.sender, quantity: tx.quantity))
+                    _ = effects?()?.play(GiftEffectEvent(gift: gift, sender: user ?? tx.sender, quantity: tx.quantity, receiver: receiverOf?(receiver)))
                 }
                 onSent?(tx)
             }

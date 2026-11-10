@@ -23,6 +23,13 @@ const val SCRIM_OPACITY = 0.4
 fun scrimVisible(scrim: Boolean, open: Boolean, snap: SheetSnap, placed: Boolean): Boolean =
     scrim && open && placed && snap != SheetSnap.Peek
 
+/**
+ * The scrim takes touches: asked for, open and in place, in EVERY state including peek (a tap on
+ * the empty space closes a peeking tray, 2026-11-09). The dim stays hidden at peek
+ * ([scrimVisible]); only its touches are taken.
+ */
+fun scrimTakesTouches(scrim: Boolean, open: Boolean, placed: Boolean): Boolean = scrim && open && placed
+
 /** Fade duration in ms: [SCRIM_FADE_MS], or 0 with reduced motion. */
 fun scrimFadeMs(reducedMotion: Boolean): Int = if (reducedMotion) 0 else SCRIM_FADE_MS
 

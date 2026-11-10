@@ -660,8 +660,9 @@ void main() {
     });
 
     testWidgets(
-        'scrimTap lower: a tap lowers the sheet to peek, the dim goes and '
-        'the screen behind gets the next tap', (tester) async {
+        'scrimTap lower: a tap lowers the sheet to peek and the dim goes; a '
+        'tap on the empty space at peek dismisses (2026-11-09)',
+        (tester) async {
       var dismissed = 0;
       await pump(tester, scrim: true, onDismiss: () => dismissed++);
       await tester.tapAt(const Offset(200, 40));
@@ -671,8 +672,8 @@ void main() {
       expect(dismissed, 0);
       await tester.tapAt(const Offset(200, 40));
       await tester.pump();
-      expect(h.underTaps, 1);
-      expect(dismissed, 0);
+      expect(h.underTaps, 0);
+      expect(dismissed, 1);
     });
 
     testWidgets('scrimTap dismiss: a tap calls onDismiss', (tester) async {

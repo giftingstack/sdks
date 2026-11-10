@@ -53,7 +53,8 @@ final class EffectsConformanceTests: XCTestCase {
                 let event = GiftEffectEvent(
                     gift: try giftInfo(gift, at),
                     sender: play["sender"]?.stringValue,
-                    quantity: play["quantity"]?.intValue
+                    quantity: play["quantity"]?.intValue,
+                    receiver: receiver(play["receiver"])
                 )
                 let id = scheduler.play(event)
                 if let expected = step["returns"]?.intValue {
@@ -119,6 +120,13 @@ final class EffectsConformanceTests: XCTestCase {
         )
     }
 
+    private func receiver(_ value: JSONValue?) -> GiftEffectReceiver? {
+        guard let value = value, let name = value["name"]?.stringValue else {
+            return nil
+        }
+        return GiftEffectReceiver(name: name, side: value["side"]?.intValue, color: value["color"]?.stringValue)
+    }
+
     private func ids(_ values: [Int]) -> JSONValue {
         .array(values.map { .number(Double($0)) })
     }
@@ -127,14 +135,25 @@ final class EffectsConformanceTests: XCTestCase {
         guard let data = data else {
             return .null
         }
-        return .object([
+        var out: [String: JSONValue] = [
             "id": .number(Double(data.id)),
             "senderName": .string(data.senderName),
             "giftName": .string(data.giftName),
             "image": data.image.map { JSONValue.string($0) } ?? .null,
             "count": .number(Double(data.count)),
             "big": .bool(data.big),
-        ])
+        ]
+        if let r = data.receiver {
+            var receiver: [String: JSONValue] = [
+                "name": .string(r.name),
+                "color": r.color.map { JSONValue.string($0) } ?? .null,
+            ]
+            if let side = r.side {
+                receiver["side"] = .number(Double(side))
+            }
+            out["receiver"] = .object(receiver)
+        }
+        return .object(out)
     }
 
     // MARK: - pictureGate

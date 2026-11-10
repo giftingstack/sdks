@@ -4,7 +4,7 @@
  * each time it grows. The region is a polite live region, so a screen reader says it. A pill is
  * created for a line and removed after it has slid out.
  */
-import { type NoticeData, pictureSrc } from "../core";
+import { BATTLE_EXTRA_COLORS, type NoticeData, pictureSrc } from "../core";
 import { setPicture } from "./images";
 import { type Easing, inQuad, lerp, outBack, run, sample, sampleTimes, springScale } from "./anim";
 
@@ -39,6 +39,13 @@ export interface NoticeViewOptions {
   parent: HTMLElement;
   /** Distance from the bottom edge of the layer, px. */
   bottom: number;
+}
+
+/** Whether the browser reads `color` as a CSS colour (it drops what it cannot parse). */
+function readable(el: HTMLElement, color: string): boolean {
+  const probe = el.ownerDocument.createElement("span");
+  probe.style.color = color;
+  return probe.style.color !== "";
 }
 
 export class NoticeView {
@@ -163,7 +170,24 @@ export class NoticeView {
     const q = (sel: string) => pill.querySelector(sel) as HTMLElement;
     q(".gs-avatar").textContent = (Array.from(data.senderName)[0] ?? "").toUpperCase();
     q(".gs-notice-name").textContent = data.senderName;
-    q(".gs-notice-what").textContent = `sent ${data.giftName}`;
+    const r = data.receiver;
+    q(".gs-notice-what").textContent = r
+      ? `sent ${data.giftName} to ${r.name}`
+      : `sent ${data.giftName}`;
+    // A battle gift: a 2 px ring in the side colour inside the pill's edge, then a 1 px line in
+    // the pill's text colour inside it, so the ring shows even when the side colour is the pill's
+    // own (the default accent on the default notice). The text keeps its colour, the pill its
+    // size. An unreadable colour counts as none (SPEC 7.4).
+    pill.style.boxShadow = "";
+    if (r) {
+      const text = data.big ? "var(--gs-notice-big-text)" : "var(--gs-notice-text)";
+      const line = `inset 0 0 0 3px ${text}`;
+      const own = r.color && readable(pill, r.color) ? r.color : null;
+      // The default palette (SPEC 7.4, 18.7): accent, coin, teal, pink, then over again.
+      const palette = ["var(--gs-accent)", "var(--gs-coin)", ...BATTLE_EXTRA_COLORS];
+      const side = own ?? palette[(r.side ?? 0) % palette.length]!;
+      pill.style.boxShadow = `inset 0 0 0 2px ${side}, ${line}`;
+    }
 
     // A fresh <img> for each picture: one reused element shows the previous gift until the new one loads.
     if (data.image !== (line.image?.getAttribute("src") ?? null)) {

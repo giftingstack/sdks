@@ -10,7 +10,7 @@
  * `RoomClient` (the session state machine).
  */
 import { type EffectTier, type TierThresholds, tierFor } from "./recipes";
-import type { Gift, GiftEffectEvent } from "./types";
+import type { Gift, GiftEffectEvent, GiftEffectReceiver } from "./types";
 import { assertSecureUrl } from "./url";
 
 /** The only subprotocol; the client token rides as the second entry. */
@@ -532,6 +532,13 @@ export interface RoomMappingOptions {
   /** Display name of a sender without a name claim. Return undefined for the default. */
   resolveName?: (user: string) => string | null | undefined;
   replayed?: boolean;
+  /**
+   * The room's current battle (`RoomClient.getBattle()`). With two or more sides and the gift's
+   * receiver one of the first two, the event gets a `receiver` (SPEC 18.4). `RoomClient` passes it.
+   */
+  battle?: RoomBattle | null;
+  /** The bar's `sideColors`: the border colour of every side, by side (same list as the bar's). */
+  sideColors?: readonly string[];
 }
 
 /**
@@ -569,7 +576,37 @@ export function roomGiftToEffect(
     replayed: options.replayed ?? false,
   };
   if (sender !== undefined) event.sender = sender;
+  const receiver = battleReceiver(msg.receiver?.id, msg.at, options);
+  if (receiver) event.receiver = receiver;
   return event;
+}
+
+/**
+ * The receiving side of a gift in a battle (SPEC 18.4), or undefined. Only a gift of the round
+ * itself counts: `battle.started <= at < battle.ends` (a replayed gift from before the round, or one
+ * at the end or later, is no battle gift), the battle has two or more sides and `receiver` is one of
+ * them (any of the up to 8). `RoomClient.receiverFor` is this for "now"; the tray uses it for the user's own gifts.
+ */
+export function battleReceiver(
+  receiver: string | null | undefined,
+  at: number,
+  options: Pick<RoomMappingOptions, "battle" | "resolveName" | "sideColors">,
+): GiftEffectReceiver | undefined {
+  const round = options.battle;
+  if (!receiver || !round || round.scores.length < 2 || at < round.started || at >= round.ends) {
+    return undefined;
+  }
+  const side = round.scores.findIndex((s) => s.id === receiver);
+  if (side < 0) return undefined;
+  let name: string | undefined;
+  if (options.resolveName) {
+    try {
+      name = options.resolveName(receiver) || undefined;
+    } catch {
+      name = undefined;
+    }
+  }
+  return { name: name ?? receiver, side, color: options.sideColors?.[side] ?? null };
 }
 
 // ---------------------------------------------------------------- battle scores
@@ -785,6 +822,18 @@ export class RoomClient {
 
   /** Server time now (from the last welcome), null before the first welcome. */
   serverNow = (): number | null => this.filter.serverNow(this.now());
+
+  /**
+   * The battle side `user` is on right now (SPEC 18.4), for the gifts this app plays itself: give
+   * it to the tray as `receiverOf` so the user's own gift says who got it too. Undefined outside a
+   * round or when `user` is no side.
+   */
+  receiverFor = (user: string): GiftEffectReceiver | undefined =>
+    battleReceiver(user, this.serverNow() ?? this.now(), {
+      battle: this.battle,
+      resolveName: this.options.resolveName,
+      sideColors: this.options.sideColors,
+    });
 
   /** `battleView` of the current round at the server's time now, null without a round. */
   getBattleView = (): BattleView | null =>
@@ -1037,6 +1086,8 @@ export class RoomClient {
         catalog: o.getCatalog?.() ?? o.catalog,
         resolveName: o.resolveName,
         replayed,
+        battle: this.battle,
+        sideColors: o.sideColors,
       });
       this.safe(() => o.onEvent?.(event));
       for (const l of this.eventListeners) this.safe(() => l(event));

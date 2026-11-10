@@ -162,6 +162,18 @@ Color giftColor(String value) {
   );
 }
 
+/// A [Color] as a token string [giftColor] reads back: `#rrggbb`, or
+/// `rgba(r, g, b, a)` when it is not opaque.
+String giftColorCss(Color c) {
+  final v = c.toARGB32();
+  final a = (v >> 24) & 0xFF;
+  if (a == 0xFF) {
+    return '#${(v & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+  }
+  return 'rgba(${(v >> 16) & 0xFF}, ${(v >> 8) & 0xFF}, ${v & 0xFF}, '
+      '${(a / 255).toStringAsFixed(3)})';
+}
+
 /// The dark preset: the default look with a deeper accent, so the white Send
 /// label reaches 4.5:1. (`const GiftingTheme()` keeps the 1.0 look.)
 final GiftingTheme darkTheme = GiftingTheme.fromTokens(darkThemeTokens);

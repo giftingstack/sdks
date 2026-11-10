@@ -61,7 +61,7 @@ struct NoticeView: View {
                     .font(.system(size: 12.5, weight: .bold))
                     .foregroundColor(textColor)
                     .lineLimit(1)
-                Text(verbatim: "sent \(data.giftName)")
+                Text(verbatim: NoticeView.whatText(data))
                     .font(.system(size: 12.5))
                     .foregroundColor(textColor)
                     .opacity(0.92)
@@ -86,6 +86,19 @@ struct NoticeView: View {
         .padding(.trailing, 16)
         .padding(.vertical, big ? 7 : 5)
         .background(Capsule().fill(big ? theme.noticeBigBackground : theme.noticeBackground))
+        // A battle gift (SPEC 7.4): a 2 px border in the side's colour and, inside it, a 1 px line in the text
+        // colour, so the ring shows even when the side colour is the pill's own. Both are drawn over the pill's
+        // edge (the padding already keeps the content 5 px away): the pill keeps its size.
+        .overlay(
+            Group {
+                if let receiver = data.receiver {
+                    ZStack {
+                        Capsule().strokeBorder(sideColor(receiver), lineWidth: 2)
+                        Capsule().strokeBorder(textColor, lineWidth: 1).padding(2)
+                    }
+                }
+            }
+        )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(verbatim: NoticeView.spokenText(data)))
     }
@@ -138,10 +151,36 @@ struct NoticeView: View {
         #endif
     }
 
+    /// The border colour: the colour the app gave (an unreadable string counts as none), else the
+    /// theme's accent for side 0 and its coin colour for side 1.
+    private func sideColor(_ receiver: GiftEffectReceiver) -> Color {
+        if let own = receiver.color, let color = Color(giftingCSS: own) {
+            return color
+        }
+        // The default palette (SPEC 7.4, 18.7): accent, coin, teal, pink, then over again.
+        let index = (receiver.side ?? 0) % (2 + battleExtraColors.count)
+        if index == 0 {
+            return theme.accent
+        }
+        if index == 1 {
+            return theme.coin
+        }
+        return Color(giftingCSS: battleExtraColors[index - 2]) ?? theme.accent
+    }
+
+    /// Line two: `sent Rose`, or `sent Rose to Mia` for a battle gift.
+    static func whatText(_ data: NoticeData) -> String {
+        if let receiver = data.receiver {
+            return "sent \(data.giftName) to \(receiver.name)"
+        }
+        return "sent \(data.giftName)"
+    }
+
     static func spokenText(_ data: NoticeData) -> String {
-        data.count > 1
-            ? "\(data.senderName) sent \(data.giftName) x\(data.count)"
-            : "\(data.senderName) sent \(data.giftName)"
+        let what = whatText(data)
+        return data.count > 1
+            ? "\(data.senderName) \(what) x\(data.count)"
+            : "\(data.senderName) \(what)"
     }
 }
 #endif

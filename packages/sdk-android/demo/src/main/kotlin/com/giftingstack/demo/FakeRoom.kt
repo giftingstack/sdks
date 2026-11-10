@@ -9,16 +9,23 @@ import kotlin.random.Random
 
 /** The room of the demo's Live tab and its stream host. */
 const val LIVE_ROOM = "pixel_live"
+
+/** The room of the "Battle 4+" mode: four hosts in every round. */
+const val LIVE_ROOM_4 = "pixel_live_4"
 const val LIVE_HOST = "zoe"
 
 /** The second host of the battle bar, and the length of a round and of the break after it. */
 const val LIVE_RIVAL = "mateo"
+
+/** The hosts of the battle: the first two play "Battle", all four play "Battle 4+" (a free-for-all, one bar cell and one Gift button each). */
+val LIVE_HOSTS = listOf(LIVE_HOST, LIVE_RIVAL, "emma", "dana")
 const val LIVE_ROUND_MS = 45_000L
 const val LIVE_BREAK_MS = 5_000L
 
 /** The "posts" the Live tab gifts go to: one per side of the battle, with the room id on every send. */
 val LIVE_POST = Post("live_1", LIVE_HOST, "Live", ArtKind.Aurora, "now", 0)
 val LIVE_RIVAL_POST = Post("live_1", LIVE_RIVAL, "Live", ArtKind.Aurora, "now", 0)
+val LIVE_HOST_POSTS = LIVE_HOSTS.map { Post("live_1", it, "Live", ArtKind.Aurora, "now", 0) }
 
 /** The line under the host name in the Live tab. */
 fun liveStatusLine(state: com.giftingstack.core.RoomState): String =
@@ -32,7 +39,7 @@ fun liveStatusLine(state: com.giftingstack.core.RoomState): String =
     }
 
 /** Who sends gifts into the pretend room (everyone but the host). */
-val LIVE_SENDERS: List<String> = SENDERS.filter { it != LIVE_HOST && it != LIVE_RIVAL }
+val LIVE_SENDERS: List<String> = SENDERS.filter { it !in LIVE_HOSTS }
 
 /**
  * A pretend rooms server for the demo: a [RoomSocketFactory] that speaks the real wire protocol
@@ -52,6 +59,8 @@ class FakeRoomServer(
     private val random: Random = Random.Default,
     private val minDelayMs: Long = 8_000,
     private val maxDelayMs: Long = 16_000,
+    /** How many hosts every round has: two, or four for the "Battle 4+" mode. */
+    private val sides: Int = 2,
 ) {
     private var nextId = now() * 1000
     private var nextTx = 1
@@ -65,11 +74,16 @@ class FakeRoomServer(
     // The battle round: gifts to either host count while the round is open; a new one starts after a break.
     private var round = 1
     private var started = now()
-    private val units = LongArray(2)
-    private val counts = LongArray(2)
+    private val units = LongArray(4)
+    private val counts = LongArray(4)
 
-    private fun battleJson(): String =
-        """{"round":"demo_r$round","started":$started,"ends":${started + LIVE_ROUND_MS},"scores":[{"id":${q(LIVE_HOST)},"units":${units[0]},"gifts":${counts[0]}},{"id":${q(LIVE_RIVAL)},"units":${units[1]},"gifts":${counts[1]}}]}"""
+    /** The sides of every round: the first [sides] hosts. */
+    private fun sidesNow(): List<String> = LIVE_HOSTS.take(sides)
+
+    private fun battleJson(): String {
+        val scores = sidesNow().mapIndexed { i, id -> """{"id":${q(id)},"units":${units[i]},"gifts":${counts[i]}}""" }.joinToString(",")
+        return """{"round":"demo_r$round","started":$started,"ends":${started + LIVE_ROUND_MS},"scores":[$scores]}"""
+    }
 
     private fun scoresFrame(): String = """{"t":"scores","battle":${battleJson()}}"""
 
@@ -78,11 +92,11 @@ class FakeRoomServer(
      * counts for the open round. The SDK leaves the sender's own gifts out of its effects.
      */
     fun publish(sender: String, gift: Gift, quantity: Int, receiver: String) {
-        val side = if (receiver == LIVE_RIVAL) 1 else 0
+        val side = sidesNow().indexOf(receiver)
         val open = sockets.filter { !it.closed }
         val text = frame(sender, gift, quantity, receiver)
         for (s in open) s.deliver(text)
-        if (now() >= started + LIVE_ROUND_MS) return
+        if (side < 0 || now() >= started + LIVE_ROUND_MS) return
         units[side] += gift.price * quantity
         counts[side] += quantity.toLong()
         val scores = scoresFrame()
@@ -160,9 +174,9 @@ class FakeRoomServer(
             }
         }
 
-        /** Sends a gift to one of the two hosts and counts it into the round while it is open. */
+        /** Sends a gift to one of the hosts of this round and counts it into the round while it is open. */
         private fun giftTo(sender: String, gift: Gift, quantity: Int, side: Int) {
-            push(frame(sender, gift, quantity, if (side == 0) LIVE_HOST else LIVE_RIVAL))
+            push(frame(sender, gift, quantity, sidesNow()[side]))
             if (now() >= started + LIVE_ROUND_MS) return
             units[side] += gift.price * quantity
             counts[side] += quantity.toLong()
@@ -178,7 +192,7 @@ class FakeRoomServer(
                 val cheap = all.sortedBy { it.price }.take(maxOf(1, kotlin.math.ceil(all.size * 0.6).toInt()))
                 val gift = (if (random.nextInt(10) == 0) all else cheap).randomOrNull(random)
                 if (sender != null && gift != null) {
-                    val side = random.nextInt(2)
+                    val side = random.nextInt(sidesNow().size)
                     if (random.nextInt(12) == 0) {
                         for (i in 0 until 5) later(i * 250L) { giftTo(sender, gift, 1, side) }
                     } else {

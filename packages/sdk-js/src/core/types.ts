@@ -73,6 +73,21 @@ export interface GiftEffectEvent {
   sender?: string;
   /** How many were sent in this one send. Default 1. */
   quantity?: number;
+  /**
+   * Who got the gift, for a battle (SPEC 7.4): the notice then reads "sent Rose to Mia" and its
+   * pill gets a border in the side's colour. Leave it out outside battles.
+   */
+  receiver?: GiftEffectReceiver;
+}
+
+/** The receiving side of a battle gift (SPEC 7.4, 18.4). */
+export interface GiftEffectReceiver {
+  /** Shown in the notice. */
+  name: string;
+  /** 0 = first side, 1 = second side (the battle bar's order). Picks the default colour. */
+  side?: number;
+  /** A CSS/hex colour for the border; null or absent: the side's default (accent, coin). */
+  color?: string | null;
 }
 
 // ---------------------------------------------------------------- gift walls (SPEC section 14)

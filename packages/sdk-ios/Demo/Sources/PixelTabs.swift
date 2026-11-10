@@ -53,15 +53,20 @@ struct PixelLiveTab: View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 12) {
                 PixelTitle(text: "Live", palette: palette)
+                // The two modes: "Battle" (two hosts) and "Battle 4+" (four hosts in every round, a free-for-all).
+                HStack(spacing: 8) {
+                    modeButton("Battle", on: !model.battle4) { model.setBattle4(false) }
+                    modeButton("Battle 4+", on: model.battle4) { model.setBattle4(true) }
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     stage
                     HStack(spacing: 10) {
                         PixelAvatar(user: PixelData.liveHost, size: 40)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(verbatim: "\(PixelData.firstName(PixelData.liveHost)) vs \(PixelData.firstName(PixelData.liveRival))")
+                            Text(verbatim: hosts.map { PixelData.firstName($0) }.joined(separator: model.battle4 ? ", " : " vs "))
                                 .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(palette.text)
-                            Text(verbatim: "Evening stream battle")
+                            Text(verbatim: model.battle4 ? "Four creators in one round: every side has its own colour" : "Evening stream battle")
                                 .font(.system(size: 12))
                                 .foregroundColor(palette.muted)
                         }
@@ -70,18 +75,29 @@ struct PixelLiveTab: View {
                     // The SDK's battle bar: follows the room and ticks its own clock.
                     GiftBattleBar(
                         room: room,
-                        users: [
-                            PixelData.liveHost: BattleBarUser(name: PixelData.firstName(PixelData.liveHost)),
-                            PixelData.liveRival: BattleBarUser(name: PixelData.firstName(PixelData.liveRival)),
-                        ],
+                        users: Dictionary(
+                            uniqueKeysWithValues: PixelData.liveHosts.map { ($0, BattleBarUser(name: PixelData.firstName($0))) }
+                        ),
                         reducedMotion: model.reducedMotion,
                         theme: model.theme.gifting
                     )
                     // Each side's Gift button sits under that side of the bar.
-                    HStack(spacing: 8) {
-                        giftButton(PixelData.livePost)
-                        Spacer(minLength: 0)
-                        giftButton(PixelData.rivalPost)
+                    if hosts.count > 2 {
+                        // Three or more sides: two columns, so a name never wraps or leaves the screen.
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
+                            ForEach(hosts.indices, id: \.self) { index in
+                                giftButton(PixelData.livePost(for: hosts[index]), fill: true)
+                            }
+                        }
+                    } else {
+                        HStack(spacing: 8) {
+                            ForEach(hosts.indices, id: \.self) { index in
+                                if index > 0 {
+                                    Spacer(minLength: 0)
+                                }
+                                giftButton(PixelData.livePost(for: hosts[index]))
+                            }
+                        }
                     }
                     Text(verbatim: stateText)
                         .font(.system(size: 12))
@@ -139,20 +155,41 @@ struct PixelLiveTab: View {
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
-    private func giftButton(_ post: PixelPost) -> some View {
+    /// The hosts of the mode the tab is in: two, or all four.
+    private var hosts: [String] {
+        model.battle4 ? PixelData.liveHosts : Array(PixelData.liveHosts.prefix(2))
+    }
+
+    private func modeButton(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(verbatim: title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(on ? Color.white : palette.text)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 14)
+                .background(Capsule().fill(on ? palette.accent : palette.card))
+                .overlay(Capsule().stroke(on ? palette.accent : palette.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func giftButton(_ post: PixelPost, fill: Bool = false) -> some View {
         Button {
             // The Gift button opens the tray, and closes it again (the SDK's toggle()).
-            model.giftButton(post, roomId: PixelData.liveRoom)
+            model.giftButton(post, roomId: model.liveRoomId)
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "gift.fill")
                     .font(.system(size: 14, weight: .semibold))
                 Text(verbatim: "Gift \(PixelData.firstName(post.author))")
                     .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .foregroundColor(palette.accent)
             .padding(.vertical, 8)
             .padding(.horizontal, 14)
+            .frame(maxWidth: fill ? .infinity : nil)
             .background(Capsule().fill(palette.background))
             .overlay(Capsule().stroke(palette.line, lineWidth: 1))
             .contentShape(Capsule())

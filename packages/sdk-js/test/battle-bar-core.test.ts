@@ -5,6 +5,7 @@ import {
   battleBarModel,
   battleGains,
   battleSideColors,
+  battleSidePalette,
   battleView,
   contrastRatio,
   darkTheme,
@@ -58,8 +59,8 @@ describe("battle bar model", () => {
   it("splits by share inside the visible band and names the sides", () => {
     const m = battleBarModel(view(300, 100), { nameOf: (id) => id.toUpperCase() })!;
     expect(m.pct).toBe(75);
-    expect(m.sides[0].name).toBe("MIA");
-    expect(m.sides[0].leads).toBe(true);
+    expect(m.sides[0]!.name).toBe("MIA");
+    expect(m.sides[0]!.leads).toBe(true);
     expect(m.spoken).toBe("MIA 300, THEO 100");
     expect(battleBarModel(view(1, 0))!.pct).toBe(100 - BATTLE_MIN_SHARE_PCT);
     expect(battleBarModel(view(0, 1))!.pct).toBe(BATTLE_MIN_SHARE_PCT);
@@ -132,15 +133,28 @@ describe("conformance: battle-bar.json", () => {
         labels: c.labels,
       });
       if (c.expect === null) return expect(m).toBeNull();
-      const { sides, pct, ...rest } = c.expect;
+      const { sides, pct, pcts, ...rest } = c.expect;
       expect(m).toMatchObject(rest);
       if (pct !== undefined) expect(Math.abs(m!.pct - pct)).toBeLessThan(1e-6);
+      if (pcts !== undefined) {
+        expect(m!.pcts).toHaveLength(pcts.length);
+        (pcts as number[]).forEach((p, i) => expect(Math.abs(m!.pcts[i]! - p)).toBeLessThan(1e-6));
+        expect(m!.pcts.reduce((a, b) => a + b, 0)).toBeCloseTo(100, 6);
+      }
+      if (sides !== undefined) expect(m!.sides).toHaveLength(sides.length);
       (sides ?? []).forEach((s: Json, i: number) => expect(m!.sides[i]).toMatchObject(s));
     });
 
   for (const c of f.gains as Json[])
     it(`gains ${JSON.stringify(c.before)} -> ${JSON.stringify(c.after)}`, () => {
       expect(battleGains(c.before, c.after)).toEqual(c.expect);
+    });
+
+  for (const c of f.palette as Json[])
+    it(`palette: ${c.name}`, () => {
+      expect(
+        battleSidePalette(themes[c.theme as keyof typeof themes], c.count, c.override),
+      ).toEqual(c.expect);
     });
 
   for (const c of f.colors as Json[])

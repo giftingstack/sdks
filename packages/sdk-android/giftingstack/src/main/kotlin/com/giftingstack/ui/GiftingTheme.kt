@@ -2,6 +2,7 @@ package com.giftingstack.ui
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.giftingstack.core.GiftThemeTokens
 import com.giftingstack.core.ThemeMode
 import com.giftingstack.core.darkThemeTokens
@@ -84,6 +85,14 @@ internal fun tokenColor(value: String): Color {
     val (r, g, b) = m.destructured
     val a = m.groupValues[4].ifEmpty { "1" }.toFloat()
     return Color(r.toInt().coerceIn(0, 255), g.toInt().coerceIn(0, 255), b.toInt().coerceIn(0, 255), (a.coerceIn(0f, 1f) * 255f + 0.5f).toInt())
+}
+
+/** A [Color] as a token string [tokenColor] reads back: `#rrggbb`, or `rgba(r, g, b, a)` when it is not opaque. */
+internal fun colorCss(c: Color): String {
+    val v = c.toArgb()
+    val a = (v ushr 24) and 0xFF
+    if (a == 0xFF) return "#" + (v and 0xFFFFFF).toString(16).padStart(6, '0')
+    return "rgba(${(v shr 16) and 0xFF}, ${(v shr 8) and 0xFF}, ${v and 0xFF}, ${"%.3f".format(java.util.Locale.ROOT, a / 255f)})"
 }
 
 typealias GiftTheme = GiftingTheme

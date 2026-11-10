@@ -142,7 +142,7 @@ private struct PixelContent: View {
         case .feed:
             PixelFeedTab(model: model, palette: palette, theme: theme)
         case .live:
-            PixelLiveTab(model: model, room: model.room, palette: palette)
+            PixelLiveTab(model: model, room: model.liveRoom, palette: palette)
         case .top:
             PixelTopTab(model: model, palette: palette, theme: theme)
         case .inbox:

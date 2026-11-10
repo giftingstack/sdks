@@ -144,6 +144,7 @@ class _DemoScreenState extends State<DemoScreen> {
 
   /// The Live tab's room, joined while the tab is open.
   GiftRoom? _room;
+  bool _battle4 = false;
 
   List<Gift> _catalog = const [];
   String _selectedId = 'sun-dragon';
@@ -235,11 +236,17 @@ class _DemoScreenState extends State<DemoScreen> {
       effects: _effects,
       reference: post.id,
       roomId: roomId,
+      // In a battle your own gift says who got it too (the room knows the sides).
+      receiverOf: (r) => _room?.receiverFor(r),
       // A tap on the scrim or the Gift button (toggle) closes the tray: let go of it.
       onOpenChange: (open) {
         if (!open) _closeTray();
       },
       onSent: (tx) {
+        // In a real room the server counts the gift into the battle; the pretend one is told here.
+        if (roomId != null) {
+          scoreOwnGift(tx.receiver, tx.unitPrice, tx.quantity);
+        }
         if (!mounted) return;
         setState(() {
           _balance = tx.senderBalanceAfter;
@@ -463,16 +470,32 @@ class _DemoScreenState extends State<DemoScreen> {
   /// A real [GiftRoom] on a pretend server: a real app passes no `socket:`
   /// and its own `getToken` (the token carries `rooms` and `name`).
   GiftRoom _joinRoom() => GiftRoom(
-        room: liveRoomId,
+        room: _battle4 ? '${liveRoomId}_4' : liveRoomId,
         getToken: ({required bool forceRefresh}) async => demoRoomToken('ava'),
         client: _client,
         effects: _effects,
+        // The battle notice says who got the gift: names like the bar's, and
+        // (the bar has no override) the theme's accent / coin side colours.
+        resolveName: nameOf,
         socket: fakeRoomSocketFactory(
           gifts: () => _catalog,
           senders: _senders,
           nameOf: nameOf,
+          sides: _battle4 ? 4 : 2,
         ),
       );
+
+  /// The two modes of the Live tab: "Battle" (two hosts) and "Battle 4+" (four
+  /// hosts every round, a free-for-all). Changing it joins a fresh room.
+  void _setBattle4(bool on) {
+    if (_battle4 == on) return;
+    setState(() {
+      _battle4 = on;
+      _room?.dispose();
+      _room = _joinRoom();
+      _closeTray();
+    });
+  }
 
   /// The bottom bar, flat like the iOS one: icon over label, 50 high plus the
   /// bottom inset (not the tall Material 3 bar).
@@ -761,19 +784,23 @@ class _DemoScreenState extends State<DemoScreen> {
 
   /// One side's Gift button: opens the tray for that side, closes it when it is
   /// already open for the same side.
-  Widget _liveGift(String id, Key key) => GestureDetector(
+  Widget _liveGift(String id, Key key, {bool fill = false}) => GestureDetector(
         key: key,
         onTap: () => _tray != null && _trayLive && _trayTo == id
             ? _tray!.toggle()
-            : _openTray(_livePostOf(id), roomId: liveRoomId),
+            : _openTray(_livePostOf(id),
+                roomId: _battle4 ? '${liveRoomId}_4' : liveRoomId),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          alignment: fill ? Alignment.center : null,
           decoration: BoxDecoration(
             color: _theme.accent,
             borderRadius: BorderRadius.circular(24),
           ),
           child: Text(
             'Gift ${nameOf(id)}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: _theme.accentText,
               fontWeight: FontWeight.w700,
@@ -790,6 +817,14 @@ class _DemoScreenState extends State<DemoScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _title('Live'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _seg('Battle', !_battle4, () => _setBattle4(false)),
+              const SizedBox(width: 8),
+              _seg('Battle 4+', _battle4, () => _setBattle4(true)),
+            ],
+          ),
           const SizedBox(height: 12),
           _card(
             Column(
@@ -820,22 +855,63 @@ class _DemoScreenState extends State<DemoScreen> {
                     room: room,
                     theme: _theme,
                     users: {
-                      for (final id in const ['mira', 'noor'])
+                      for (final id in const ['mira', 'noor', 'lina', 'owen'])
                         id: BattleBarUser(name: nameOf(id)),
                     },
                   ),
                   // Each side's Gift button sits under that side of the bar.
                   const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _liveGift('mira', const ValueKey<String>('live-gift')),
-                      _liveGift(
-                        'noor',
-                        const ValueKey<String>('live-gift-noor'),
-                      ),
-                    ],
-                  ),
+                  if (_battle4)
+                    // "Battle 4+": four hosts every round, one Gift button and
+                    // one cell of the bar each, in two columns so a name
+                    // never wraps or leaves the screen.
+                    LayoutBuilder(
+                      builder: (context, box) {
+                        final w = (box.maxWidth - 8) / 2;
+                        return Wrap(
+                          runSpacing: 8,
+                          spacing: 8,
+                          children: [
+                            for (final (id, key) in const [
+                              ('mira', 'live-gift'),
+                              ('noor', 'live-gift-noor'),
+                              ('lina', 'live-gift-lina'),
+                              ('owen', 'live-gift-owen'),
+                            ])
+                              SizedBox(
+                                width: w,
+                                child: _liveGift(
+                                  id,
+                                  ValueKey<String>(key),
+                                  fill: true,
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    )
+                  else
+                    // Two sides: two equal columns, each button centred under
+                    // its own half of the bar (like the web demo).
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _liveGift(
+                            'mira',
+                            const ValueKey<String>('live-gift'),
+                            fill: true,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _liveGift(
+                            'noor',
+                            const ValueKey<String>('live-gift-noor'),
+                            fill: true,
+                          ),
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 10),
                 ],
                 if (room == null)
@@ -1147,7 +1223,10 @@ class _Header extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            GestureDetector(
+            // Flexible: on a 320 px phone the chip gives way (an ellipsis)
+            // instead of running off the screen.
+            Flexible(
+                child: GestureDetector(
               key: const ValueKey<String>('coin-chip'),
               onTap: onCoins,
               child: Container(
@@ -1161,6 +1240,7 @@ class _Header extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       width: 16,
@@ -1171,21 +1251,24 @@ class _Header extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Text(
+                    Flexible(
+                        child: Text(
                       fmt(balance),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       key: const ValueKey<String>('coin-chip-text'),
                       style: TextStyle(
                         color: theme.text,
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
                       ),
-                    ),
+                    )),
                     const SizedBox(width: 6),
                     Icon(Icons.add_circle, size: 16, color: theme.accent),
                   ],
                 ),
               ),
-            ),
+            )),
           ],
         ),
       );

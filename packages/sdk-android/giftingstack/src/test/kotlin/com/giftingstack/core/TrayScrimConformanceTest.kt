@@ -36,6 +36,16 @@ class TrayScrimPureConformanceTest {
     }
 
     @Test
+    fun takesTouches() {
+        val cases = scrimFile.getValue("takesTouches").jsonArray
+        assertEquals(8, cases.size)
+        for (e in cases) {
+            val o = e.jsonObject
+            assertEquals("takesTouches $o", o.bool("expect"), scrimTakesTouches(o.bool("scrim"), o.bool("open"), o.bool("placed")))
+        }
+    }
+
+    @Test
     fun fade() {
         for (e in scrimFile.getValue("fade").jsonArray) {
             val o = e.jsonObject

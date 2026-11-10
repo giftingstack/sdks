@@ -264,16 +264,20 @@ public struct GiftEffectEvent: Codable, Sendable, Equatable, Hashable {
     public var sender: String?
     /// How many were sent in this one send. Default 1.
     public var quantity: Int?
+    /// Who got the gift, for a battle (SPEC 7.4): the notice then reads "sent Rose to Mia" and its
+    /// pill gets a border in the side's colour. Leave it nil outside battles.
+    public var receiver: GiftEffectReceiver?
 
-    public init(gift: GiftInfo, sender: String? = nil, quantity: Int? = nil) {
+    public init(gift: GiftInfo, sender: String? = nil, quantity: Int? = nil, receiver: GiftEffectReceiver? = nil) {
         self.gift = gift
         self.sender = sender
         self.quantity = quantity
+        self.receiver = receiver
     }
 
     /// The event for a catalog gift: the big picture is `animationUrl ?? iconUrl`, the notice
     /// picture is `iconUrl` (the one the tray already shows).
-    public init(gift: Gift, sender: String? = nil, quantity: Int? = nil) {
+    public init(gift: Gift, sender: String? = nil, quantity: Int? = nil, receiver: GiftEffectReceiver? = nil) {
         self.gift = GiftInfo(
             id: gift.id,
             name: gift.name,
@@ -283,12 +287,14 @@ public struct GiftEffectEvent: Codable, Sendable, Equatable, Hashable {
         )
         self.sender = sender
         self.quantity = quantity
+        self.receiver = receiver
     }
 
     enum CodingKeys: String, CodingKey {
         case gift
         case sender
         case quantity
+        case receiver
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -296,5 +302,23 @@ public struct GiftEffectEvent: Codable, Sendable, Equatable, Hashable {
         try c.encode(gift, forKey: .gift)
         try c.encodeIfPresent(sender, forKey: .sender)
         try c.encodeIfPresent(quantity, forKey: .quantity)
+        try c.encodeIfPresent(receiver, forKey: .receiver)
+    }
+}
+
+/// The receiving side of a battle gift (SPEC 7.4, 18.4).
+public struct GiftEffectReceiver: Codable, Sendable, Equatable, Hashable {
+    /// Shown in the notice.
+    public var name: String
+    /// 0 = first side, 1 = second side (the battle bar's order). Picks the default colour.
+    public var side: Int?
+    /// The border colour as `#rgb`, `#rrggbb` or `rgba(r, g, b, a)`; nil: the side's default
+    /// (the theme's accent, then its coin colour).
+    public var color: String?
+
+    public init(name: String, side: Int? = nil, color: String? = nil) {
+        self.name = name
+        self.side = side
+        self.color = color
     }
 }

@@ -74,6 +74,10 @@ public struct GiftTray: View {
     /// Set a moment after the first complete measurement: until then the sheet is not drawn and
     /// every move is a jump, so it never slides about behind a footer that is already in place.
     @State var sheetShown = false
+    /// Whether the tray is open NOW, kept in state for the delayed work of the sheet. `isOpen` is a plain
+    /// property: an `onChange` action, and every `Task` it starts, may still hold the previous render's
+    /// value, which kept a reopened tray (toggle on the same receiver) open but never shown.
+    @State var sheetOpen = false
     @State var sheetDrag: SheetDragState?
     @State var lastDragEnd = Date.distantPast
     /// True while the sheet's drag gesture runs; SwiftUI resets it on end AND on cancel, so an

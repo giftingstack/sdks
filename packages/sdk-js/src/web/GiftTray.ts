@@ -11,6 +11,7 @@ import {
   resolveTrayPlacement,
   scrimFadeMs,
   scrimTapOutcome,
+  scrimTakesTouches,
   scrimVisible,
   sendButtonState,
 } from "../core";
@@ -443,12 +444,11 @@ export class GiftTray {
       this.container.insertBefore(el, this.element);
       this.scrimEl = el;
     }
-    const on = scrimVisible({
-      scrim: true,
-      open: this.openState.isOpen(),
-      snap: sheet.getState().snap,
-      placed: sheet.isPlaced(),
-    });
+    const open = this.openState.isOpen();
+    const placed = sheet.isPlaced();
+    const on = scrimVisible({ scrim: true, open, snap: sheet.getState().snap, placed });
+    // Touches are taken in every state, peek included (the dim stays hidden there).
+    el.toggleAttribute("data-gs-active", scrimTakesTouches({ scrim: true, open, placed }));
     if (on === this.scrimShown && el.style.transitionDuration) return;
     this.scrimShown = on;
     el.style.transitionDuration = `${scrimFadeMs(this.motion?.matches ?? false)}ms`;

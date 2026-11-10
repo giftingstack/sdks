@@ -4,6 +4,7 @@ import {
   type GiftingClient,
   type GiftingError,
   GiftTrayController,
+  type GiftTrayControllerOptions,
   type GiftTrayState,
 } from "../core";
 import { GiftTray, type GiftTrayOptions } from "./GiftTray";
@@ -29,6 +30,8 @@ export interface CreateGiftTrayOptions extends Omit<
   reference?: string;
   /** Room on screen: every send names it (see `joinRoom`). */
   roomId?: string;
+  /** In a battle: `room.receiverFor`, so your own gift says who got it (SPEC 18.4). */
+  receiverOf?: GiftTrayControllerOptions["receiverOf"];
   onSent?: (transaction: GiftTransaction) => void;
   /** Called for every failed send. `error.insufficientBalance` means: open your coin store. */
   onError?: (error: GiftingError) => void;
@@ -94,6 +97,7 @@ export function createGiftTray(options: CreateGiftTrayOptions): GiftTrayHandle {
     playOn,
     reference,
     roomId: options.roomId,
+    receiverOf: options.receiverOf,
     onSent,
     onError,
     prefetch,

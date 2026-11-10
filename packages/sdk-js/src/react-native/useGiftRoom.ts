@@ -47,6 +47,8 @@ export interface UseGiftRoomOptions {
   minTier?: EffectTier;
   thresholds?: Partial<TierThresholds>;
   resolveName?: (user: string) => string | null | undefined;
+  /** Border colours of the two battle sides in the gift notice; pass the bar's `sideColors` (SPEC 7.4). */
+  sideColors?: readonly string[];
   /** Default `wss://rt.giftingstack.com`. `ws://` only to localhost, 127.0.0.1, ::1, 10.0.2.2. */
   url?: string;
   /** Allow a plain `ws://` `url` to any host. Default false. For development only. */
@@ -168,6 +170,7 @@ function roomOptions(
     minTier: o.minTier,
     thresholds: o.thresholds,
     resolveName: o.resolveName,
+    sideColors: o.sideColors,
     onEvent: (event) => {
       latest.current.effects?.current?.play(event);
       latest.current.onEvent?.(event);

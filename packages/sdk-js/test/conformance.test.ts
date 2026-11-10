@@ -27,6 +27,7 @@ import {
   SCRIM_OPACITY,
   scrimFadeMs,
   scrimTapOutcome,
+  scrimTakesTouches,
   scrimVisible,
   resolveSheetHeights,
   type PlacementInput,
@@ -139,6 +140,7 @@ describe("conformance: effects.json scheduler", () => {
           const event: GiftEffectEvent = { gift: f.gifts[step.play.gift] };
           if (step.play.sender !== undefined) event.sender = step.play.sender;
           if (step.play.quantity !== undefined) event.quantity = step.play.quantity;
+          if (step.play.receiver !== undefined) event.receiver = step.play.receiver;
           const id = scheduler.play(event);
           if (step.returns !== undefined) expect(id, `${at} play() id`).toBe(step.returns);
         } else if (step.started !== undefined) scheduler.started(step.started);
@@ -445,6 +447,12 @@ describe("conformance: tray-scrim.json", () => {
     it(`visible #${i + 1}: ${JSON.stringify(c)}`, () => {
       const { expect: want, ...state } = c;
       expect(scrimVisible(state as Parameters<typeof scrimVisible>[0])).toBe(want);
+    });
+  }
+  for (const [i, c] of (f.takesTouches as Json[]).entries()) {
+    it(`takesTouches #${i + 1}: ${JSON.stringify(c)}`, () => {
+      const { expect: want, ...state } = c;
+      expect(scrimTakesTouches(state as Parameters<typeof scrimTakesTouches>[0])).toBe(want);
     });
   }
   for (const c of f.fade as Json[]) {

@@ -55,6 +55,188 @@
   },
   "scenarios": [
     {
+      "name": "battle gifts: two receivers with the same name on different sides are two notices and two combos",
+      "steps": [
+        {
+          "atMs": 0,
+          "play": {
+            "gift": "rose",
+            "sender": "ayla",
+            "receiver": {
+              "name": "Alex",
+              "side": 0
+            }
+          },
+          "returns": 1
+        },
+        {
+          "started": 1
+        },
+        {
+          "atMs": 100,
+          "play": {
+            "gift": "rose",
+            "sender": "ayla",
+            "receiver": {
+              "name": "Alex",
+              "side": 1
+            }
+          },
+          "returns": 2
+        },
+        {
+          "started": 2
+        },
+        {
+          "expect": {
+            "events": ["enter:1", "notice:1", "enter:2", "notice:2"],
+            "notice": {
+              "id": 2,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false,
+              "receiver": {
+                "name": "Alex",
+                "side": 1,
+                "color": null
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "battle gifts: the receiver is part of the notice key and of the combo and reaches the notice; no receiver keeps the old key",
+      "steps": [
+        {
+          "atMs": 0,
+          "play": {
+            "gift": "rose",
+            "sender": "ayla",
+            "receiver": {
+              "name": "Mia",
+              "side": 0
+            }
+          },
+          "returns": 1
+        },
+        {
+          "started": 1
+        },
+        {
+          "expect": {
+            "events": ["enter:1", "notice:1"],
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false,
+              "receiver": {
+                "name": "Mia",
+                "side": 0,
+                "color": null
+              }
+            }
+          }
+        },
+        {
+          "atMs": 100,
+          "play": {
+            "gift": "rose",
+            "sender": "ayla",
+            "receiver": {
+              "name": "Theo",
+              "side": 1,
+              "color": "#00aa88"
+            }
+          },
+          "returns": 2
+        },
+        {
+          "started": 2
+        },
+        {
+          "expect": {
+            "events": ["enter:2", "notice:2"],
+            "notice": {
+              "id": 2,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false,
+              "receiver": {
+                "name": "Theo",
+                "side": 1,
+                "color": "#00aa88"
+              }
+            }
+          }
+        },
+        {
+          "atMs": 200,
+          "play": {
+            "gift": "rose",
+            "sender": "ayla",
+            "receiver": {
+              "name": "Mia",
+              "side": 0
+            }
+          },
+          "returns": 3
+        },
+        {
+          "started": 3
+        },
+        {
+          "expect": {
+            "events": ["enter:3", "notice:1"],
+            "notice": {
+              "id": 1,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 2,
+              "big": false,
+              "receiver": {
+                "name": "Mia",
+                "side": 0,
+                "color": null
+              }
+            }
+          }
+        },
+        {
+          "atMs": 300,
+          "play": {
+            "gift": "rose",
+            "sender": "ayla"
+          },
+          "returns": 4
+        },
+        {
+          "started": 4
+        },
+        {
+          "expect": {
+            "events": ["enter:4", "notice:3"],
+            "notice": {
+              "id": 3,
+              "senderName": "ayla",
+              "giftName": "Rose",
+              "image": "https://assets.test/rose/256.webp",
+              "count": 1,
+              "big": false
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "each tier enters at once; the notice waits for started()",
       "steps": [
         { "atMs": 0, "play": { "gift": "rose", "sender": "ayla" }, "returns": 1 },

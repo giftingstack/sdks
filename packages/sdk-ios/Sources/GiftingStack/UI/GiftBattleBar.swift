@@ -14,16 +14,21 @@ public struct BattleBarUser: Sendable, Equatable {
 }
 
 private let battleAvatar: CGFloat = 40
+/// The default colours of the third and fourth side (SPEC 18.7); the palette then starts over.
+private func battleExtraColor(_ index: Int) -> Color {
+    Color(giftingCSS: battleExtraColors[index]) ?? Color.gray
+}
 private let battleGold = Color(giftingHex: 0xFFC83D)
 /// `1 - (1 - t)^3`, the ease of the web and React Native bars, as a Bezier.
 private func battleEaseOut(_ seconds: Double) -> Animation {
     Animation.timingCurve(0.33, 1, 0.68, 1, duration: seconds)
 }
 
-/// The battle bar of a versus round (SPEC 18.7): both receivers with their scores, a countdown,
-/// and a split bar whose boundary slides as gifts arrive. It draws `battleView` only; your server
-/// starts and ends rounds. Nothing is drawn while the room has no round with two sides. VoiceOver
-/// gets one element: both scores, then the result.
+/// The battle bar of a round (SPEC 18.7): the receivers with their scores, a countdown, and a split
+/// bar whose boundary slides as gifts arrive. Two sides are the classic versus; three or more (up to
+/// 8) are a free-for-all: the clock, a row of cells, a bar of proportional segments. It draws
+/// `battleView` only; your server starts and ends rounds. Nothing is drawn while the room has no
+/// round with two sides. VoiceOver gets one element: the scores, then the result.
 ///
 /// ```swift
 /// GiftBattleBar(
@@ -45,9 +50,11 @@ public struct GiftBattleBar: View {
 
     /// Follows the round of `room` and refreshes the clock every `tickMs` while it is open.
     /// - Parameters:
-    ///   - users: names and pictures of the two receivers by id. Fallback: the id.
-    ///   - sideColors: two `#rrggbb` colours to use instead of the theme's accent and coin colour
-    ///     (the text on each is picked by contrast).
+    ///   - users: names and pictures of the receivers by id. Fallback: the id.
+    ///   - sideColors: the side colours, one per side in order (`#rrggbb`, text picked by contrast).
+    ///     Default: the theme's accent, its coin colour, then teal and pink, then the same again. A
+    ///     shorter list keeps the default for the sides it does not name. Give the room the same list
+    ///     (`GiftRoomModel(sideColors:)`).
     ///   - reducedMotion: nil (default): follows the system Reduce Motion setting. Reduced
     ///     motion: no sliding, counting or pulse.
     ///   - tickMs: how often the clock refreshes while a round is open. 0 = never.
@@ -164,7 +171,7 @@ private struct BattleBarDrawing: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var lastRound: String?
     @State private var lastUnits: [Int]?
-    @State private var pulsing: [Bool] = [false, false]
+    @State private var pulsing: [Bool] = []
     @State private var announced = ""
 
     private var still: Bool {
@@ -172,7 +179,7 @@ private struct BattleBarDrawing: View {
     }
 
     private var units: [Int] {
-        (view?.sides ?? []).prefix(2).map { $0.units }
+        (view?.sides ?? []).map { $0.units }
     }
 
     var body: some View {
@@ -216,6 +223,9 @@ private struct BattleBarDrawing: View {
         if still {
             return
         }
+        if pulsing.count < next.count {
+            pulsing += [Bool](repeating: false, count: next.count - pulsing.count)
+        }
         for index in gains.indices where gains[index] && index < pulsing.count {
             withAnimation(.easeOut(duration: 0.2)) {
                 pulsing[index] = true
@@ -229,49 +239,73 @@ private struct BattleBarDrawing: View {
         }
     }
 
+    /// The colour of every side: the app's, else the default palette (SPEC 18.7).
     private func colors(_ model: BattleBarModel) -> [(color: Color, text: Color)] {
-        if let over = sideColors, over.count >= 2 {
-            return over.prefix(2).map { (hex: String) -> (color: Color, text: Color) in
-                let text: Color = battleReadableOn(hex) == "#000000" ? Color.black : Color.white
-                return (color: Color(giftingCSS: hex) ?? theme.accent, text: text)
-            }
-        }
-        return [
+        let defaults: [(color: Color, text: Color)] = [
             (color: theme.accent, text: theme.accentText),
             (color: theme.coin, text: theme.coinText),
-        ]
+        ] + battleExtraColors.indices.map { index in
+            (
+                color: battleExtraColor(index),
+                text: battleReadableOn(battleExtraColors[index]) == "#000000" ? Color.black : Color.white
+            )
+        }
+        return model.sides.indices.map { index -> (color: Color, text: Color) in
+            if let over = sideColors, index < over.count, let own = Color(giftingCSS: over[index]) {
+                let text: Color = battleReadableOn(over[index]) == "#000000" ? Color.black : Color.white
+                return (color: own, text: text)
+            }
+            return defaults[index % defaults.count]
+        }
+    }
+
+    private func clockView(_ model: BattleBarModel) -> some View {
+        let clockFill = model.isFinal ? theme.accent : theme.background
+        let clockBorder = model.isFinal ? Color.clear : (model.urgent ? theme.danger : theme.border)
+        let clockText = model.isFinal ? theme.accentText : (model.urgent ? theme.danger : theme.text)
+        return VStack(spacing: 3) {
+            Text(verbatim: labels.vs)
+                .font(.system(size: 10, weight: .black))
+                .kerning(1.8)
+                .foregroundColor(theme.muted)
+            Text(verbatim: model.clock)
+                .font(.system(size: 13, weight: .heavy).monospacedDigit())
+                .foregroundColor(clockText)
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .frame(minWidth: 52)
+                .background(Capsule().fill(clockFill))
+                .overlay(Capsule().stroke(clockBorder, lineWidth: 1))
+        }
+        .fixedSize()
     }
 
     private func content(_ model: BattleBarModel) -> some View {
         let pair = colors(model)
-        let clockFill = model.isFinal ? theme.accent : theme.background
-        let clockBorder = model.isFinal ? Color.clear : (model.urgent ? theme.danger : theme.border)
-        let clockText = model.isFinal ? theme.accentText : (model.urgent ? theme.danger : theme.text)
         let spoken = [model.spoken, model.banner].filter { !$0.isEmpty }.joined(separator: ". ")
+        let multi = model.sides.count > 2
         return VStack(spacing: 10) {
-            HStack(alignment: .center, spacing: 8) {
-                sideView(model.sides[0], right: false, color: pair[0], user: users[model.sides[0].id], index: 0)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                VStack(spacing: 3) {
-                    Text(verbatim: labels.vs)
-                        .font(.system(size: 10, weight: .black))
-                        .kerning(1.8)
-                        .foregroundColor(theme.muted)
-                    Text(verbatim: model.clock)
-                        .font(.system(size: 13, weight: .heavy).monospacedDigit())
-                        .foregroundColor(clockText)
-                        .lineLimit(1)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .frame(minWidth: 52)
-                        .background(Capsule().fill(clockFill))
-                        .overlay(Capsule().stroke(clockBorder, lineWidth: 1))
+            if multi {
+                // Three or more sides: the clock, a row of cells, a bar of proportional segments.
+                clockView(model)
+                HStack(alignment: .top, spacing: 6) {
+                    ForEach(model.sides.indices, id: \.self) { index in
+                        cellView(model.sides[index], color: pair[index], user: users[model.sides[index].id], index: index, many: model.sides.count > 4)
+                            .frame(maxWidth: .infinity, alignment: .top)
+                    }
                 }
-                .fixedSize()
-                sideView(model.sides[1], right: true, color: pair[1], user: users[model.sides[1].id], index: 1)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                multiBar(model, colors: pair.map { $0.color })
+            } else {
+                HStack(alignment: .center, spacing: 8) {
+                    sideView(model.sides[0], right: false, color: pair[0], user: users[model.sides[0].id], index: 0)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    clockView(model)
+                    sideView(model.sides[1], right: true, color: pair[1], user: users[model.sides[1].id], index: 1)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                splitBar(model, a: pair[0].color, b: pair[1].color)
             }
-            splitBar(model, a: pair[0].color, b: pair[1].color)
             if !model.banner.isEmpty {
                 Text(verbatim: model.banner)
                     .font(.system(size: 13, weight: .heavy))
@@ -282,6 +316,51 @@ private struct BattleBarDrawing: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: spoken))
+    }
+
+    // MARK: - One cell of three or more sides
+
+    /// A centred cell: avatar (36, 30 from five sides) over the name over the score.
+    private func cellView(
+        _ side: BattleBarSide,
+        color: (color: Color, text: Color),
+        user: BattleBarUser?,
+        index: Int,
+        many: Bool
+    ) -> some View {
+        let size: CGFloat = many ? 30 : 36
+        let ring = side.won ? battleGold : color.color
+        let avatar = ZStack {
+            Circle().strokeBorder(ring, lineWidth: 2)
+            avatarImage(side, color: color, url: user?.avatarUrl, size: size)
+                .frame(width: size, height: size)
+        }
+        .frame(width: size + 8, height: size + 8)
+        .overlay(
+            Group {
+                if side.won {
+                    Text(verbatim: "\u{265B}")
+                        .font(.system(size: 18))
+                        .foregroundColor(battleGold)
+                        .offset(y: -14)
+                }
+            },
+            alignment: .top
+        )
+        return VStack(spacing: 4) {
+            avatar
+            Text(verbatim: side.name)
+                .font(.system(size: many ? 11 : 12, weight: .bold))
+                .foregroundColor(theme.text)
+                .lineLimit(1)
+            BattleCountingScore(value: Double(side.units), labels: labels)
+                .font(.system(size: many ? 14 : 17, weight: .heavy).monospacedDigit())
+                .foregroundColor(theme.text)
+                .lineLimit(1)
+                .animation(still ? nil : battleEaseOut(0.65), value: side.units)
+        }
+        .opacity(side.lost ? 0.5 : 1)
+        .scaleEffect(index < pulsing.count && pulsing[index] ? 1.07 : 1)
     }
 
     // MARK: - One receiver
@@ -336,11 +415,16 @@ private struct BattleBarDrawing: View {
     }
 
     @ViewBuilder
-    private func avatarImage(_ side: BattleBarSide, color: (color: Color, text: Color), url: String?) -> some View {
+    private func avatarImage(
+        _ side: BattleBarSide,
+        color: (color: Color, text: Color),
+        url: String?,
+        size: CGFloat = battleAvatar
+    ) -> some View {
         let letter = ZStack {
             Circle().fill(color.color)
             Text(verbatim: giftInitial(side.name))
-                .font(.system(size: 18, weight: .heavy))
+                .font(.system(size: size == battleAvatar ? 18 : size * 0.45, weight: .heavy))
                 .foregroundColor(color.text)
         }
         if let link = url, let target = URL(string: link) {
@@ -357,12 +441,40 @@ private struct BattleBarDrawing: View {
                         }
                     }
                 })
-                .frame(width: battleAvatar, height: battleAvatar)
+                .frame(width: size, height: size)
                 .clipShape(Circle())
             }
         } else {
             letter
         }
+    }
+
+    // MARK: - The bar of three or more sides
+
+    /// One segment per side, side `i` in `colors[i]` with the width `pcts[i]` percent, 2 pt white lines
+    /// between them. Every width slides (800 ms, ease out cubic) unless reduced motion.
+    private func multiBar(_ model: BattleBarModel, colors: [Color]) -> some View {
+        GeometryReader { geo in
+            let inner = max(0, geo.size.width - 2)
+            HStack(spacing: 0) {
+                ForEach(model.pcts.indices, id: \.self) { index in
+                    Rectangle()
+                        .fill(colors[index])
+                        .frame(width: inner * CGFloat(model.pcts[index]) / 100, height: 14)
+                        .overlay(
+                            Rectangle().fill(Color.white).frame(width: index == 0 ? 0 : 2),
+                            alignment: .leading
+                        )
+                }
+            }
+            .frame(width: inner, height: 14, alignment: .leading)
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .offset(x: 1, y: 1)
+            .frame(width: geo.size.width, height: 16, alignment: .topLeading)
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(theme.border, lineWidth: 1))
+            .animation(still ? nil : battleEaseOut(0.8), value: model.pcts)
+        }
+        .frame(height: 16)
     }
 
     // MARK: - The split bar

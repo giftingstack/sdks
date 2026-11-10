@@ -127,6 +127,7 @@ class BattleBarModel {
   const BattleBarModel({
     required this.sides,
     required this.pct,
+    required this.pcts,
     required this.clock,
     required this.urgent,
     required this.isFinal,
@@ -135,11 +136,16 @@ class BattleBarModel {
     required this.spoken,
   });
 
-  /// The two sides, in the server's order.
+  /// Every side, in the server's order: two or more (up to the API's 8).
   final List<BattleBarSide> sides;
 
-  /// The first side's part of the bar, percent, kept inside the visible band.
+  /// The first side's part of the bar, percent, kept inside the visible band
+  /// (`pcts[0]`).
   final double pct;
+
+  /// Every side's part of the bar, percent, summing to 100; none under
+  /// [battleMinSharePct] (see [battleSegmentPcts]).
+  final List<double> pcts;
 
   /// `m:ss`, or the `final` label once the round ended.
   final String clock;
@@ -160,9 +166,46 @@ class BattleBarModel {
   final String spoken;
 }
 
+/// Every side's part of a bar, percent (SPEC 18.7): `share x 100`, but no side
+/// under [battleMinSharePct]: such a side is held at the minimum and the rest
+/// share what is left in proportion to their shares, repeated until every part
+/// is visible. Sums to 100.
+List<double> battleSegmentPcts(List<double> shares) {
+  final n = shares.length;
+  final pinned = List<bool>.filled(n, false);
+  final out = List<double>.filled(n, 0);
+  while (true) {
+    final free = <int>[
+      for (var i = 0; i < n; i++)
+        if (!pinned[i]) i,
+    ];
+    final left = 100 - battleMinSharePct * (n - free.length);
+    var sum = 0.0;
+    for (final i in free) {
+      sum += shares[i];
+    }
+    var again = false;
+    for (final i in free) {
+      out[i] = sum > 0 ? shares[i] / sum * left : left / free.length;
+      if (out[i] < battleMinSharePct) {
+        pinned[i] = true;
+        again = true;
+      }
+    }
+    if (!again) break;
+    for (var i = 0; i < n; i++) {
+      if (pinned[i]) out[i] = battleMinSharePct.toDouble();
+    }
+  }
+  for (var i = 0; i < n; i++) {
+    if (pinned[i]) out[i] = battleMinSharePct.toDouble();
+  }
+  return out;
+}
+
 /// The bar for [view], or null when it has fewer than two sides (a round with
-/// one receiver has nothing to compare). Extra sides beyond two are ignored:
-/// the bar is a versus.
+/// one receiver has nothing to compare). Every side is a cell of the bar (a
+/// free-for-all of up to 8); two sides look exactly as the versus always did.
 BattleBarModel? battleBarModel(
   BattleView? view, {
   String Function(String id)? nameOf,
@@ -188,16 +231,20 @@ BattleBarModel? battleBarModel(
     );
   }
 
-  final a = side(view.sides[0]);
-  final b = side(view.sides[1]);
+  final sides = view.sides.map(side).toList();
   final secs = _ceilSeconds(view.remainingMs);
   final winner = isFinal ? view.leader : null;
+  final pct = math.min(
+    100 - battleMinSharePct,
+    math.max(battleMinSharePct, view.sides[0].share * 100),
+  );
+  final pcts = sides.length == 2
+      ? <double>[pct.toDouble(), 100 - pct.toDouble()]
+      : battleSegmentPcts(<double>[for (final s in view.sides) s.share]);
   return BattleBarModel(
-    sides: <BattleBarSide>[a, b],
-    pct: math.min(
-      100 - battleMinSharePct,
-      math.max(battleMinSharePct, view.sides[0].share * 100),
-    ),
+    sides: sides,
+    pct: sides.length == 2 ? pct.toDouble() : pcts[0],
+    pcts: pcts,
     clock: isFinal ? labels.finalText : formatBattleClock(view.remainingMs),
     urgent: !isFinal && secs <= battleUrgentSeconds,
     isFinal: isFinal,
@@ -206,13 +253,17 @@ BattleBarModel? battleBarModel(
         ? ''
         : winner != null
             ? _fill(labels.wins, <String, String>{
-                'name': winner == a.id ? a.name : b.name,
+                'name': sides.firstWhere((s) => s.id == winner).name,
               })
             : labels.draw,
-    spoken: _fill(labels.spoken, <String, String>{
-      'a': a.spoken,
-      'b': b.spoken,
-    }),
+    // Two sides: the `spoken` label (`{a}, {b}`); more: every side's text
+    // joined by ", ".
+    spoken: sides.length == 2
+        ? _fill(labels.spoken, <String, String>{
+            'a': sides[0].spoken,
+            'b': sides[1].spoken,
+          })
+        : sides.map((s) => s.spoken).join(', '),
   );
 }
 
@@ -243,24 +294,43 @@ String battleReadableOn(String hex) => parseHex(hex) == null ||
     ? '#ffffff'
     : '#000000';
 
+/// The third and fourth side colour of the default palette (teal, pink); the
+/// fifth side starts over with the theme's accent.
+const List<String> battleExtraColors = <String>['#2ec4b6', '#ff5d8f'];
+
+/// The colour of every side of a bar or notice (SPEC 18.7, 7.4): side `i`
+/// takes `override[i]` when the app gave one (text picked by contrast), else
+/// the default palette: the theme's accent, its coin colour (each with the
+/// theme's own text colour on it, already 4.5:1 in both presets), then
+/// [battleExtraColors], then the same four again.
+List<SideColor> battleSidePalette(
+  GiftThemeTokens theme,
+  int count, [
+  List<String>? override,
+]) {
+  final defaults = <SideColor>[
+    SideColor(theme.accent, theme.accentText),
+    SideColor(theme.coin, theme.coinText),
+    for (final c in battleExtraColors) SideColor(c, battleReadableOn(c)),
+  ];
+  return <SideColor>[
+    for (var i = 0; i < count; i++)
+      if (override != null && i < override.length && override[i].isNotEmpty)
+        SideColor(override[i], battleReadableOn(override[i]))
+      else
+        defaults[i % defaults.length],
+  ];
+}
+
 /// The two side colours: the theme's accent against its coin colour (each with
 /// the theme's own text colour on it, already 4.5:1 in both presets), or
-/// [override] (text picked by contrast).
+/// [override] (text picked by contrast). [battleSidePalette] for any number of
+/// sides.
 List<SideColor> battleSideColors(
   GiftThemeTokens theme, [
   List<String>? override,
-]) {
-  if (override != null) {
-    return <SideColor>[
-      SideColor(override[0], battleReadableOn(override[0])),
-      SideColor(override[1], battleReadableOn(override[1])),
-    ];
-  }
-  return <SideColor>[
-    SideColor(theme.accent, theme.accentText),
-    SideColor(theme.coin, theme.coinText),
-  ];
-}
+]) =>
+    battleSidePalette(theme, 2, override);
 
 /// Which sides gained score since [before] (to pulse them). [before] null:
 /// nobody pulses.

@@ -36,6 +36,7 @@ import {
   pictureSrc,
   scrimFadeMs,
   scrimTapOutcome,
+  scrimTakesTouches,
   scrimVisible,
   sendButtonState,
 } from "../core";
@@ -328,7 +329,17 @@ function useSheet(props: GiftTrayProps, rows: number, open: boolean) {
 }
 
 /** The dim behind the sheet (spec 9.4): black at 0.4, fades over `fadeMs`, takes touches only while shown. */
-function Scrim({ on, fadeMs, onPress }: { on: boolean; fadeMs: number; onPress: () => void }) {
+function Scrim({
+  on,
+  active,
+  fadeMs,
+  onPress,
+}: {
+  on: boolean;
+  active: boolean;
+  fadeMs: number;
+  onPress: () => void;
+}) {
   const opacity = useRef(new Animated.Value(on ? SCRIM_OPACITY : 0)).current;
   useEffect(() => {
     Animated.timing(opacity, {
@@ -341,9 +352,9 @@ function Scrim({ on, fadeMs, onPress }: { on: boolean; fadeMs: number; onPress: 
   return (
     <Animated.View
       style={[StyleSheet.absoluteFill, { backgroundColor: "#000", opacity }]}
-      pointerEvents={on ? "auto" : "none"}
-      accessibilityElementsHidden={!on}
-      importantForAccessibility={on ? "auto" : "no-hide-descendants"}
+      pointerEvents={active ? "auto" : "none"}
+      accessibilityElementsHidden={!active}
+      importantForAccessibility={active ? "auto" : "no-hide-descendants"}
       testID="gift-scrim"
     >
       <Pressable
@@ -575,6 +586,7 @@ export function GiftTray(props: GiftTrayProps) {
     snap: state.snap,
     placed: s.ready,
   });
+  const scrimActive = scrimTakesTouches({ scrim: !!props.scrim, open, placed: s.ready });
   function tapScrim() {
     const outcome = scrimTapOutcome({
       scrim: !!props.scrim,
@@ -599,7 +611,7 @@ export function GiftTray(props: GiftTrayProps) {
       importantForAccessibility={open ? "auto" : "no-hide-descendants"}
       testID="gift-sheet"
     >
-      {props.scrim && <Scrim on={scrimOn} fadeMs={scrimFadeMs(s.reduced)} onPress={tapScrim} />}
+      {props.scrim && <Scrim on={scrimOn} active={scrimActive} fadeMs={scrimFadeMs(s.reduced)} onPress={tapScrim} />}
       <View
         style={[
           styles.sheetRoot,

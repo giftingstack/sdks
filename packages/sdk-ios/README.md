@@ -18,7 +18,7 @@ pick the `GiftingStack` product. In a `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/giftingstack/sdks.git", from: "0.1.2"),
+    .package(url: "https://github.com/giftingstack/sdks.git", from: "0.1.3"),
 ],
 targets: [
     .target(name: "YourApp", dependencies: [.product(name: "GiftingStack", package: "sdks")]),
@@ -277,13 +277,15 @@ GiftBattleBar(
         "ava": BattleBarUser(name: "Ava", avatarUrl: "https://..."),
         "mateo": BattleBarUser(name: "Mateo"),
     ],
-    sideColors: ["#e0457b", "#3a8dff"],            // optional: two #rrggbb colours (default: accent and coin)
+    sideColors: ["#e0457b", "#3a8dff"],            // optional: one #rrggbb colour per side (default: accent, coin, teal, pink, then over again)
     reducedMotion: nil,                            // nil: follows Reduce Motion
     theme: .dark,
     labels: BattleBarLabels(finalText: "Bitti", wins: "{name} kazandı")
 )
 // Or draw a round you hold yourself: GiftBattleBar(view: room.battleView(), ...)
 ```
+
+The gift notice of a battle says who got the gift: `sent Rose to Mia`, with a 2 px border in the side's colour (accent for the first side, coin colour for the second). Pass the same pair to the room as to the bar, and the names from `resolveName`: `GiftRoomModel(..., resolveName: ..., sideColors: ["#e0457b", "#3a8dff"])`. Outside battles nothing changes. The user's own gift says who got it too when the tray knows the room: `GiftTrayModel(..., receiverOf: room.receiverFor)` (or `tray.controller.receiverOf = ...` once both exist). An app that plays its own events can set `GiftEffectEvent(receiver: GiftEffectReceiver(name:side:color:))`.
 
 The pure model (`battleBarModel`, `formatBattleScore`, `formatBattleClock`, `battleSideColors`) is in the core; the numbers are the shared fixture `battle-bar.json` (`BattleBarConformanceTests`). Reduced motion: no sliding, counting or pulse. The view uses only iOS 15 APIs: `TimelineView`, `AsyncImage`, `Animation.timingCurve`, `Animatable`, `onChange(of:perform:)`, `Task.sleep(nanoseconds:)`, `accessibilityReduceMotion`.
 

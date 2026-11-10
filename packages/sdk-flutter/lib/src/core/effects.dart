@@ -49,6 +49,12 @@ class ScheduledEffect {
   final int count;
 }
 
+/// What tells two receivers apart for the combo and the notice key: the side
+/// and the name (two hosts with one display name still sit on different
+/// sides). Null without a receiver.
+String? _receiverKey(GiftEffectReceiver? r) =>
+    r == null ? null : '${r.side ?? ''}:${r.name}';
+
 /// What the notice shows.
 class NoticeData {
   /// Creates notice data.
@@ -59,6 +65,7 @@ class NoticeData {
     required this.image,
     required this.count,
     required this.big,
+    this.receiver,
   });
 
   /// Changes when a different gift or sender starts a new notice.
@@ -79,6 +86,9 @@ class NoticeData {
   /// Large-gift (golden) notice.
   final bool big;
 
+  /// Only in a battle (SPEC 7.4): who got the gift and the side's colour.
+  final GiftEffectReceiver? receiver;
+
   /// Wire-style JSON, for comparison in tests.
   Map<String, Object?> toJson() => <String, Object?>{
         'id': id,
@@ -87,6 +97,7 @@ class NoticeData {
         'image': image,
         'count': count,
         'big': big,
+        if (receiver != null) 'receiver': receiver!.toJson(),
       };
 }
 
@@ -240,7 +251,14 @@ class EffectScheduler {
     final sender = event.sender ?? defaultSenderName;
     final quantity = event.quantity ?? 1;
     final id = _nextId++;
-    final run = _combo.hit(sender, event.gift.id, _now());
+    // A combo counts per receiver too: gifts to two hosts of a battle are two
+    // runs.
+    final rkey = _receiverKey(event.receiver);
+    final run = _combo.hit(
+      sender,
+      rkey == null ? event.gift.id : '${event.gift.id}\u0000$rkey',
+      _now(),
+    );
     final count = quantity > 1 ? quantity : run;
     final item = ScheduledEffect(
       id: id,
@@ -334,7 +352,13 @@ class EffectScheduler {
   void _showNotice(ScheduledEffect item) {
     final event = item.event;
     final sender = event.sender ?? defaultSenderName;
-    final key = '$sender|${event.gift.id}';
+    final receiver = event.receiver;
+    // The receiver is part of the key: a combo to one host and one to the
+    // other are two notices.
+    final rkey = _receiverKey(receiver);
+    final key = rkey == null
+        ? '$sender|${event.gift.id}'
+        : '$sender|${event.gift.id}|$rkey';
     _noticeOwner = item.id;
     // Every pair keeps its own id while it is remembered, so a combo returns to
     // its own line even when other people sent gifts in between.
@@ -351,6 +375,13 @@ class EffectScheduler {
       image: event.gift.icon ?? event.gift.image,
       count: item.count,
       big: item.recipe.noticeBig,
+      receiver: receiver == null
+          ? null
+          : GiftEffectReceiver(
+              name: receiver.name,
+              side: receiver.side,
+              color: receiver.color,
+            ),
     );
     _noticeData = data;
     _noticeVisible = true;

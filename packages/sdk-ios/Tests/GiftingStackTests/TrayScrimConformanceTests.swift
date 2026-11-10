@@ -33,6 +33,21 @@ final class TrayScrimConformanceTests: XCTestCase {
         }
     }
 
+    func testTakesTouches() throws {
+        let f = try Fixtures.conformance("tray-scrim.json")
+        let cases = try Fixtures.list(f["takesTouches"], "tray-scrim.json takesTouches")
+        XCTAssertEqual(cases.count, 8)
+        for (i, c) in cases.enumerated() {
+            let at = "[tray-scrim.json takesTouches] #(i + 1)"
+            let got = scrimTakesTouches(
+                scrim: try XCTUnwrap(c["scrim"]?.boolValue, at),
+                open: try XCTUnwrap(c["open"]?.boolValue, at),
+                placed: try XCTUnwrap(c["placed"]?.boolValue, at)
+            )
+            XCTAssertEqual(got, c["expect"]?.boolValue, at)
+        }
+    }
+
     func testFade() throws {
         let f = try Fixtures.conformance("tray-scrim.json")
         for c in try Fixtures.list(f["fade"], "tray-scrim.json fade") {

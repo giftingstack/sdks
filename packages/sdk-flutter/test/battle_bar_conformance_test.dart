@@ -101,7 +101,7 @@ void main() {
           'spoken': m.spoken,
         };
         for (final e in want.entries) {
-          if (e.key == 'sides') continue;
+          if (e.key == 'sides' || e.key == 'pcts') continue;
           if (e.key == 'pct') {
             expect(m.pct, closeTo((e.value! as num).toDouble(), 1e-6),
                 reason: 'pct');
@@ -109,9 +109,20 @@ void main() {
             expect(got[e.key], e.value, reason: e.key);
           }
         }
+        final pcts = want['pcts'];
+        if (pcts != null) {
+          final list = asList(pcts);
+          expect(m.pcts, hasLength(list.length));
+          for (var i = 0; i < list.length; i++) {
+            expect(m.pcts[i], closeTo((list[i]! as num).toDouble(), 1e-6),
+                reason: 'pcts[$i]');
+          }
+          expect(m.pcts.reduce((a, b) => a + b), closeTo(100, 1e-6));
+        }
         final sides = want['sides'];
         if (sides != null) {
           final list = asList(sides);
+          expect(m.sides, hasLength(list.length));
           for (var i = 0; i < list.length; i++) {
             final s = m.sides[i];
             final side = <String, Object?>{
@@ -142,6 +153,25 @@ void main() {
             : <int>[for (final v in asList(c['before'])) v! as int];
         final after = <int>[for (final v in asList(c['after'])) v! as int];
         expect(battleGains(before, after), asList(c['expect']));
+      });
+    }
+  });
+
+  group('palette', () {
+    for (final raw in asList(f['palette'])) {
+      final c = asMap(raw);
+      test(c['name']! as String, () {
+        final over = c['override'] == null
+            ? null
+            : <String>[for (final v in asList(c['override'])) v! as String];
+        final got = battleSidePalette(
+            _theme(c['theme']! as String), c['count']! as int, over);
+        final want = asList(c['expect']);
+        expect(got, hasLength(want.length));
+        for (var i = 0; i < want.length; i++) {
+          expect(got[i].color, asMap(want[i])['color'], reason: 'color $i');
+          expect(got[i].text, asMap(want[i])['text'], reason: 'text $i');
+        }
       });
     }
   });

@@ -196,7 +196,7 @@ final class RoomsConformanceTests: XCTestCase {
         let catalog = try XCTUnwrap(f["catalog"], "rooms-mapping.json catalog").decode([Gift].self)
         for c in try Fixtures.list(f["cases"], "rooms-mapping.json cases") {
             let at = "[rooms-mapping.json] \(c["name"]?.stringValue ?? "?")"
-            assertKnownKeys(c, ["name", "event", "catalog", "names", "replayed", "expect"], at)
+            assertKnownKeys(c, ["name", "event", "catalog", "names", "replayed", "battle", "sideColors", "expect"], at)
             let event = try XCTUnwrap(c["event"], at)
             let text = try roomJSONText(event)
             let expected = try XCTUnwrap(c["expect"], at)
@@ -212,7 +212,22 @@ final class RoomsConformanceTests: XCTestCase {
                 msg,
                 catalog: c["catalog"]?.boolValue == true ? catalog : nil,
                 resolveName: resolve,
-                replayed: c["replayed"]?.boolValue ?? false
+                replayed: c["replayed"]?.boolValue ?? false,
+                battle: c["battle"].map { b in
+                    RoomBattle(
+                        round: b["round"]?.stringValue ?? "",
+                        started: b["started"]?.intValue ?? 0,
+                        ends: b["ends"]?.intValue ?? 0,
+                        scores: (b["scores"]?.arrayValue ?? []).map {
+                            RoomScoreEntry(
+                                id: $0["id"]?.stringValue ?? "",
+                                units: $0["units"]?.intValue ?? 0,
+                                gifts: $0["gifts"]?.intValue ?? 0
+                            )
+                        }
+                    )
+                },
+                sideColors: c["sideColors"]?.arrayValue?.compactMap { $0.stringValue }
             )
             assertJSONEqual(roomEventJSON(out), expected, at)
         }
@@ -623,6 +638,16 @@ func roomEventJSON(_ e: RoomGiftEvent) -> JSONValue {
     ]
     if let sender = e.sender {
         out["sender"] = .string(sender)
+    }
+    if let r = e.receiver {
+        var receiver: [String: JSONValue] = [
+            "name": .string(r.name),
+            "color": optionalString(r.color),
+        ]
+        if let side = r.side {
+            receiver["side"] = .number(Double(side))
+        }
+        out["receiver"] = .object(receiver)
     }
     return .object(out)
 }

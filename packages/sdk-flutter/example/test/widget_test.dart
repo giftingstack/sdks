@@ -256,7 +256,12 @@ void main() {
       await tester.tap(
           find.byKey(ValueKey<String>('gift-${fallbackGifts[2].id}')).first);
       await tester.pumpAndSettle(const Duration(seconds: 1));
-      // The other side's button reopens the tray for that side.
+      // The tray is at peek and the scrim takes the tap there (SPEC 9.4): the
+      // first tap on the other side's button closes the tray, the next one
+      // reopens it for that side.
+      await tester.tap(find.byKey(const ValueKey<String>('live-gift-noor')));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(find.byType(GiftTray), findsNothing);
       await tester.tap(find.byKey(const ValueKey<String>('live-gift-noor')));
       await tester.pumpAndSettle(const Duration(seconds: 1));
       expect(find.byType(GiftTray), findsOneWidget);
@@ -264,6 +269,43 @@ void main() {
       await tester.tap(find.text('Top').last);
       await tester.pumpAndSettle(const Duration(seconds: 1));
       expect(find.byType(GiftTray), findsNothing);
+    });
+
+    testWidgets('live room: Battle 4+ has four sides, a Gift button for each',
+        (tester) async {
+      await openDemo(tester);
+      await tab(tester, 'Live');
+      expect(
+          find.byKey(const ValueKey<String>('live-gift-lina')), findsNothing);
+      await tester.tap(find.text('Battle 4+'));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      for (final id in [
+        'live-gift',
+        'live-gift-noor',
+        'live-gift-lina',
+        'live-gift-owen'
+      ]) {
+        expect(find.byKey(ValueKey<String>(id)), findsOneWidget, reason: id);
+      }
+      // On a small phone (320 wide) the four buttons are two columns and stay on screen.
+      await tester.binding.setSurfaceSize(const Size(320, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      final mira =
+          tester.getRect(find.byKey(const ValueKey<String>('live-gift')));
+      final noor =
+          tester.getRect(find.byKey(const ValueKey<String>('live-gift-noor')));
+      final lina =
+          tester.getRect(find.byKey(const ValueKey<String>('live-gift-lina')));
+      expect(mira.top, noor.top, reason: 'two columns');
+      expect(lina.top, greaterThan(mira.top), reason: 'the second row');
+      expect(noor.right, lessThanOrEqualTo(320));
+      expect(tester.takeException(), isNull);
+      // Back to the two-sided battle.
+      await tester.tap(find.text('Battle').first);
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(
+          find.byKey(const ValueKey<String>('live-gift-owen')), findsNothing);
     });
 
     testWidgets('no debug surface on screen: tabs, posts and a Gift button',

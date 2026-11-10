@@ -987,10 +987,6 @@ export class GiftBattleBarElement extends Base {
   }
 
   private settings(): Partial<GiftBattleBarOptions> {
-    const colors = this.getAttribute("side-colors")
-      ?.split(",")
-      .map((c) => c.trim())
-      .filter(Boolean);
     return {
       ...this.extra,
       ...defined({
@@ -1000,11 +996,20 @@ export class GiftBattleBarElement extends Base {
         labels: this.labelsValue,
         reducedMotion: flag(this, "reduced-motion"),
         tickMs: number(this, "tick-ms"),
-        sideColors:
-          colors?.length === 2 ? ([colors[0]!, colors[1]!] as [string, string]) : undefined,
+        sideColors: sideColorsOf(this),
       }),
     };
   }
+}
+
+/** `side-colors="#ff3366,#00aa88,..."` (the bar's and the room's attribute): one colour per side, else none. */
+function sideColorsOf(el: HTMLElement): string[] | undefined {
+  const c = el
+    .getAttribute("side-colors")
+    ?.split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return c?.length ? c : undefined;
 }
 
 /**
@@ -1015,7 +1020,7 @@ export class GiftBattleBarElement extends Base {
  * Attributes: `room` (required), `effects` (a CSS selector of a `<gift-effect-layer>`; default the
  * first one in the document), `min-tier` (`small` | `medium` | `large`), `skip-own` (default true;
  * `skip-own="false"` plays your own gifts again), `max-replay-age-ms`, `pause-when-hidden`, `url`,
- * `allow-insecure` (a plain `ws://` url to any host). Changing `room`, `url` or `allow-insecure`
+ * `allow-insecure` (a plain `ws://` url to any host), `side-colors` (`"#ff3366,#00aa88"`: the border colours of the two battle sides in the gift notice; give the bar the same pair). Changing `room`, `url` or `allow-insecure`
  * joins again; every other attribute and the `getToken`, `client`, `resolveName` and `thresholds`
  * properties change in place, on the open socket.
  * Properties: `getToken` (required, the function you give `createGiftingClient`), `client` (to
@@ -1034,6 +1039,7 @@ export class GiftRoomElement extends Base {
     "pause-when-hidden",
     "url",
     "allow-insecure",
+    "side-colors",
   ];
 
   private instance: RoomHandle | null = null;
@@ -1110,6 +1116,7 @@ export class GiftRoomElement extends Base {
       client: this.clientValue,
       resolveName: this.resolveNameValue,
       thresholds: this.thresholdsValue,
+      sideColors: sideColorsOf(this),
     };
   }
 

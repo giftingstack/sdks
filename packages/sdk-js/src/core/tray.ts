@@ -4,7 +4,7 @@
  * the effect for each gift. React Native's `useGiftTray` is a thin wrapper around it.
  */
 import { GiftingError, type GiftingClient } from "./client";
-import type { Gift, GiftEffectEvent, GiftTransaction } from "./types";
+import type { Gift, GiftEffectEvent, GiftEffectReceiver, GiftTransaction } from "./types";
 
 /** The part of an effect layer the tray needs. */
 export interface EffectPlayer {
@@ -24,6 +24,11 @@ export interface GiftTrayControllerOptions {
   reference?: string;
   /** Room on screen (SPEC 17.1): every send names it, so the room's viewers see the gift. */
   roomId?: string;
+  /**
+   * In a battle, the side a receiver is on (`room.receiverFor`, SPEC 18.4): the user's own gift
+   * then says who got it, like the room's gifts of the others. Undefined outside a battle.
+   */
+  receiverOf?: (receiver: string) => GiftEffectReceiver | undefined;
   onSent?: (transaction: GiftTransaction) => void;
   onError?: (error: GiftingError) => void;
   /** Starts downloading a picture. Called for every icon and big picture once the catalog loads. */
@@ -141,8 +146,14 @@ export class GiftTrayController {
     this.pending++;
     // Take the coins at once so the number moves with every tap.
     this.set({ balance: this.state.balance - gift.price });
-    const show = (sender: string, quantity: number) =>
-      effects?.()?.play({
+    const show = (sender: string, quantity: number) => {
+      let battleReceiver: GiftEffectReceiver | undefined;
+      try {
+        battleReceiver = this.options.receiverOf?.(receiver);
+      } catch {
+        battleReceiver = undefined; // app code: never let it break a send
+      }
+      return effects?.()?.play({
         gift: {
           id: gift.id,
           name: gift.name,
@@ -152,7 +163,9 @@ export class GiftTrayController {
         },
         sender,
         quantity,
+        ...(battleReceiver ? { receiver: battleReceiver } : {}),
       });
+    };
     const early = (this.options.playOn ?? "tap") === "tap";
     const shownId = early ? show(user ?? "You", 1) : undefined;
     try {

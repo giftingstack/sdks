@@ -159,6 +159,15 @@ final class PixelModel: ObservableObject {
     /// real app: `GiftRoomModel(room:getToken:client:effects:)` with no `socket`.
     let fakeRoom: DemoFakeRoom
     let room: GiftRoomModel
+    /// "Battle 4+": the same, with four hosts in every round (a free-for-all of four sides).
+    let fakeRoom4: DemoFakeRoom
+    let room4: GiftRoomModel
+    @Published var battle4 = false
+
+    /// The room, its id and its pretend server of the mode the Live tab is in.
+    var liveRoom: GiftRoomModel { battle4 ? room4 : room }
+    var liveRoomId: String { battle4 ? PixelData.liveRoom4 : PixelData.liveRoom }
+    private var liveFake: DemoFakeRoom { battle4 ? fakeRoom4 : fakeRoom }
 
     @Published var gifts: [Gift] = demoGifts
     /// The Live tab's feed of room gifts, newest first (30 at most).
@@ -218,12 +227,23 @@ final class PixelModel: ObservableObject {
         self.senders = GiftLeaderboardModel(client: client, board: .senders, resolveUsers: PixelData.lookUpNames)
         self.receivers = GiftLeaderboardModel(client: client, board: .receivers, resolveUsers: PixelData.lookUpNames)
         self.inbox = GiftInboxModel(client: client, resolveUsers: PixelData.lookUpNames, pageSize: 8)
+        let liveSenders = PixelData.senders.filter { !PixelData.liveHosts.contains($0) }
         let fakeRoom = DemoFakeRoom(
             gifts: demoGifts,
-            senders: PixelData.senders.filter { $0 != PixelData.liveHost && $0 != PixelData.liveRival },
-            receivers: [PixelData.liveHost, PixelData.liveRival]
+            senders: liveSenders,
+            receivers: Array(PixelData.liveHosts.prefix(2))
         )
         self.fakeRoom = fakeRoom
+        let fakeRoom4 = DemoFakeRoom(gifts: demoGifts, senders: liveSenders, receivers: PixelData.liveHosts)
+        self.fakeRoom4 = fakeRoom4
+        self.room4 = GiftRoomModel(
+            room: PixelData.liveRoom4,
+            getToken: { _ in demoRoomToken(PixelData.me) },
+            client: client,
+            effects: effects,
+            resolveName: { PixelData.displayName($0) },
+            socket: fakeRoom4.socketFactory
+        )
         self.room = GiftRoomModel(
             room: PixelData.liveRoom,
             getToken: { _ in demoRoomToken(PixelData.me) },
@@ -236,7 +256,14 @@ final class PixelModel: ObservableObject {
         tray.controller.onSent = { [weak self] tx in
             self?.didSend(tx)
         }
+        // In a battle your own gift says who got it too (the room knows the sides).
+        tray.controller.receiverOf = { [weak self] user in
+            self?.liveRoom.receiverFor(user)
+        }
         room.onEvent = { [weak self] event in
+            self?.roomGift(event)
+        }
+        room4.onEvent = { [weak self] event in
             self?.roomGift(event)
         }
         inbox.onLoaded = { [weak self] items in
@@ -276,12 +303,25 @@ final class PixelModel: ObservableObject {
 
     /// The Live tab is on screen: join the room (or reconnect, with resume).
     func joinLive() {
-        room.join()
+        liveRoom.join()
     }
 
     /// The Live tab went off: close the socket, keep the resume point.
     func leaveLive() {
         room.pause()
+        room4.pause()
+    }
+
+    /// The two modes of the Live tab: "Battle" (two hosts) and "Battle 4+" (four hosts in every round). The
+    /// other room is left; the tray (if open) closes, since it sends into the room it was opened for.
+    func setBattle4(_ on: Bool) {
+        if battle4 == on {
+            return
+        }
+        liveRoom.pause()
+        closeTray()
+        battle4 = on
+        liveRoom.join()
     }
 
     private func roomGift(_ event: RoomGiftEvent) {
@@ -327,6 +367,7 @@ final class PixelModel: ObservableObject {
         await client.setGifts(list)
         gifts = list
         fakeRoom.gifts = list
+        fakeRoom4.gifts = list
         tray.refresh()
     }
 
@@ -411,8 +452,8 @@ final class PixelModel: ObservableObject {
         balance = tx.senderBalanceAfter
         bumpWall(tx.receiver, tx.reference)
         // What the API does after a send with `room_id` (the demo has no server): the room gets it.
-        if tray.controller.roomId == PixelData.liveRoom, let gift = gifts.first(where: { $0.id == tx.gift.id }) {
-            fakeRoom.publish(sender: PixelData.me, gift: gift, quantity: tx.quantity, receiver: tx.receiver)
+        if tray.controller.roomId == liveRoomId, let gift = gifts.first(where: { $0.id == tx.gift.id }) {
+            liveFake.publish(sender: PixelData.me, gift: gift, quantity: tx.quantity, receiver: tx.receiver)
         }
         // The tray stays open after a send, like a live app: tap again for a combo, the Gift
         // button again to close it.

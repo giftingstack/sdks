@@ -1,5 +1,5 @@
 {
-  "description": "The battle bar's model (SPEC 18.7): `score`, `clock`, `model` (battleView -> battleBarModel), `gains` and `colors`. Run by every SDK. `pct` is compared within 1e-6. Keys of `expect` that are missing are not checked.",
+  "description": "The battle bar's model (SPEC 18.7): `score`, `clock`, `model` (battleView -> battleBarModel), `gains`, `colors` and `palette`. Run by every SDK. `pct` is compared within 1e-6. Keys of `expect` that are missing are not checked.",
   "score": [
     { "units": 0, "expect": "0" },
     { "units": 9999, "expect": "9,999" },
@@ -354,7 +354,7 @@
       "expect": { "clock": "Final", "banner": "Berabere" }
     },
     {
-      "name": "a third side is ignored: the bar is a versus",
+      "name": "a third side is a cell too: the shares are 25, 25 and 50",
       "battle": {
         "round": "r1",
         "started": 1000,
@@ -366,7 +366,7 @@
         ]
       },
       "serverNow": 2000,
-      "expect": { "pct": 25, "spoken": "ava 100, mateo 100" }
+      "expect": { "pct": 25, "pcts": [25, 25, 50], "spoken": "ava 100, mateo 100, noah 200" }
     },
     {
       "name": "one side only: no bar",
@@ -378,6 +378,260 @@
       },
       "serverNow": 2000,
       "expect": null
+    },
+    {
+      "name": "three sides, open: every side is a cell, proportional segments, spoken lists all",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          {
+            "id": "ava",
+            "units": 300,
+            "gifts": 3
+          },
+          {
+            "id": "mateo",
+            "units": 100,
+            "gifts": 2
+          },
+          {
+            "id": "noor",
+            "units": 100,
+            "gifts": 1
+          }
+        ]
+      },
+      "serverNow": 31000,
+      "names": {
+        "ava": "Ava",
+        "mateo": "Mateo",
+        "noor": "Noor"
+      },
+      "expect": {
+        "pct": 60,
+        "pcts": [60, 20, 20],
+        "clock": "0:30",
+        "urgent": false,
+        "final": false,
+        "winner": null,
+        "banner": "",
+        "spoken": "Ava 300, Mateo 100, Noor 100",
+        "sides": [
+          {
+            "id": "ava",
+            "name": "Ava",
+            "units": 300,
+            "score": "300",
+            "spoken": "Ava 300",
+            "leads": true,
+            "won": false,
+            "lost": false
+          },
+          {
+            "id": "mateo",
+            "name": "Mateo",
+            "units": 100,
+            "score": "100",
+            "spoken": "Mateo 100",
+            "leads": false,
+            "won": false,
+            "lost": false
+          },
+          {
+            "id": "noor",
+            "name": "Noor",
+            "units": 100,
+            "score": "100",
+            "spoken": "Noor 100",
+            "leads": false,
+            "won": false,
+            "lost": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "four sides, tiny shares are held at the minimum and the rest share what is left",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          {
+            "id": "a",
+            "units": 1000,
+            "gifts": 9
+          },
+          {
+            "id": "b",
+            "units": 10,
+            "gifts": 1
+          },
+          {
+            "id": "c",
+            "units": 5,
+            "gifts": 1
+          },
+          {
+            "id": "d",
+            "units": 0,
+            "gifts": 0
+          }
+        ]
+      },
+      "serverNow": 31000,
+      "names": {},
+      "expect": {
+        "pct": 82,
+        "pcts": [82, 6, 6, 6],
+        "spoken": "a 1,000, b 10, c 5, d 0"
+      }
+    },
+    {
+      "name": "three sides, nobody scored: equal thirds, no leader",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          {
+            "id": "a",
+            "units": 0,
+            "gifts": 0
+          },
+          {
+            "id": "b",
+            "units": 0,
+            "gifts": 0
+          },
+          {
+            "id": "c",
+            "units": 0,
+            "gifts": 0
+          }
+        ]
+      },
+      "serverNow": 1000,
+      "names": {},
+      "expect": {
+        "pct": 33.3333333333,
+        "pcts": [33.3333333333, 33.3333333333, 33.3333333333],
+        "winner": null,
+        "spoken": "a 0, b 0, c 0"
+      }
+    },
+    {
+      "name": "three sides, tied at the top: no leader while open, a draw once ended",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          {
+            "id": "a",
+            "units": 200,
+            "gifts": 2
+          },
+          {
+            "id": "b",
+            "units": 200,
+            "gifts": 2
+          },
+          {
+            "id": "c",
+            "units": 100,
+            "gifts": 1
+          }
+        ]
+      },
+      "serverNow": 61000,
+      "names": {},
+      "expect": {
+        "clock": "Final",
+        "final": true,
+        "winner": null,
+        "banner": "Draw: nobody wins this round",
+        "sides": [
+          {
+            "id": "a",
+            "leads": false,
+            "won": false,
+            "lost": false
+          },
+          {
+            "id": "b",
+            "leads": false,
+            "won": false,
+            "lost": false
+          },
+          {
+            "id": "c",
+            "leads": false,
+            "won": false,
+            "lost": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "three sides, ended: the leader wins, the other two lost",
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 61000,
+        "scores": [
+          {
+            "id": "ava",
+            "units": 200,
+            "gifts": 2
+          },
+          {
+            "id": "mateo",
+            "units": 300,
+            "gifts": 3
+          },
+          {
+            "id": "noor",
+            "units": 100,
+            "gifts": 1
+          }
+        ]
+      },
+      "serverNow": 61000,
+      "names": {
+        "ava": "Ava",
+        "mateo": "Mateo",
+        "noor": "Noor"
+      },
+      "expect": {
+        "clock": "Final",
+        "final": true,
+        "winner": "mateo",
+        "banner": "Mateo wins the round",
+        "spoken": "Ava 200, Mateo 300, Noor 100",
+        "sides": [
+          {
+            "id": "ava",
+            "leads": false,
+            "won": false,
+            "lost": true
+          },
+          {
+            "id": "mateo",
+            "leads": true,
+            "won": true,
+            "lost": false
+          },
+          {
+            "id": "noor",
+            "leads": false,
+            "won": false,
+            "lost": true
+          }
+        ]
+      }
     }
   ],
   "gains": [
@@ -386,6 +640,90 @@
     { "before": [3, 4], "after": [3, 4], "expect": [false, false] },
     { "before": [3, 4], "after": [5, 9], "expect": [true, true] },
     { "before": [3, 4], "after": [2, 4], "expect": [false, false] }
+  ],
+  "palette": [
+    {
+      "name": "two sides: the colours pair",
+      "theme": "dark",
+      "count": 2,
+      "expect": [
+        {
+          "color": "#6d5cf0",
+          "text": "#ffffff"
+        },
+        {
+          "color": "#ffd27a",
+          "text": "#2a1600"
+        }
+      ]
+    },
+    {
+      "name": "five sides: accent, coin, teal, pink, then the palette starts over",
+      "theme": "dark",
+      "count": 5,
+      "expect": [
+        {
+          "color": "#6d5cf0",
+          "text": "#ffffff"
+        },
+        {
+          "color": "#ffd27a",
+          "text": "#2a1600"
+        },
+        {
+          "color": "#2ec4b6",
+          "text": "#000000"
+        },
+        {
+          "color": "#ff5d8f",
+          "text": "#000000"
+        },
+        {
+          "color": "#6d5cf0",
+          "text": "#ffffff"
+        }
+      ]
+    },
+    {
+      "name": "an override for the first side only: the others keep the palette",
+      "theme": "dark",
+      "count": 4,
+      "override": ["#112233"],
+      "expect": [
+        {
+          "color": "#112233",
+          "text": "#ffffff"
+        },
+        {
+          "color": "#ffd27a",
+          "text": "#2a1600"
+        },
+        {
+          "color": "#2ec4b6",
+          "text": "#000000"
+        },
+        {
+          "color": "#ff5d8f",
+          "text": "#000000"
+        }
+      ]
+    },
+    {
+      "name": "an override longer than the sides is cut; text by contrast",
+      "theme": "light",
+      "count": 2,
+      "override": ["#ffd27a", "#000000", "#ffffff"],
+      "expect": [
+        {
+          "color": "#ffd27a",
+          "text": "#000000"
+        },
+        {
+          "color": "#000000",
+          "text": "#ffffff"
+        }
+      ]
+    }
   ],
   "colors": [
     {

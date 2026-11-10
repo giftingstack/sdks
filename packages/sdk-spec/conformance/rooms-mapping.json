@@ -44,11 +44,18 @@
           "icon_url": "https://assets.test/rose/256.webp"
         },
         "quantity": 3,
-        "sender": { "id": "user_123", "name": "Ayse" },
-        "receiver": { "id": "user_456" }
+        "sender": {
+          "id": "user_123",
+          "name": "Ayse"
+        },
+        "receiver": {
+          "id": "user_456"
+        }
       },
       "catalog": true,
-      "names": { "user_123": "Resolved" },
+      "names": {
+        "user_123": "Resolved"
+      },
       "expect": {
         "gift": {
           "id": "rose",
@@ -82,10 +89,16 @@
           "icon_url": "https://assets.test/rose/256.webp"
         },
         "quantity": 1,
-        "sender": { "id": "user_123" },
-        "receiver": { "id": "user_456" }
+        "sender": {
+          "id": "user_123"
+        },
+        "receiver": {
+          "id": "user_456"
+        }
       },
-      "names": { "user_123": "Ayse R." },
+      "names": {
+        "user_123": "Ayse R."
+      },
       "replayed": true,
       "expect": {
         "gift": {
@@ -113,9 +126,16 @@
         "id": 7,
         "at": 8,
         "tx": "gtx_c",
-        "gift": { "id": "unknown", "name": "New gift", "price": 20000, "icon_url": null },
+        "gift": {
+          "id": "unknown",
+          "name": "New gift",
+          "price": 20000,
+          "icon_url": null
+        },
         "quantity": 2,
-        "sender": { "id": "user_9" },
+        "sender": {
+          "id": "user_9"
+        },
         "receiver": null
       },
       "catalog": true,
@@ -145,10 +165,19 @@
         "id": 7,
         "at": 8,
         "tx": "gtx_d",
-        "gift": { "id": "cake", "name": "Cake", "price": 100, "icon_url": null },
+        "gift": {
+          "id": "cake",
+          "name": "Cake",
+          "price": 100,
+          "icon_url": null
+        },
         "quantity": 1,
-        "sender": { "id": "user_9" },
-        "receiver": { "id": "host" }
+        "sender": {
+          "id": "user_9"
+        },
+        "receiver": {
+          "id": "host"
+        }
       },
       "catalog": true,
       "expect": {
@@ -183,8 +212,12 @@
           "icon_url": "https://assets.test/kiss/256.webp"
         },
         "quantity": 1,
-        "sender": { "id": "user_9" },
-        "receiver": { "id": "host" }
+        "sender": {
+          "id": "user_9"
+        },
+        "receiver": {
+          "id": "host"
+        }
       },
       "catalog": true,
       "expect": {
@@ -203,6 +236,786 @@
         "senderName": null,
         "receiverId": "host",
         "replayed": false
+      }
+    },
+    {
+      "name": "battle: the receiver is side 1; name from resolveName, colour from sideColors",
+      "event": {
+        "t": "gift",
+        "id": 101,
+        "at": 101,
+        "tx": "gtx_r101",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "host_b"
+        }
+      },
+      "battle": {
+        "round": "r1",
+        "started": 1,
+        "ends": 2000000000000,
+        "scores": [
+          {
+            "id": "host_a",
+            "units": 10,
+            "gifts": 2
+          },
+          {
+            "id": "host_b",
+            "units": 5,
+            "gifts": 1
+          }
+        ]
+      },
+      "names": {
+        "host_b": "Theo"
+      },
+      "sideColors": ["#ff3366", "#00aa88"],
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 101,
+        "tx": "gtx_r101",
+        "at": 101,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "host_b",
+        "replayed": false,
+        "receiver": {
+          "name": "Theo",
+          "side": 1,
+          "color": "#00aa88"
+        }
+      }
+    },
+    {
+      "name": "battle: side 0 without names or colours: the id is the name, the colour is null (the theme default)",
+      "event": {
+        "t": "gift",
+        "id": 102,
+        "at": 102,
+        "tx": "gtx_r102",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "host_a"
+        }
+      },
+      "battle": {
+        "round": "r1",
+        "started": 1,
+        "ends": 2000000000000,
+        "scores": [
+          {
+            "id": "host_a",
+            "units": 10,
+            "gifts": 2
+          },
+          {
+            "id": "host_b",
+            "units": 5,
+            "gifts": 1
+          }
+        ]
+      },
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 102,
+        "tx": "gtx_r102",
+        "at": 102,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "host_a",
+        "replayed": false,
+        "receiver": {
+          "name": "host_a",
+          "side": 0,
+          "color": null
+        }
+      }
+    },
+    {
+      "name": "battle: resolveName gives an empty name: the id",
+      "event": {
+        "t": "gift",
+        "id": 103,
+        "at": 103,
+        "tx": "gtx_r103",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "host_a"
+        }
+      },
+      "battle": {
+        "round": "r1",
+        "started": 1,
+        "ends": 2000000000000,
+        "scores": [
+          {
+            "id": "host_a",
+            "units": 10,
+            "gifts": 2
+          },
+          {
+            "id": "host_b",
+            "units": 5,
+            "gifts": 1
+          }
+        ]
+      },
+      "names": {
+        "host_a": ""
+      },
+      "sideColors": ["#ff3366", "#00aa88"],
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 103,
+        "tx": "gtx_r103",
+        "at": 103,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "host_a",
+        "replayed": false,
+        "receiver": {
+          "name": "host_a",
+          "side": 0,
+          "color": "#ff3366"
+        }
+      }
+    },
+    {
+      "name": "battle: the receiver is not a side: no receiver",
+      "event": {
+        "t": "gift",
+        "id": 104,
+        "at": 104,
+        "tx": "gtx_r104",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "viewer_9"
+        }
+      },
+      "battle": {
+        "round": "r1",
+        "started": 1,
+        "ends": 2000000000000,
+        "scores": [
+          {
+            "id": "host_a",
+            "units": 10,
+            "gifts": 2
+          },
+          {
+            "id": "host_b",
+            "units": 5,
+            "gifts": 1
+          }
+        ]
+      },
+      "names": {
+        "viewer_9": "Zed"
+      },
+      "sideColors": ["#ff3366", "#00aa88"],
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 104,
+        "tx": "gtx_r104",
+        "at": 104,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "viewer_9",
+        "replayed": false
+      }
+    },
+    {
+      "name": "battle with one side only: no receiver",
+      "event": {
+        "t": "gift",
+        "id": 105,
+        "at": 105,
+        "tx": "gtx_r105",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "host_a"
+        }
+      },
+      "battle": {
+        "round": "r2",
+        "started": 1,
+        "ends": 2000000000000,
+        "scores": [
+          {
+            "id": "host_a",
+            "units": 1,
+            "gifts": 1
+          }
+        ]
+      },
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 105,
+        "tx": "gtx_r105",
+        "at": 105,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "host_a",
+        "replayed": false
+      }
+    },
+    {
+      "name": "battle with three sides: the third is a side too (side 2, default colour)",
+      "event": {
+        "t": "gift",
+        "id": 106,
+        "at": 106,
+        "tx": "gtx_r106",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "host_c"
+        }
+      },
+      "battle": {
+        "round": "r3",
+        "started": 1,
+        "ends": 2000000000000,
+        "scores": [
+          {
+            "id": "host_a",
+            "units": 3,
+            "gifts": 1
+          },
+          {
+            "id": "host_b",
+            "units": 2,
+            "gifts": 1
+          },
+          {
+            "id": "host_c",
+            "units": 1,
+            "gifts": 1
+          }
+        ]
+      },
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 106,
+        "tx": "gtx_r106",
+        "at": 106,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "host_c",
+        "replayed": false,
+        "receiver": {
+          "name": "host_c",
+          "side": 2,
+          "color": null
+        }
+      }
+    },
+    {
+      "name": "no battle: sideColors alone change nothing",
+      "event": {
+        "t": "gift",
+        "id": 107,
+        "at": 107,
+        "tx": "gtx_r107",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "host_a"
+        }
+      },
+      "sideColors": ["#ff3366", "#00aa88"],
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 107,
+        "tx": "gtx_r107",
+        "at": 107,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "host_a",
+        "replayed": false
+      }
+    },
+    {
+      "name": "battle: a gift sent before the round started (a replay): no receiver",
+      "event": {
+        "t": "gift",
+        "id": 500,
+        "at": 500,
+        "tx": "gtx_w500",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "host_a"
+        }
+      },
+      "battle": {
+        "round": "r1",
+        "started": 1000,
+        "ends": 2000000000000,
+        "scores": [
+          {
+            "id": "host_a",
+            "units": 10,
+            "gifts": 2
+          },
+          {
+            "id": "host_b",
+            "units": 5,
+            "gifts": 1
+          }
+        ]
+      },
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 500,
+        "tx": "gtx_w500",
+        "at": 500,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "host_a",
+        "replayed": false
+      }
+    },
+    {
+      "name": "battle: a gift at or after the round end: no receiver",
+      "event": {
+        "t": "gift",
+        "id": 3000,
+        "at": 3000,
+        "tx": "gtx_w3000",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "host_a"
+        }
+      },
+      "battle": {
+        "round": "r1",
+        "started": 1,
+        "ends": 3000,
+        "scores": [
+          {
+            "id": "host_a",
+            "units": 10,
+            "gifts": 2
+          },
+          {
+            "id": "host_b",
+            "units": 5,
+            "gifts": 1
+          }
+        ]
+      },
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 3000,
+        "tx": "gtx_w3000",
+        "at": 3000,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "host_a",
+        "replayed": false
+      }
+    },
+    {
+      "name": "battle with four sides and four colours: the fourth side takes the fourth colour",
+      "event": {
+        "t": "gift",
+        "id": 108,
+        "at": 108,
+        "tx": "gtx_r108",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "host_d"
+        }
+      },
+      "battle": {
+        "round": "r3",
+        "started": 1,
+        "ends": 2000000000000,
+        "scores": [
+          {
+            "id": "host_a",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "host_b",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "host_c",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "host_d",
+            "units": 1,
+            "gifts": 1
+          }
+        ]
+      },
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 108,
+        "tx": "gtx_r108",
+        "at": 108,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "host_d",
+        "replayed": false,
+        "receiver": {
+          "name": "Dana",
+          "side": 3,
+          "color": "#444444"
+        }
+      },
+      "sideColors": ["#111111", "#222222", "#333333", "#444444"],
+      "names": {
+        "host_d": "Dana"
+      }
+    },
+    {
+      "name": "sideColors shorter than the sides: the later sides have no colour of their own (the palette)",
+      "event": {
+        "t": "gift",
+        "id": 109,
+        "at": 109,
+        "tx": "gtx_r109",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "host_c"
+        }
+      },
+      "battle": {
+        "round": "r3",
+        "started": 1,
+        "ends": 2000000000000,
+        "scores": [
+          {
+            "id": "host_a",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "host_b",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "host_c",
+            "units": 1,
+            "gifts": 1
+          }
+        ]
+      },
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 109,
+        "tx": "gtx_r109",
+        "at": 109,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "host_c",
+        "replayed": false,
+        "receiver": {
+          "name": "host_c",
+          "side": 2,
+          "color": null
+        }
+      },
+      "sideColors": ["#111111", "#222222"]
+    },
+    {
+      "name": "battle with eight sides (the API limit): the eighth is side 7",
+      "event": {
+        "t": "gift",
+        "id": 110,
+        "at": 110,
+        "tx": "gtx_r110",
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "icon_url": "https://assets.test/rose/256.webp"
+        },
+        "quantity": 2,
+        "sender": {
+          "id": "user_1",
+          "name": "Ava"
+        },
+        "receiver": {
+          "id": "h8"
+        }
+      },
+      "battle": {
+        "round": "r3",
+        "started": 1,
+        "ends": 2000000000000,
+        "scores": [
+          {
+            "id": "h1",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "h2",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "h3",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "h4",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "h5",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "h6",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "h7",
+            "units": 1,
+            "gifts": 1
+          },
+          {
+            "id": "h8",
+            "units": 1,
+            "gifts": 1
+          }
+        ]
+      },
+      "expect": {
+        "gift": {
+          "id": "rose",
+          "name": "Rose",
+          "price": 50,
+          "image": "https://assets.test/rose/256.webp",
+          "icon": "https://assets.test/rose/256.webp"
+        },
+        "sender": "Ava",
+        "quantity": 2,
+        "id": 110,
+        "tx": "gtx_r110",
+        "at": 110,
+        "senderId": "user_1",
+        "senderName": "Ava",
+        "receiverId": "h8",
+        "replayed": false,
+        "receiver": {
+          "name": "Hana",
+          "side": 7,
+          "color": null
+        }
+      },
+      "names": {
+        "h8": "Hana"
       }
     }
   ]

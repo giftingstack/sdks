@@ -177,6 +177,13 @@ void _effects() {
                 ),
                 sender: p['sender'] as String?,
                 quantity: p['quantity'] as int?,
+                receiver: p['receiver'] == null
+                    ? null
+                    : GiftEffectReceiver(
+                        name: asMap(p['receiver'])['name']! as String,
+                        side: asMap(p['receiver'])['side'] as int?,
+                        color: asMap(p['receiver'])['color'] as String?,
+                      ),
               ),
             );
             if (step['returns'] != null) {

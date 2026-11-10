@@ -8,6 +8,8 @@ import 'package:giftingstack/giftingstack.dart';
 const Map<String, String> demoUserNames = {
   'mira': 'Mira',
   'noor': 'Noor',
+  'lina': 'Lina',
+  'owen': 'Owen Reed',
   'zoe': 'Zoe Lambert',
   'caleb': 'Caleb Stone',
   'elise': 'Elise',
@@ -16,7 +18,6 @@ const Map<String, String> demoUserNames = {
   'sofia': 'Sofia Rossi',
   'ben': 'Ben',
   'emma': 'Emma',
-  'owen': 'Owen Reed',
   'mila': 'Mila Hart',
   'theo': 'Theo Martin',
   'iris': 'Iris Novak',

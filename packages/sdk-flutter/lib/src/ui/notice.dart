@@ -1,7 +1,9 @@
 import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
 
+import '../core/battle_bar.dart' show battleExtraColors;
 import '../core/effects.dart';
+import '../core/types.dart' show GiftEffectReceiver;
 import 'effect_timeline.dart';
 import 'images.dart';
 import 'theme.dart';
@@ -121,112 +123,138 @@ class _GiftNoticeState extends State<GiftNotice> with TickerProviderStateMixin {
     final initial = data.senderName.isEmpty
         ? ''
         : String.fromCharCode(data.senderName.runes.first).toUpperCase();
-    final label = '${data.senderName} sent ${data.giftName}'
+    final receiver = data.receiver;
+    final what = receiver == null
+        ? 'sent ${data.giftName}'
+        : 'sent ${data.giftName} to ${receiver.name}';
+    final label = '${data.senderName} $what'
         '${data.count > 1 ? ' x${data.count}' : ''}';
 
-    final pill = Container(
-      padding: EdgeInsets.fromLTRB(5, big ? 7 : 5, 16, big ? 7 : 5),
-      decoration: BoxDecoration(
-        color: big ? theme.noticeBigBackground : theme.noticeBackground,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Container(
-            width: big ? 34 : 28,
-            height: big ? 34 : 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: theme.accent,
-              shape: BoxShape.circle,
+    final background = big ? theme.noticeBigBackground : theme.noticeBackground;
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Container(
+          width: big ? 34 : 28,
+          height: big ? 34 : 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: theme.accent,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: theme.accentText,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              decoration: TextDecoration.none,
             ),
-            child: Text(
-              initial,
-              style: TextStyle(
-                color: theme.accentText,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                decoration: TextDecoration.none,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                data.senderName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                  height: 15 / 12.5,
+                  decoration: TextDecoration.none,
+                ),
               ),
-            ),
+              Text(
+                what,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textColor.withValues(alpha: 0.92 * textColor.a),
+                  fontSize: 12.5,
+                  height: 15 / 12.5,
+                  fontWeight: FontWeight.w400,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
           ),
+        ),
+        if (image != null) ...<Widget>[
           const SizedBox(width: 8),
-          Flexible(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  data.senderName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12.5,
-                    height: 15 / 12.5,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-                Text(
-                  'sent ${data.giftName}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: textColor.withValues(alpha: 0.92 * textColor.a),
-                    fontSize: 12.5,
-                    height: 15 / 12.5,
-                    fontWeight: FontWeight.w400,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (image != null) ...<Widget>[
-            const SizedBox(width: 8),
-            Image(
-              // A fresh Image per picture: one reused Image would show the
-              // previous gift's bitmap until the next one has loaded.
-              key: ValueKey<String>(image),
-              image: widget.imageProvider(image),
+          Image(
+            // A fresh Image per picture: one reused Image would show the
+            // previous gift's bitmap until the next one has loaded.
+            key: ValueKey<String>(image),
+            image: widget.imageProvider(image),
+            width: big ? 46 : 36,
+            height: big ? 46 : 36,
+            fit: BoxFit.contain,
+            excludeFromSemantics: true,
+            errorBuilder: (_, __, ___) => SizedBox(
               width: big ? 46 : 36,
               height: big ? 46 : 36,
-              fit: BoxFit.contain,
-              excludeFromSemantics: true,
-              errorBuilder: (_, __, ___) => SizedBox(
-                width: big ? 46 : 36,
-                height: big ? 46 : 36,
-              ),
             ),
-          ],
-          if (data.count > 1) ...<Widget>[
-            const SizedBox(width: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 40),
-              child: AnimatedBuilder(
-                animation: _pop,
-                builder: (context, child) =>
-                    Transform.scale(scale: _pop.value, child: child),
-                child: Text(
-                  'x${data.count}',
-                  key: const ValueKey<String>('gift-combo'),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: big ? theme.noticeBigText : theme.comboText,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    fontStyle: FontStyle.italic,
-                    decoration: TextDecoration.none,
-                  ),
+          ),
+        ],
+        if (data.count > 1) ...<Widget>[
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 40),
+            child: AnimatedBuilder(
+              animation: _pop,
+              builder: (context, child) =>
+                  Transform.scale(scale: _pop.value, child: child),
+              child: Text(
+                'x${data.count}',
+                key: const ValueKey<String>('gift-combo'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: big ? theme.noticeBigText : theme.comboText,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  fontStyle: FontStyle.italic,
+                  decoration: TextDecoration.none,
                 ),
               ),
             ),
-          ],
+          ),
         ],
-      ),
+      ],
     );
+    // A battle gift (SPEC 7.4): a 2 px border in the side's colour, and inside
+    // it a 1 px line in the text colour, so the ring shows even when the side
+    // colour is the pill's own. Both sit inside the pill's edge: the padding
+    // gives their 3 px back, so the pill keeps its size.
+    final pill = receiver == null
+        ? Container(
+            padding: EdgeInsets.fromLTRB(5, big ? 7 : 5, 16, big ? 7 : 5),
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: row,
+          )
+        : Container(
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: _sideColor(receiver, theme), width: 2),
+            ),
+            child: Container(
+              padding: EdgeInsets.fromLTRB(2, big ? 4 : 2, 13, big ? 4 : 2),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: textColor),
+              ),
+              child: row,
+            ),
+          );
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: widget.maxWidth),
@@ -253,6 +281,25 @@ class _GiftNoticeState extends State<GiftNotice> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  /// The border colour: the colour the app gave (unreadable strings count as
+  /// none), else the theme's accent for side 0 and its coin colour for side 1.
+  static Color _sideColor(GiftEffectReceiver r, GiftingTheme theme) {
+    final own = r.color;
+    if (own != null) {
+      try {
+        return giftColor(own);
+      } on FormatException {
+        // falls through to the default
+      }
+    }
+    // The default palette (SPEC 7.4, 18.7): accent, coin, teal, pink, then
+    // over again.
+    final i = (r.side ?? 0) % (2 + battleExtraColors.length);
+    if (i == 0) return theme.accent;
+    if (i == 1) return theme.coin;
+    return giftColor(battleExtraColors[i - 2]);
   }
 
   /// Visible: ease-out back(1.2) on the way in; hidden: ease-in quad on the

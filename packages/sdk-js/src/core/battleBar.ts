@@ -81,9 +81,15 @@ export interface BattleBarSide {
 }
 
 export interface BattleBarModel {
-  sides: [BattleBarSide, BattleBarSide];
-  /** The first side's part of the bar, percent, kept inside the visible band. */
+  /** Every side of the round, in the server's order: two or more (up to the API's 8). */
+  sides: BattleBarSide[];
+  /** The first side's part of the bar, percent, kept inside the visible band (= `pcts[0]`). */
   pct: number;
+  /**
+   * Every side's part of the bar, percent, in order, summing to 100; none under
+   * `BATTLE_MIN_SHARE_PCT` (a side under it is held at it, the rest share what is left).
+   */
+  pcts: number[];
   clock: string;
   /** Under `BATTLE_URGENT_SECONDS` and still open. */
   urgent: boolean;
@@ -97,8 +103,38 @@ export interface BattleBarModel {
 }
 
 /**
+ * Every side's part of a bar, percent (SPEC 18.7): `share x 100`, but no side under
+ * `BATTLE_MIN_SHARE_PCT`: such a side is held at the minimum and the rest share what is left in
+ * proportion to their shares, repeated until every part is visible. Sums to 100. For two sides
+ * this is the clamp of the first part to 6..94.
+ */
+export function battleSegmentPcts(shares: readonly number[]): number[] {
+  const n = shares.length;
+  const pinned = new Array<boolean>(n).fill(false);
+  const out = new Array<number>(n).fill(0);
+  for (;;) {
+    const free = shares.map((_, i) => i).filter((i) => !pinned[i]);
+    const left = 100 - BATTLE_MIN_SHARE_PCT * (n - free.length);
+    const sum = free.reduce((s, i) => s + shares[i]!, 0);
+    let again = false;
+    for (const i of free) {
+      out[i] = sum > 0 ? (shares[i]! / sum) * left : left / free.length;
+      if (out[i]! < BATTLE_MIN_SHARE_PCT) {
+        pinned[i] = true;
+        again = true;
+      }
+    }
+    if (!again) break;
+    for (let i = 0; i < n; i++) if (pinned[i]) out[i] = BATTLE_MIN_SHARE_PCT;
+  }
+  for (let i = 0; i < n; i++) if (pinned[i]) out[i] = BATTLE_MIN_SHARE_PCT;
+  return out;
+}
+
+/**
  * The bar for one `BattleView`, or null when it has fewer than two sides (a round with one
- * receiver has nothing to compare). Extra sides beyond two are ignored: the bar is a versus.
+ * receiver has nothing to compare). Every side is a cell of the bar (a free-for-all of up to 8);
+ * two sides look exactly as the versus always did.
  */
 export function battleBarModel(
   view: BattleView | null,
@@ -122,16 +158,19 @@ export function battleBarModel(
       lost: final && view.leader !== null && view.leader !== s.id,
     };
   };
-  const a = side(view.sides[0]!);
-  const b = side(view.sides[1]!);
+  const sides = view.sides.map(side);
   const secs = Math.ceil(view.remainingMs / 1000);
   const winner = final ? view.leader : null;
+  const pct = Math.min(
+    100 - BATTLE_MIN_SHARE_PCT,
+    Math.max(BATTLE_MIN_SHARE_PCT, view.sides[0]!.share * 100),
+  );
+  const pcts =
+    sides.length === 2 ? [pct, 100 - pct] : battleSegmentPcts(view.sides.map((s) => s.share));
   return {
-    sides: [a, b],
-    pct: Math.min(
-      100 - BATTLE_MIN_SHARE_PCT,
-      Math.max(BATTLE_MIN_SHARE_PCT, view.sides[0]!.share * 100),
-    ),
+    sides,
+    pct: sides.length === 2 ? pct : pcts[0]!,
+    pcts,
     clock: final ? l.final : formatBattleClock(view.remainingMs),
     urgent: !final && secs <= BATTLE_URGENT_SECONDS,
     final,
@@ -139,9 +178,13 @@ export function battleBarModel(
     banner: !final
       ? ""
       : winner
-        ? fillText(l.wins, { name: winner === a.id ? a.name : b.name })
+        ? fillText(l.wins, { name: sides.find((s) => s.id === winner)?.name ?? winner })
         : l.draw,
-    spoken: fillText(l.spoken, { a: a.spoken, b: b.spoken }),
+    // Two sides: the `spoken` label (`"{a}, {b}"`); more: every side's spoken text, joined by ", ".
+    spoken:
+      sides.length === 2
+        ? fillText(l.spoken, { a: sides[0]!.spoken, b: sides[1]!.spoken })
+        : sides.map((s) => s.spoken).join(", "),
   };
 }
 
@@ -157,23 +200,45 @@ const readableOn = (hex: string): string =>
     : "#000000";
 
 /**
+ * The third and fourth side colour of the default palette (teal, pink); the fifth side starts
+ * over with the theme's accent. Their text colour is picked by contrast, like an override's.
+ */
+export const BATTLE_EXTRA_COLORS = ["#2ec4b6", "#ff5d8f"] as const;
+
+/**
+ * The colour of every side of a bar or notice (SPEC 18.7, 7.4): side `i` takes `override[i]` when
+ * the app gave one (text picked by contrast), else the default palette: the theme's accent, its
+ * coin colour (each with the theme's own text colour on it, already 4.5:1 in both presets), then
+ * `BATTLE_EXTRA_COLORS`, then the same four again.
+ */
+export function battleSidePalette(
+  theme: Partial<GiftTheme> | undefined,
+  count: number,
+  override?: readonly string[],
+): SideColor[] {
+  const t = resolveTheme(theme);
+  const defaults: SideColor[] = [
+    { color: t.accent, text: t.accentText },
+    { color: t.coin, text: t.coinText },
+    ...BATTLE_EXTRA_COLORS.map((color) => ({ color, text: readableOn(color) })),
+  ];
+  return Array.from({ length: count }, (_, i) => {
+    const own = override?.[i];
+    return own ? { color: own, text: readableOn(own) } : defaults[i % defaults.length]!;
+  });
+}
+
+/**
  * The two side colours: the theme's accent against its coin colour (each with the theme's own
  * text colour on it, already 4.5:1 in both presets), or `override` (text picked by contrast).
+ * `battleSidePalette` for any number of sides.
  */
 export function battleSideColors(
   theme?: Partial<GiftTheme>,
-  override?: [string, string],
+  override?: readonly string[],
 ): [SideColor, SideColor] {
-  if (override)
-    return [
-      { color: override[0], text: readableOn(override[0]) },
-      { color: override[1], text: readableOn(override[1]) },
-    ];
-  const t = resolveTheme(theme);
-  return [
-    { color: t.accent, text: t.accentText },
-    { color: t.coin, text: t.coinText },
-  ];
+  const [a, b] = battleSidePalette(theme, 2, override);
+  return [a!, b!];
 }
 
 /** Which sides gained score since `before` (to pulse them). `before` null: nobody pulses. */

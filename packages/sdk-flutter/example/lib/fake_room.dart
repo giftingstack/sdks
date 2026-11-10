@@ -18,6 +18,7 @@ RoomSocketFactory fakeRoomSocketFactory({
   Random? random,
   int minDelayMs = 8000,
   int maxDelayMs = 16000,
+  int sides = 2,
 }) {
   final rand = random ?? Random();
   var nextId = DateTime.now().millisecondsSinceEpoch * 1000;
@@ -53,10 +54,22 @@ RoomSocketFactory fakeRoomSocketFactory({
         maxDelayMs: maxDelayMs,
         gifts: gifts,
         senders: senders,
+        sides: sides,
         frame: frame,
         viewers: () => viewers,
         setViewers: (n) => viewers = n,
       );
+}
+
+/// The pretend room the app is joined to now (the last one made).
+_FakeRoomSocket? _current;
+
+/// A gift the viewer of this app sent to one of the two hosts counts into the round, like a real
+/// room's server does for every gift sent into it. Not part of the SDK.
+void scoreOwnGift(String receiver, int unitPrice, int quantity) {
+  final side = _FakeRoomSocket.receivers.indexOf(receiver);
+  if (side < 0) return; // (the third host only counts in the rounds it is in)
+  _current?._scoreUnits(side, unitPrice * quantity, quantity);
 }
 
 class _FakeRoomSocket implements RoomSocket {
@@ -67,10 +80,12 @@ class _FakeRoomSocket implements RoomSocket {
     required this.maxDelayMs,
     required this.gifts,
     required this.senders,
+    required this.sides,
     required this.frame,
     required this.viewers,
     required this.setViewers,
   }) {
+    _current = this;
     _later(150, () {
       _open = true;
       handlers.onOpen();
@@ -83,19 +98,29 @@ class _FakeRoomSocket implements RoomSocket {
   final int maxDelayMs;
   final List<Gift> Function() gifts;
   final List<String> senders;
+
+  /// How many hosts every round has: two, or four for the "Battle 4+" mode (a
+  /// free-for-all, SPEC 18.7).
+  final int sides;
   final Map<String, Object?> Function(String, Gift, int, String) frame;
   final int Function() viewers;
   final void Function(int) setViewers;
 
-  /// The two hosts of the battle bar, and the length of a round.
-  static const List<String> receivers = <String>['mira', 'noor'];
+  /// The hosts of the battle bar (the first [sides] of them play), and the
+  /// length of a round.
+  static const List<String> receivers = <String>[
+    'mira',
+    'noor',
+    'lina',
+    'owen',
+  ];
   static const int roundMs = 45000;
   static const int breakMs = 5000;
 
   int _round = 1;
   int _started = DateTime.now().millisecondsSinceEpoch;
-  final List<int> _units = <int>[0, 0];
-  final List<int> _count = <int>[0, 0];
+  final List<int> _units = <int>[0, 0, 0, 0];
+  final List<int> _count = <int>[0, 0, 0, 0];
 
   final Set<Timer> _timers = <Timer>{};
   bool _open = false;
@@ -145,7 +170,7 @@ class _FakeRoomSocket implements RoomSocket {
         'started': _started,
         'ends': _started + roundMs,
         'scores': <Object?>[
-          for (var i = 0; i < 2; i++)
+          for (var i = 0; i < sides; i++)
             <String, Object?>{
               'id': receivers[i],
               'units': _units[i],
@@ -155,9 +180,13 @@ class _FakeRoomSocket implements RoomSocket {
       };
 
   /// Counts a gift into the round while it is open, then tells the room.
-  void _score(int side, Gift gift, int quantity) {
+  void _score(int side, Gift gift, int quantity) =>
+      _scoreUnits(side, gift.price * quantity, quantity);
+
+  void _scoreUnits(int side, int units, int quantity) {
+    if (side >= sides) return;
     if (DateTime.now().millisecondsSinceEpoch >= _started + roundMs) return;
-    _units[side] += gift.price * quantity;
+    _units[side] += units;
     _count[side] += quantity;
     _push(<String, Object?>{'t': 'scores', 'battle': _battle()});
   }
@@ -168,8 +197,8 @@ class _FakeRoomSocket implements RoomSocket {
     _later(breakMs, () {
       _round++;
       _started = DateTime.now().millisecondsSinceEpoch;
-      _units.fillRange(0, 2, 0);
-      _count.fillRange(0, 2, 0);
+      _units.fillRange(0, 4, 0);
+      _count.fillRange(0, 4, 0);
       _push(<String, Object?>{'t': 'scores', 'battle': _battle()});
       _later(roundMs, _endRound);
     });
@@ -196,11 +225,13 @@ class _FakeRoomSocket implements RoomSocket {
         final sender = senders[rand.nextInt(senders.length)];
         // Mostly everyday gifts (the cheaper 60%): luxury effects cover the
         // stream, so they are rare.
-        final byPrice = [...catalog]..sort((a, b) => a.price.compareTo(b.price));
-        final cheap = byPrice.take(max(1, (catalog.length * 0.6).ceil())).toList();
+        final byPrice = [...catalog]
+          ..sort((a, b) => a.price.compareTo(b.price));
+        final cheap =
+            byPrice.take(max(1, (catalog.length * 0.6).ceil())).toList();
         final from = rand.nextInt(10) == 0 ? catalog : cheap;
         final gift = from[rand.nextInt(from.length)];
-        final side = rand.nextInt(2);
+        final side = rand.nextInt(sides);
         final to = receivers[side];
         if (rand.nextInt(12) == 0) {
           for (var i = 0; i < 5; i++) {

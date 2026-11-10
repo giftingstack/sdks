@@ -27,6 +27,16 @@
     { "scrim": false, "open": false, "snap": "default", "placed": false, "expect": false },
     { "scrim": false, "open": false, "snap": "expanded", "placed": false, "expect": false }
   ],
+  "takesTouches": [
+    { "scrim": true, "open": true, "placed": true, "expect": true },
+    { "scrim": true, "open": true, "placed": false, "expect": false },
+    { "scrim": true, "open": false, "placed": true, "expect": false },
+    { "scrim": true, "open": false, "placed": false, "expect": false },
+    { "scrim": false, "open": true, "placed": true, "expect": false },
+    { "scrim": false, "open": true, "placed": false, "expect": false },
+    { "scrim": false, "open": false, "placed": true, "expect": false },
+    { "scrim": false, "open": false, "placed": false, "expect": false }
+  ],
   "fade": [
     { "name": "motion allowed: 200 ms", "reducedMotion": false, "ms": 200 },
     { "name": "reduced motion: at once", "reducedMotion": true, "ms": 0 }

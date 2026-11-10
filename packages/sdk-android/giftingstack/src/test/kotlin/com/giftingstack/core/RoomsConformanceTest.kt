@@ -10,6 +10,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -307,6 +309,19 @@ class RoomsMappingTest(private val name: String, private val c: JsonObject) {
                     catalog = if (c["catalog"]?.str() == "true") f.getValue("catalog").arr().map { Gift.fromJson(it) } else null,
                     resolveName = names?.let { n -> { u: String -> n.stringOrNull(u) } },
                     replayed = c["replayed"]?.str()?.toBoolean() ?: false,
+                    battle =
+                        c["battle"]?.obj()?.let { b ->
+                            RoomBattle(
+                                b.string("round"),
+                                b.getValue("started").jsonPrimitive.long,
+                                b.getValue("ends").jsonPrimitive.long,
+                                b.getValue("scores").arr().map { s ->
+                                    val o = s.obj()
+                                    RoomScoreEntry(o.string("id"), o.getValue("units").jsonPrimitive.long, o.getValue("gifts").jsonPrimitive.long)
+                                },
+                            )
+                        },
+                    sideColors = c["sideColors"]?.arr()?.map { it.jsonPrimitive.content },
                 ),
             )
         val actual =
@@ -333,6 +348,18 @@ class RoomsMappingTest(private val name: String, private val c: JsonObject) {
                 put("senderName", out.senderName.json())
                 put("receiverId", out.receiverId.json())
                 put("replayed", JsonPrimitive(out.replayed))
+                out.receiver?.let { r ->
+                    put(
+                        "receiver",
+                        JsonObject(
+                            buildMap {
+                                put("name", JsonPrimitive(r.name))
+                                r.side?.let { put("side", JsonPrimitive(it)) }
+                                put("color", r.color.json())
+                            },
+                        ),
+                    )
+                }
             }
         assertEquals(name, c.getValue("expect"), JsonObject(actual))
         // `toEffect` is what the layer plays.

@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.giftingstack.core.Gift
 import com.giftingstack.core.GiftTrayController
+import com.giftingstack.core.GiftEffectReceiver
 import com.giftingstack.core.GiftTrayOptions
 import com.giftingstack.core.GiftTrayState
 import com.giftingstack.core.GiftTransaction
@@ -113,6 +114,7 @@ internal object GiftTrayTestMode {
  * @param playOn `Tap` plays the effect at the tap and takes it back on failure; `Success`
  *   waits for the server.
  * @param roomId send every gift into this room (SPEC 17.1); pair it with [rememberGiftRoom].
+ * @param receiverOf in a battle, `room::receiverFor`: your own gift then says who got it too (SPEC 18.4).
  * @param open the first open state (default true: a tray that exists is shown). `false` starts it closed; the
  *   host's Gift button then opens it with `holder.toggle()` (SPEC 9.4). Read once.
  * @param onOpenChange called after every change of the open state (never for a call that changes nothing).
@@ -128,6 +130,7 @@ fun rememberGiftTrayHolder(
     playOn: PlayOn = PlayOn.Tap,
     reference: String? = null,
     roomId: String? = null,
+    receiverOf: ((String) -> GiftEffectReceiver?)? = null,
     onSent: ((GiftTransaction) -> Unit)? = null,
     onError: ((GiftingException) -> Unit)? = null,
     open: Boolean = true,
@@ -143,6 +146,7 @@ fun rememberGiftTrayHolder(
             playOn = playOn,
             reference = reference,
             roomId = roomId,
+            receiverOf = receiverOf,
             onSent = onSent,
             onError = onError,
             prefetch = { loader.prefetch(it) },

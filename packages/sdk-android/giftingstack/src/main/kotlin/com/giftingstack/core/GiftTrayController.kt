@@ -30,6 +30,11 @@ class GiftTrayOptions(
     val reference: String? = null,
     /** A room id (SPEC 17.1): every send goes into that room, everyone in it sees the effect. */
     val roomId: String? = null,
+    /**
+     * In a battle, the side a receiver is on (`room.controller.receiverFor`, SPEC 18.4): the user's own gift
+     * then says who got it, like the room's gifts of the others. Null outside a battle.
+     */
+    val receiverOf: ((String) -> GiftEffectReceiver?)? = null,
     val onSent: ((GiftTransaction) -> Unit)? = null,
     val onError: ((GiftingException) -> Unit)? = null,
     /** Starts downloading a picture. Called for every `icon_url` once the catalog loads (not the big pictures, SPEC 8 step 2). */
@@ -142,8 +147,14 @@ class GiftTrayController(options: GiftTrayOptions) {
         pending.incrementAndGet()
         // Take the coins at once so the number moves with every tap.
         _state.update { it.copy(balance = it.balance - gift.price) }
-        fun show(sender: String, quantity: Int): Int? =
-            o.effects?.invoke()?.play(
+        fun show(sender: String, quantity: Int): Int? {
+            val battleReceiver =
+                try {
+                    o.receiverOf?.invoke(o.receiver)
+                } catch (e: Exception) {
+                    null // app code: never let it break a send
+                }
+            return o.effects?.invoke()?.play(
                 GiftEffectEvent(
                     gift =
                         EffectGift(
@@ -155,8 +166,10 @@ class GiftTrayController(options: GiftTrayOptions) {
                         ),
                     sender = sender,
                     quantity = quantity,
+                    receiver = battleReceiver,
                 ),
             )
+        }
         val early = o.playOn == PlayOn.Tap
         val shownId: Int? = if (early) show(user ?: "You", 1) else null
         try {

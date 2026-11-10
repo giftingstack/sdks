@@ -68,7 +68,10 @@ public final class GiftRoomModel: ObservableObject {
     ///   - skipOwn: default true: your own gifts already played on tap.
     ///   - maxReplayAgeMs: default 10,000: older gifts (after a reconnect) are dropped.
     ///   - minTier: only gifts of this tier or bigger. Default `.small` (all).
-    ///   - resolveName: display name of a sender whose token has no `name`.
+    ///   - resolveName: display name of a sender whose token has no `name`; also the name of the
+    ///     receiver in a battle gift notice.
+    ///   - sideColors: the border colours of the two battle sides in the gift notice (SPEC 7.4): pass
+    ///     the same pair as `GiftBattleBar(sideColors:)`. nil: the theme's accent and coin colour.
     ///   - url: default `wss://rt.giftingstack.com`.
     ///   - allowInsecure: lets a plain `ws://` url to a host that is not on this device through (default
     ///     false: only `wss://` and localhost, 127.0.0.1, ::1, 10.0.2.2). Another `ws://` url stops the app
@@ -86,6 +89,7 @@ public final class GiftRoomModel: ObservableObject {
         minTier: EffectTier = .small,
         thresholds: TierThresholds = TierThresholds(),
         resolveName: ((String) -> String?)? = nil,
+        sideColors: [String]? = nil,
         url: String? = nil,
         pauseInBackground: Bool = true,
         onEvent: ((RoomGiftEvent) -> Void)? = nil,
@@ -120,6 +124,7 @@ public final class GiftRoomModel: ObservableObject {
             minTier: minTier,
             thresholds: thresholds,
             resolveName: resolveName,
+            sideColors: sideColors,
             // URLSessionRoomSocket sends protocol pings: no `ping` text.
             heartbeatMs: 0,
             refreshJitterMs: roomRefreshJitterMs,
@@ -144,6 +149,12 @@ public final class GiftRoomModel: ObservableObject {
         unsubscribe = controller.subscribe { [weak self] next in
             self?.state = next
         }
+    }
+
+    /// The battle side `user` is on now (SPEC 18.4): pass it to the tray as `receiverOf: room.receiverFor` so
+    /// your own gift says who got it too. nil outside a round.
+    public func receiverFor(_ user: String) -> GiftEffectReceiver? {
+        controller.receiverFor(user)
     }
 
     /// `battleView` of the current round at the server's time now, nil without a round. Call it

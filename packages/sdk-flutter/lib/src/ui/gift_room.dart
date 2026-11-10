@@ -9,6 +9,7 @@ import '../core/timers.dart';
 import '../core/types.dart';
 import 'gift_effect_controller.dart';
 import 'room_socket.dart';
+import 'theme.dart' show giftColorCss;
 
 export '../core/rooms.dart' show RoomGiftEvent, RoomState, RoomStatus;
 export 'room_socket.dart' show RoomWebSocketConnector, ioRoomSocketFactory;
@@ -58,6 +59,7 @@ class GiftRoom extends ChangeNotifier with WidgetsBindingObserver {
     EffectTier minTier = EffectTier.small,
     TierThresholds thresholds = const TierThresholds(),
     String? Function(String user)? resolveName,
+    List<Color>? sideColors,
     String? url,
     bool allowInsecure = false,
     int heartbeatMs = roomHeartbeatMs,
@@ -79,6 +81,9 @@ class GiftRoom extends ChangeNotifier with WidgetsBindingObserver {
         minTier: minTier,
         thresholds: thresholds,
         resolveName: resolveName,
+        sideColors: sideColors == null
+            ? null
+            : <String>[for (final c in sideColors) giftColorCss(c)],
         heartbeatMs: heartbeatMs,
         refreshJitterMs: roomRefreshJitterMs,
         onEvent: (event) {
@@ -123,6 +128,11 @@ class GiftRoom extends ChangeNotifier with WidgetsBindingObserver {
   void _changed() {
     if (!_disposed) notifyListeners();
   }
+
+  /// The battle side [user] is on now (SPEC 18.4): pass it to the tray as
+  /// `receiverOf: room.receiverFor` so your own gift says who got it too. Null
+  /// outside a round.
+  GiftEffectReceiver? receiverFor(String user) => _client.receiverFor(user);
 
   /// The pure logic underneath, for apps that need more (`start`, `pause`,
   /// `reconnectNow`, `onEvent`).

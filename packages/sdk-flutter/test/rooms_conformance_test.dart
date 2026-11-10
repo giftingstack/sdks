@@ -262,6 +262,24 @@ void _mapping() {
           catalog: c['catalog'] == true ? catalog : null,
           resolveName: names == null ? null : (u) => names[u],
           replayed: (c['replayed'] as bool?) ?? false,
+          battle: c['battle'] == null
+              ? null
+              : RoomBattle(
+                  round: asMap(c['battle'])['round']! as String,
+                  started: asMap(c['battle'])['started']! as int,
+                  ends: asMap(c['battle'])['ends']! as int,
+                  scores: <RoomScoreEntry>[
+                    for (final s in asMap(c['battle'])['scores']! as List)
+                      RoomScoreEntry(
+                        id: asMap(s)['id']! as String,
+                        units: asMap(s)['units']! as int,
+                        gifts: asMap(s)['gifts']! as int,
+                      ),
+                  ],
+                ),
+          sideColors: c['sideColors'] == null
+              ? null
+              : (c['sideColors']! as List).cast<String>(),
         );
         final got = out.toJson();
         expect(jsonEquals(got, c['expect']), isTrue,

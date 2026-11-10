@@ -123,7 +123,13 @@ fun PixelApp(awayOnce: AwayOnce) {
     // The pretend rooms server, made before the tray: a live send is published into it, which is what
     // the API does for a send with `room_id`. A real app passes no socket and has no such step.
     val giftsRef = remember { mutableStateOf(demoGifts) }
+    val roomForTray = remember { arrayOfNulls<com.giftingstack.ui.GiftRoom>(1) }
     val fakeRoom = remember { FakeRoomServer(gifts = { giftsRef.value }, timers = Timers.forScope(scope)) }
+    // "Battle 4+": the same pretend server with four hosts in every round (a free-for-all).
+    val fakeRoom4 = remember { FakeRoomServer(gifts = { giftsRef.value }, timers = Timers.forScope(scope), sides = 4) }
+    var battle4 by remember { mutableStateOf(false) }
+    val liveRoomId = if (battle4) LIVE_ROOM_4 else LIVE_ROOM
+    val liveServer = if (battle4) fakeRoom4 else fakeRoom
 
     // The tray belongs to the post whose Gift button was pressed (the post id is the gift's `reference`).
     val forPost = trayPost ?: POSTS.first()
@@ -131,16 +137,18 @@ fun PixelApp(awayOnce: AwayOnce) {
         rememberGiftTrayHolder(
             client = client,
             receiver = forPost.author,
+            // In a battle your own gift says who got it too (the room, made below, knows the sides).
+            receiverOf = { roomForTray[0]?.receiverFor(it) },
             effects = effects,
             reference = forPost.id,
             // Closed until a Gift button opens it.
             open = false,
             // On the Live tab every gift goes into the room, so the other viewers see it.
-            roomId = if (tab == PixelTab.Live) LIVE_ROOM else null,
+            roomId = if (tab == PixelTab.Live) liveRoomId else null,
             onSent = { tx ->
                 refreshWalls()
                 if (tab == PixelTab.Live) {
-                    giftsRef.value.firstOrNull { it.id == tx.gift.id }?.let { fakeRoom.publish(DEMO_VIEWER, it, tx.quantity, tx.receiver) }
+                    giftsRef.value.firstOrNull { it.id == tx.gift.id }?.let { liveServer.publish(DEMO_VIEWER, it, tx.quantity, tx.receiver) }
                 }
                 // The tray stays open after a send, like a live app: tap again for a combo, the Gift button
                 // again to close it.
@@ -154,14 +162,16 @@ fun PixelApp(awayOnce: AwayOnce) {
     SideEffect { giftsRef.value = gifts }
     val room =
         rememberGiftRoom(
-            room = if (tab == PixelTab.Live) LIVE_ROOM else null,
+            room = if (tab == PixelTab.Live) liveRoomId else null,
             getToken = { demoRoomToken(DEMO_VIEWER) },
             client = client,
             effects = effects,
             resolveName = ::displayName,
-            socket = fakeRoom.factory,
+            socket = liveServer.factory,
         )
     val roomState by room.state.collectAsState()
+
+    roomForTray[0] = room
 
     // A gift somebody else sent: the effect over whatever is open, a notification, the profile wall.
     fun deliver(inc: Incoming) {
@@ -273,7 +283,7 @@ fun PixelApp(awayOnce: AwayOnce) {
             Box(Modifier.weight(1f)) {
                 when (tab) {
                     PixelTab.Feed -> FeedScreen(client, theme, wallKey, reduced, onGift = { if (trayPost?.id == it.id) tray.toggle() else openTray(it) }, onChip = { p, g -> openTray(p, g.id) })
-                    PixelTab.Live -> LiveScreen(room, roomState, theme, reduced, onGift = { post -> if (trayPost?.author == post.author) tray.toggle() else openTray(post) })
+                    PixelTab.Live -> LiveScreen(room, roomState, theme, reduced, battle4, onBattle4 = { battle4 = it; tray.close() }, onGift = { post -> if (trayPost?.author == post.author) tray.toggle() else openTray(post) })
                     PixelTab.Top -> TopScreen(client, theme, reduced, board)
                     PixelTab.Inbox ->
                         InboxScreen(client, theme, inboxHandle) { items ->
