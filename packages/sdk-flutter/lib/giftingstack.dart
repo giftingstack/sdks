@@ -15,6 +15,7 @@ export 'src/ui/gift_away_summary.dart'
         awayResolveWaitMs,
         awayTexts;
 export 'src/ui/gift_battle_bar.dart' show BattleBarUser, GiftBattleBar;
+export 'src/ui/gift_button.dart' show GiftButton, GiftButtonSize, GiftGlyphPainter;
 export 'src/ui/gift_effect_controller.dart';
 export 'src/ui/gift_effect_layer.dart';
 export 'src/ui/gift_inbox.dart' show GiftInbox, GiftInboxState;

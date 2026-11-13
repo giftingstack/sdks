@@ -45,7 +45,7 @@ import com.giftingstack.ui.DefaultGiftImageLoader
 import com.giftingstack.ui.GiftingTheme
 
 /** The four tabs of the bottom bar. */
-enum class PixelTab(val label: String) { Feed("Feed"), Live("Live"), Top("Top"), Inbox("Inbox"), Me("Me") }
+enum class PixelTab(val label: String) { Feed("Feed"), Live("Live"), Chat("Chat"), Top("Top"), Inbox("Inbox"), Me("Me") }
 
 /** Height of the tab bar without the system navigation bar. */
 internal val TAB_BAR_HEIGHT = 56.dp
@@ -181,6 +181,25 @@ private fun TabIcon(tab: PixelTab, color: Color) {
                 drawArc(color, 140f, 80f, false, Offset(s * 0.06f, s * 0.06f), androidx.compose.ui.geometry.Size(s * 0.88f, s * 0.88f), style = st)
                 drawArc(color, -40f, 80f, false, Offset(s * 0.06f, s * 0.06f), androidx.compose.ui.geometry.Size(s * 0.88f, s * 0.88f), style = st)
             }
+            PixelTab.Chat -> {
+                // A speech bubble with a tail on the lower left.
+                val p = Path().apply {
+                    moveTo(s * 0.2f, s * 0.16f)
+                    lineTo(s * 0.8f, s * 0.16f)
+                    quadraticTo(s * 0.9f, s * 0.16f, s * 0.9f, s * 0.26f)
+                    lineTo(s * 0.9f, s * 0.6f)
+                    quadraticTo(s * 0.9f, s * 0.7f, s * 0.8f, s * 0.7f)
+                    lineTo(s * 0.42f, s * 0.7f)
+                    lineTo(s * 0.22f, s * 0.88f)
+                    lineTo(s * 0.24f, s * 0.7f)
+                    lineTo(s * 0.2f, s * 0.7f)
+                    quadraticTo(s * 0.1f, s * 0.7f, s * 0.1f, s * 0.6f)
+                    lineTo(s * 0.1f, s * 0.26f)
+                    quadraticTo(s * 0.1f, s * 0.16f, s * 0.2f, s * 0.16f)
+                    close()
+                }
+                drawPath(p, color, style = Stroke(width = st.width, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+            }
             PixelTab.Top -> {
                 val p = Path().apply {
                     moveTo(s * 0.5f, s * 0.1f)
@@ -218,7 +237,7 @@ private fun TabIcon(tab: PixelTab, color: Color) {
     }
 }
 
-/** The bottom bar: five tabs, a count badge on the Inbox. No system bar padding here: the caller adds it. */
+/** The bottom bar: six tabs, a count badge on the Inbox. No system bar padding here: the caller adds it. */
 @Composable
 internal fun PixelTabBar(current: PixelTab, unread: Int, theme: GiftingTheme, onSelect: (PixelTab) -> Unit) {
     Row(Modifier.fillMaxWidth().height(TAB_BAR_HEIGHT).background(theme.surface)) {

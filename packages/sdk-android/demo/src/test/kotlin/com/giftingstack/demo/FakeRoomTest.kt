@@ -125,4 +125,36 @@ class FakeRoomTest {
         assertEquals(n, events.size)
         room.leave()
     }
+
+    @Test fun plainLiveRoomHasOneHostAndNoBattle() = runTest {
+        val clock = Clock()
+        val server = FakeRoomServer(gifts = { catalog }, timers = clock.api, now = { clock.now }, random = Random(7), battle = false)
+        val events = ArrayList<RoomGiftEvent>()
+        val room =
+            RoomClient(
+                RoomClientOptions(
+                    room = LIVE_ROOM_PLAIN,
+                    getToken = { demoRoomToken(DEMO_VIEWER) },
+                    socket = server.factory,
+                    scope = backgroundScope,
+                    timers = clock.api,
+                    now = { clock.now },
+                    onEvent = { events.add(it) },
+                ),
+            )
+        room.start()
+        runCurrent()
+        clock.advance(200)
+        assertEquals(RoomStatus.Open, room.getState().status)
+        // 200 s: gifts arrive, all for the one host, and no battle (no round, no scores) ever shows up.
+        clock.advance(200_000)
+        assertEquals(null, room.getBattle())
+        assertTrue("others sent gifts", events.isNotEmpty())
+        assertTrue(events.all { it.receiverId == LIVE_HOST })
+        assertTrue(server.sockets.single().sent.none { it.contains("scores") })
+        // Your own send reaches the room without any score frame.
+        server.publish(DEMO_VIEWER, catalog.first(), 1, LIVE_HOST)
+        assertEquals(null, room.getBattle())
+        room.leave()
+    }
 }

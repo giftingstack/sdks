@@ -47,6 +47,8 @@ public struct GiftBattleBar: View {
     private let tickMs: Int
     private let theme: GiftingTheme
     private let labels: BattleBarLabels
+    private let onPressSide: ((String) -> Void)?
+    private let pressSideLabel: String
 
     /// Follows the round of `room` and refreshes the clock every `tickMs` while it is open.
     /// - Parameters:
@@ -60,6 +62,11 @@ public struct GiftBattleBar: View {
     ///   - tickMs: how often the clock refreshes while a round is open. 0 = never.
     ///   - theme: uses `background`, `border`, `text`, `muted`, `accent`, `accentText`, `coin`,
     ///     `coinText` and `danger`.
+    ///   - onPressSide: (spec 21.4) makes every side's avatar a button (at least 44 x 44) that calls this with the
+    ///     side's id. Open your tray with that side picked: `tray.selectReceiver(id); tray.open()`. nil (default):
+    ///     the bar is one read-only element, as before.
+    ///   - pressSideLabel: the accessibility label of a side's button; `{name}` is replaced. Default
+    ///     "Send {name} a gift".
     public init(
         room: GiftRoomModel,
         users: [String: BattleBarUser] = [:],
@@ -67,7 +74,9 @@ public struct GiftBattleBar: View {
         reducedMotion: Bool? = nil,
         tickMs: Int = 1_000,
         theme: GiftingTheme = GiftingTheme(),
-        labels: BattleBarLabels = BattleBarLabels()
+        labels: BattleBarLabels = BattleBarLabels(),
+        onPressSide: ((String) -> Void)? = nil,
+        pressSideLabel: String = defaultPressSideLabel
     ) {
         self.room = room
         self.view = nil
@@ -77,6 +86,8 @@ public struct GiftBattleBar: View {
         self.tickMs = tickMs
         self.theme = theme
         self.labels = labels
+        self.onPressSide = onPressSide
+        self.pressSideLabel = pressSideLabel
     }
 
     /// Draws a round you hold yourself (nil: nothing is drawn).
@@ -86,7 +97,9 @@ public struct GiftBattleBar: View {
         sideColors: [String]? = nil,
         reducedMotion: Bool? = nil,
         theme: GiftingTheme = GiftingTheme(),
-        labels: BattleBarLabels = BattleBarLabels()
+        labels: BattleBarLabels = BattleBarLabels(),
+        onPressSide: ((String) -> Void)? = nil,
+        pressSideLabel: String = defaultPressSideLabel
     ) {
         self.room = nil
         self.view = view
@@ -96,6 +109,8 @@ public struct GiftBattleBar: View {
         self.tickMs = 0
         self.theme = theme
         self.labels = labels
+        self.onPressSide = onPressSide
+        self.pressSideLabel = pressSideLabel
     }
 
     public var body: some View {
@@ -107,7 +122,9 @@ public struct GiftBattleBar: View {
                 sideColors: sideColors,
                 reducedMotion: reducedMotion,
                 theme: theme,
-                labels: labels
+                labels: labels,
+                onPressSide: onPressSide,
+                pressSideLabel: pressSideLabel
             )
         } else {
             BattleBarDrawing(
@@ -116,7 +133,9 @@ public struct GiftBattleBar: View {
                 sideColors: sideColors,
                 reducedMotion: reducedMotion,
                 theme: theme,
-                labels: labels
+                labels: labels,
+                onPressSide: onPressSide,
+                pressSideLabel: pressSideLabel
             )
         }
     }
@@ -132,6 +151,8 @@ private struct BattleBarRoomHost: View {
     let reducedMotion: Bool?
     let theme: GiftingTheme
     let labels: BattleBarLabels
+    let onPressSide: ((String) -> Void)?
+    let pressSideLabel: String
 
     var body: some View {
         let current = room.battle == nil ? nil : room.battleView()
@@ -152,7 +173,9 @@ private struct BattleBarRoomHost: View {
             sideColors: sideColors,
             reducedMotion: reducedMotion,
             theme: theme,
-            labels: labels
+            labels: labels,
+            onPressSide: onPressSide,
+            pressSideLabel: pressSideLabel
         )
     }
 }
@@ -167,6 +190,8 @@ private struct BattleBarDrawing: View {
     let reducedMotion: Bool?
     let theme: GiftingTheme
     let labels: BattleBarLabels
+    let onPressSide: ((String) -> Void)?
+    let pressSideLabel: String
 
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var lastRound: String?
@@ -285,10 +310,11 @@ private struct BattleBarDrawing: View {
         let pair = colors(model)
         let spoken = [model.spoken, model.banner].filter { !$0.isEmpty }.joined(separator: ". ")
         let multi = model.sides.count > 2
-        return VStack(spacing: 10) {
+        let stack = VStack(spacing: 10) {
             if multi {
                 // Three or more sides: the clock, a row of cells, a bar of proportional segments.
                 clockView(model)
+                    .modifier(BattleSpokenSummary(text: spoken))
                 HStack(alignment: .top, spacing: 6) {
                     ForEach(model.sides.indices, id: \.self) { index in
                         cellView(model.sides[index], color: pair[index], user: users[model.sides[index].id], index: index, many: model.sides.count > 4)
@@ -296,15 +322,18 @@ private struct BattleBarDrawing: View {
                     }
                 }
                 multiBar(model, colors: pair.map { $0.color })
+                    .accessibilityHidden(true)
             } else {
                 HStack(alignment: .center, spacing: 8) {
                     sideView(model.sides[0], right: false, color: pair[0], user: users[model.sides[0].id], index: 0)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     clockView(model)
+                        .modifier(BattleSpokenSummary(text: spoken))
                     sideView(model.sides[1], right: true, color: pair[1], user: users[model.sides[1].id], index: 1)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 splitBar(model, a: pair[0].color, b: pair[1].color)
+                    .accessibilityHidden(true)
             }
             if !model.banner.isEmpty {
                 Text(verbatim: model.banner)
@@ -312,10 +341,42 @@ private struct BattleBarDrawing: View {
                     .foregroundColor(theme.text)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
+                    // Read with the scores (the clock's summary).
+                    .accessibilityHidden(true)
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: spoken))
+        // Without `onPressSide`: one read-only element, as before. With it (spec 21.4): the side buttons, and the
+        // clock reads the scores and the result; the names, scores and bars are not read again.
+        return Group {
+            if onPressSide == nil {
+                stack
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(verbatim: spoken))
+            } else {
+                stack
+                    .accessibilityElement(children: .contain)
+            }
+        }
+    }
+
+    /// A side's avatar; with `onPressSide` a button (spec 21.4) with at least a 44 x 44 touch target, the platform's
+    /// pressed feedback and the label `pressSideLabel` (`{name}` replaced).
+    @ViewBuilder
+    private func pressableAvatar<Avatar: View>(_ avatar: Avatar, side: BattleBarSide) -> some View {
+        if let press = onPressSide {
+            Button {
+                press(side.id)
+            } label: {
+                avatar
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(verbatim: pressSideLabel.replacingOccurrences(of: "{name}", with: side.name)))
+            .accessibilityIdentifier("battle-side-\(side.id)")
+        } else {
+            avatar
+        }
     }
 
     // MARK: - One cell of three or more sides
@@ -348,16 +409,18 @@ private struct BattleBarDrawing: View {
             alignment: .top
         )
         return VStack(spacing: 4) {
-            avatar
+            pressableAvatar(avatar, side: side)
             Text(verbatim: side.name)
                 .font(.system(size: many ? 11 : 12, weight: .bold))
                 .foregroundColor(theme.text)
                 .lineLimit(1)
+                .accessibilityHidden(true)
             BattleCountingScore(value: Double(side.units), labels: labels)
                 .font(.system(size: many ? 14 : 17, weight: .heavy).monospacedDigit())
                 .foregroundColor(theme.text)
                 .lineLimit(1)
                 .animation(still ? nil : battleEaseOut(0.65), value: side.units)
+                .accessibilityHidden(true)
         }
         .opacity(side.lost ? 0.5 : 1)
         .scaleEffect(index < pulsing.count && pulsing[index] ? 1.07 : 1)
@@ -404,10 +467,12 @@ private struct BattleBarDrawing: View {
         return HStack(spacing: 8) {
             if right {
                 who
-                avatar
+                    .accessibilityHidden(true)
+                pressableAvatar(avatar, side: side)
             } else {
-                avatar
+                pressableAvatar(avatar, side: side)
                 who
+                    .accessibilityHidden(true)
             }
         }
         .opacity(side.lost ? 0.5 : 1)
@@ -512,6 +577,17 @@ private struct BattleBarDrawing: View {
             .animation(still ? nil : battleEaseOut(0.8), value: model.pct)
         }
         .frame(height: 16)
+    }
+}
+
+/// The clock as the bar's spoken summary (the scores, then the result) while the sides are buttons (spec 21.4).
+private struct BattleSpokenSummary: ViewModifier {
+    let text: String
+
+    func body(content: Content) -> some View {
+        content
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: text))
     }
 }
 

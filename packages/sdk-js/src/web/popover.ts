@@ -14,6 +14,8 @@ export interface PopoverViewOptions {
   grid: HTMLElement;
   label: () => string;
   onOpenChange?: (open: boolean) => void;
+  /** Default `true`. `false`: the tray handles the anchor's clicks (a bound text field, spec 20.3). */
+  anchorClicks?: boolean;
 }
 
 let ids = 0;
@@ -50,7 +52,8 @@ export class PopoverView {
     anchor.setAttribute("aria-haspopup", "dialog");
     anchor.setAttribute("aria-expanded", "false");
     anchor.setAttribute("aria-controls", root.id);
-    anchor.addEventListener("click", () => this.toggle(), { signal: this.base.signal });
+    if (options.anchorClicks !== false)
+      anchor.addEventListener("click", () => this.toggle(), { signal: this.base.signal });
   }
 
   isOpen(): boolean {

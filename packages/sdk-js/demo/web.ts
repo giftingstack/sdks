@@ -15,6 +15,9 @@ import {
   GiftAwaySummary,
   type GiftAwaySummaryOptions,
   GiftBattleBar,
+  GiftButton,
+  type TrayReceiver,
+  battleSidePalette,
   GiftEffectLayer,
   GiftInbox,
   GiftLeaderboard,
@@ -161,10 +164,13 @@ async function main(): Promise<void> {
   }
   const app = q(document, "#app");
   const main = q(app, "#main");
+  // A comment bar scrolls with the page: the notice follows it.
+  main.addEventListener("scroll", () => placeNoticeSoon(), { passive: true });
+  window.addEventListener("resize", () => placeNoticeSoon());
   const right = q(app, "#right");
   const banner = q(app, "#banner");
   const panels = Object.fromEntries(
-    ["feed", "live", "top", "inbox", "me"].map((n) => [n, q(app, `[data-panel="${n}"]`)]),
+    ["feed", "live", "chat", "top", "inbox", "me"].map((n) => [n, q(app, `[data-panel="${n}"]`)]),
   ) as Record<string, HTMLElement>;
 
   let theme: GiftTheme = THEMES.dark;
@@ -183,6 +189,32 @@ async function main(): Promise<void> {
     noticeBottom: baseNotice(),
     theme,
   });
+  /** The open sheet's top edge from the app's bottom (0: no sheet on screen). */
+  let trayInset = 0;
+  /**
+   * The gift notice's place: above the tab bar, above an open sheet, and above a message bar on
+   * screen (the Chat tab's, a stream's comment bar), so the pill never covers what you type. The
+   * bar is the app's own, so the app places the notice (`noticeBottom`): bar top + 8 px.
+   */
+  const placeNotice = (): void => {
+    let px = trayInset > 0 ? trayInset + 16 : baseNotice();
+    const bar = [...app.querySelectorAll<HTMLElement>(".dm-bar, .live-bar")].find(
+      (b) => b.getClientRects().length > 0,
+    );
+    if (bar) {
+      const a = app.getBoundingClientRect();
+      const b = bar.getBoundingClientRect();
+      // Only a bar that is on screen (a comment bar scrolled out of sight does not count).
+      if (b.bottom > a.top && b.top < a.bottom) px = Math.max(px, Math.round(a.bottom - b.top + 8));
+    }
+    effects.setOptions({ noticeBottom: px });
+  };
+  let noticeTimer = 0;
+  /** After a layout change (the bar moves with the sheet, the page scrolls): once, after layout. */
+  const placeNoticeSoon = (): void => {
+    window.clearTimeout(noticeTimer);
+    noticeTimer = window.setTimeout(placeNotice, 0);
+  };
 
   // ---- balance (header chip, profile)
   const setBalance = (n: number): void => {
@@ -237,7 +269,8 @@ async function main(): Promise<void> {
     selectedId = h.tray.getSelected()?.id ?? selectedId;
     h.destroy();
     app.style.removeProperty("--tray-inset");
-    effects.setOptions({ noticeBottom: baseNotice() });
+    trayInset = 0;
+    placeNoticeSoon();
   };
   const store = (): void =>
     void openCoinStore(app, (coins) => {
@@ -245,13 +278,65 @@ async function main(): Promise<void> {
       void syncBalance();
       void handle?.refresh();
     });
-  const openTray = (post: Post, anchor: HTMLElement, giftId?: string, roomId?: string): void => {
+  type TrayExtra = {
+    /** The message bar's text field: the SDK swaps the tray with the keyboard (spec 20). */
+    input?: HTMLInputElement;
+    onSent?: (tx: GiftTransaction) => void;
+    /** A battle: the sides, for the tray's "Send to" row (spec 21). */
+    receivers?: TrayReceiver[];
+  };
+  const openTray = (
+    post: Post,
+    anchor: HTMLElement,
+    giftId?: string,
+    roomId?: string,
+    extra: TrayExtra = {},
+  ): void => {
     const sheet = app.clientWidth < 600;
     if (handle && anchorOf === anchor && !giftId) {
       // The popover anchor's own click closes it; on a phone the Gift button toggles the sheet.
       if (sheet) handle.toggle();
       return;
     }
+    makeTray(post, anchor, giftId, roomId, extra);
+    if (!sheet) handle!.tray.open();
+  };
+  /**
+   * A message bar's gift button (the chat screen, the live comment bar): the tray is made for the
+   * bar, closed, before the first press, and the SDK does the rest (spec 20): the button closes the
+   * keyboard and opens the tray in its place, a tap on the field closes the tray, the button again
+   * brings the keyboard back. Other trays (the feed's) replace it, so it is made again whenever the
+   * person reaches for the bar.
+   */
+  const giftBar = (
+    bar: HTMLElement,
+    input: HTMLInputElement,
+    button: GiftButton,
+    post: () => Post,
+    extra: () => {
+      roomId?: string;
+      onSent?: (tx: GiftTransaction) => void;
+      receivers?: TrayReceiver[];
+    },
+  ): (() => GiftTrayHandle | null) => {
+    const arm = (): GiftTrayHandle | null => {
+      if (!(handle && anchorOf === button.element))
+        makeTray(post(), button.element, undefined, extra().roomId, { ...extra(), input });
+      return handle;
+    };
+    bar.addEventListener("pointerdown", arm, true);
+    bar.addEventListener("focusin", arm);
+    return arm;
+  };
+  const barButtons: GiftButton[] = [];
+  const makeTray = (
+    post: Post,
+    anchor: HTMLElement,
+    giftId: string | undefined,
+    roomId: string | undefined,
+    extra: TrayExtra,
+  ): void => {
+    const sheet = app.clientWidth < 600;
     closeTray();
     anchorOf = anchor;
     // What is behind the tray stays in sight (the feed and a live room alike): picking a gift
@@ -268,23 +353,30 @@ async function main(): Promise<void> {
       effects,
       theme,
       anchor,
+      input: extra.input,
+      receivers: extra.receivers,
       defaultSelectedId: giftId ?? selectedId,
       onTopUp: store,
       onInsetChange: (px) => {
-        effects.setOptions({ noticeBottom: px > 0 ? px + 16 : baseNotice() });
+        trayInset = px;
+        placeNoticeSoon();
         // The page keeps its Gift button above the sheet: room for the sheet, and the button in view.
         app.style.setProperty("--tray-inset", `${sheet ? px : 0}px`);
         if (sheet && px > 0) keepInView(anchor);
       },
       // A pick makes the tray small everywhere; the SDK draws the dim and closes on a tap on it.
       collapseOnSelect: true,
-      scrim: true,
+      // The chat's message bar keeps its conversation in full view: no dim there (the SDK's default
+      // with `input`). A live room's comment bar has the dim, so a tap on the stream closes the tray.
+      scrim: !extra.input || roomId !== undefined,
       scrimTap: "dismiss",
       onOpenChange: (open) => {
-        if (!open) queueMicrotask(() => handle === h && closeTray());
+        // A bar's tray stays (closed) for the next press; the others go when they close.
+        if (!open && !extra.input) queueMicrotask(() => handle === h && closeTray());
       },
       onSent: (tx: GiftTransaction) => {
         setBalance(tx.sender_balance_after);
+        extra.onSent?.(tx);
         const w = walls.find((x) => x.user === tx.receiver && x.reference === tx.reference);
         if (w) w.wall.update({ refreshKey: ++w.key });
         // The tray stays open after a send, like a live app: tap again for a combo, the Gift
@@ -292,8 +384,101 @@ async function main(): Promise<void> {
       },
     });
     handle = h;
-    if (!sheet) h.tray.open();
   };
+
+  // ---- chat: a one-to-one messaging screen. The conversation, the input and the bubbles are the
+  // app's OWN chat (GiftingStack carries no chat); what comes from the SDK is the gift tray and the
+  // effects. The gift button sits in the message bar like an emoji button: it puts the tray where
+  // the keyboard was (the keyboard closes), and a tap on the text field brings the keyboard back.
+  {
+    const DM: Post = { ...POSTS[0]!, id: "dm_ava_mateo", author: "mateo" };
+    const panel = panels.chat!;
+    panel.innerHTML = `
+      <div class="dm-head">${avatar(DM.author, 36)}<div><b>${esc(displayName(DM.author))}</b><small>online</small></div></div>
+      <p class="dm-note">The conversation is your app's chat. The gift button opens the GiftingStack tray in the keyboard's place.</p>
+      <ol class="dm-list" aria-live="polite"></ol>
+      <form class="dm-bar">
+        <div class="dm-field">
+          <input type="text" placeholder="Message" aria-label="Message" autocomplete="off" />
+        </div>
+        <button class="dm-send" type="submit" aria-label="Send">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-3-7z" /></svg>
+        </button>
+      </form>`;
+    const list = q<HTMLOListElement>(panel, ".dm-list");
+    const input = q<HTMLInputElement>(panel, "input");
+    // The gift button is the SDK's GiftButton, in the app's own message bar like an emoji button.
+    const giftBtn = new GiftButton(q(panel, ".dm-field"), { theme });
+    barButtons.push(giftBtn);
+    let thanks = 0;
+    const say = (from: "me" | "them", html: string): void => {
+      const li = document.createElement("li");
+      li.className = `dm-msg ${from}`;
+      li.innerHTML = html;
+      list.append(li);
+      // Only this page scrolls (scrollIntoView would also scroll a page that embeds the demo).
+      main.scrollTop = main.scrollHeight;
+    };
+    say("them", "Did you catch my stream last night?");
+    say("me", "Yes! The ending was wild 😄");
+    say("them", "Right?? Going live again on Friday");
+    // A tap on the conversation puts the tray (or the keyboard) away, as chat apps do; no dim over
+    // the chat.
+    list.addEventListener("click", () => {
+      if (handle && anchorOf === giftBtn.element) handle.tray.close();
+      input.blur();
+    });
+    q<HTMLFormElement>(panel, ".dm-bar").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      say("me", esc(text));
+      input.value = "";
+    });
+    giftBar(
+      q(panel, ".dm-bar"),
+      input,
+      giftBtn,
+      () => DM,
+      () => ({
+        onSent: (tx: GiftTransaction) => {
+          // Quick repeats of the same gift (a combo) add up in one bubble, like the gift notice. The
+          // running bubble is found wherever it is (a thank-you in between does not cut the count)
+          // while its last gift is under 5 s old; it stays where it is, above its thank-you.
+          const running = ([...list.children] as HTMLElement[])
+            .reverse()
+            .find((b) => b.dataset.gift === tx.gift.id && Date.now() - Number(b.dataset.at) < 5000);
+          // A combo that goes on after its thank-you (the bubble is not the last) gets no second one.
+          const thanked = running !== undefined && running !== list.lastElementChild;
+          if (running) {
+            const count = Number(running.dataset.count) + tx.quantity;
+            running.dataset.count = String(count);
+            running.dataset.at = String(Date.now());
+            q(running, ".dm-n").textContent = ` ×${count}`;
+          } else {
+            const img = tx.gift.icon_url
+              ? `<img src="${esc(tx.gift.icon_url)}" alt="" width="44" height="44" />`
+              : "";
+            const n = tx.quantity > 1 ? ` ×${tx.quantity}` : "";
+            say(
+              "me",
+              `<span class="dm-giftmsg">${img}<span>You sent <b>${esc(tx.gift.name)}</b><span class="dm-n">${n}</span></span></span>`,
+            );
+            const bubble = list.lastElementChild as HTMLElement;
+            bubble.dataset.gift = tx.gift.id;
+            bubble.dataset.count = String(tx.quantity);
+            bubble.dataset.at = String(Date.now());
+          }
+          main.scrollTop = main.scrollHeight;
+          // One thank-you after the sending stops, not one per tap.
+          if (!thanked) {
+            window.clearTimeout(thanks);
+            thanks = window.setTimeout(() => say("them", "Thank you!! 😍"), 1800);
+          }
+        },
+      }),
+    );
+  }
 
   // ---- feed
   for (const post of POSTS) {
@@ -380,11 +565,32 @@ async function main(): Promise<void> {
     if (target && gift) target.socket.publish("ava", gift, input.quantity ?? 1, input.receiver);
     return tx;
   };
-  const sideButton = (id: string): string =>
-    `<button class="pill gift" type="button" data-side="${id}">${GIFT_ICON}Gift ${esc(firstName(id))}</button>`;
+  // A battle's sides, for the tray's "Send to" row (spec 21): one gift button for every side. The
+  // colours are left to the SDK: the same palette as the score bar.
+  const SIDES: Record<RoomMode, string[]> = {
+    live: [LIVE_HOST],
+    battle: [LIVE_HOST, LIVE_RIVAL],
+    battle4: LIVE_FFA,
+  };
+  const receiversOf = (mode: RoomMode): TrayReceiver[] | undefined =>
+    mode === "live" ? undefined : SIDES[mode].map((id) => ({ id, name: firstName(id) }));
+  /** A battle gift line takes the receiving side's colour (the bar's palette). */
+  const sideColor = (mode: RoomMode, to?: string): { color: string; text: string } | undefined => {
+    const i = to ? SIDES[mode].indexOf(to) : -1;
+    return i < 0 ? undefined : battleSidePalette(theme, SIDES[mode].length)[i];
+  };
+  // The stream's own chat (the app's, not GiftingStack's) runs over the video, bottom left, like
+  // live apps do; the room's gifts land in the same column, so chat and gifts read as one stream.
   const stage = (): string =>
     `<div class="live-stage"><div class="art">${postArt(livePost)}</div>
-        <span class="live-tag">LIVE</span><span class="live-viewers">...</span></div>`;
+        <span class="live-tag">LIVE</span><span class="live-viewers">...</span>
+        <ol class="live-chat" aria-live="polite"></ol></div>`;
+  // The comment bar under the stream: type a comment, or the gift button for the tray (it takes
+  // the keyboard's place, as on the chat screen).
+  // The gift button in the bar is the SDK's GiftButton (added below): one for every stream, also
+  // a battle (the tray's "Send to" row picks the side).
+  const commentBar = (withGift: boolean): string =>
+    `<form class="live-bar"${withGift ? " data-gift" : ""}><input type="text" placeholder="Say something..." aria-label="Comment" autocomplete="off" /></form>`;
   panels.live!.innerHTML = `<h2>Live</h2>
     <div class="seg" role="group" aria-label="Stream">
       <button type="button" data-mode="live" aria-pressed="true">Live room</button>
@@ -394,33 +600,117 @@ async function main(): Promise<void> {
     <article class="card" data-block="live">
       ${stage()}
       <div class="post-head">${avatar(LIVE_HOST)}<div><b>${esc(firstName(LIVE_HOST))}</b><small>Evening stream</small></div></div>
+      ${commentBar(true)}
       <p class="live-state">Connecting...</p>
-      <div class="post-actions">${sideButton(LIVE_HOST)}</div>
-      <ul class="room-feed"></ul>
     </article>
     <article class="card" data-block="battle" hidden>
       ${stage()}
       <div class="post-head">${avatar(LIVE_HOST)}<div><b>${esc(firstName(LIVE_HOST))} vs ${esc(firstName(LIVE_RIVAL))}</b><small>Evening stream battle</small></div></div>
       <div class="battle"></div>
+      ${commentBar(true)}
       <p class="live-state">Connecting...</p>
-      <div class="post-actions">${sideButton(LIVE_HOST)}${sideButton(LIVE_RIVAL)}</div>
-      <ul class="room-feed"></ul>
     </article>
     <article class="card" data-block="battle4" hidden>
       ${stage()}
       <div class="post-head">${avatar(LIVE_HOST)}<div><b>${LIVE_FFA.map((id) => esc(firstName(id))).join(", ")}</b><small>Four creators in one round: every side has its own colour</small></div></div>
       <div class="battle"></div>
+      ${commentBar(true)}
       <p class="live-state">Connecting...</p>
-      <div class="post-actions">${LIVE_FFA.map(sideButton).join("")}</div>
-      <ul class="room-feed"></ul>
     </article>`;
   const block = (mode: RoomMode): HTMLElement => q(panels.live!, `[data-block="${mode}"]`);
+  // One line in the stream's chat column: a comment, or a gift (highlighted). The newest at the
+  // bottom; only the last few stay, the older ones fade out at the top.
+  const chatLine = (mode: RoomMode, html: string, gift = false): void => {
+    const list = q(block(mode), ".live-chat");
+    const li = document.createElement("li");
+    li.className = gift ? "gift" : "";
+    li.innerHTML = html;
+    list.append(li);
+    while (list.children.length > 6) list.firstElementChild?.remove();
+  };
+  const giftLine = (sender: string, giftName: string, quantity: number, to?: string): string =>
+    `<b>${esc(sender)}</b> sent ${esc(giftName)}${quantity > 1 ? ` ×${quantity}` : ""}${
+      to ? ` to ${esc(firstName(to))}` : ""
+    } ${GIFT_ICON}`;
+  // A gift line; the same sender sending the same gift again within a few seconds (a combo) adds
+  // up on that line ("×5") instead of a new line per tap, like the SDK's gift notice.
+  const giftChat = (
+    mode: RoomMode,
+    sender: string,
+    giftName: string,
+    quantity: number,
+    to?: string,
+  ): void => {
+    const list = q(block(mode), ".live-chat");
+    const key = `${sender}|${giftName}|${to ?? ""}`;
+    // The running combo of this sender and gift, wherever it is in the column: a comment that comes
+    // in between must not cut the count. It moves to the bottom, so a combo in progress stays in
+    // sight under the newest comments.
+    const running = ([...list.children] as HTMLElement[])
+      .reverse()
+      .find((l) => l.dataset.key === key && Date.now() - Number(l.dataset.at) < 5000);
+    if (running) {
+      const total = Number(running.dataset.n) + quantity;
+      running.dataset.n = String(total);
+      running.dataset.at = String(Date.now());
+      running.innerHTML = giftLine(sender, giftName, total, to);
+      list.append(running);
+      return;
+    }
+    chatLine(mode, giftLine(sender, giftName, quantity, to), true);
+    const li = list.lastElementChild as HTMLElement;
+    const side = sideColor(mode, to);
+    if (side) {
+      li.style.setProperty("--side", side.color);
+      li.style.setProperty("--side-text", side.text);
+      li.classList.add("side-gift");
+    }
+    li.dataset.key = key;
+    li.dataset.n = String(quantity);
+    li.dataset.at = String(Date.now());
+  };
+  const ownGift = (mode: RoomMode) => (tx: GiftTransaction) =>
+    giftChat(mode, "You", tx.gift.name, tx.quantity, mode === "live" ? undefined : tx.receiver);
+  /** Each stream's comment bar tray, made (closed) when first needed. */
+  const armBar: Partial<Record<RoomMode, () => GiftTrayHandle | null>> = {};
   for (const mode of Object.keys(rooms) as RoomMode[]) {
-    for (const b of block(mode).querySelectorAll<HTMLButtonElement>("[data-side]")) {
-      const post = postOf(b.dataset.side!);
-      b.addEventListener("click", () => openTray(post, b, undefined, rooms[mode].id));
+    const bar = q<HTMLFormElement>(block(mode), ".live-bar");
+    const input = q<HTMLInputElement>(bar, "input");
+    bar.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      chatLine(mode, `<b>You</b> ${esc(text)}`);
+      input.value = "";
+    });
+    if (bar.hasAttribute("data-gift")) {
+      const giftBtn = new GiftButton(bar, { theme, filled: true });
+      barButtons.push(giftBtn);
+      armBar[mode] = giftBar(
+        bar,
+        input,
+        giftBtn,
+        () => postOf(LIVE_HOST),
+        () => ({
+          roomId: rooms[mode].id,
+          onSent: ownGift(mode),
+          receivers: receiversOf(mode),
+        }),
+      );
     }
   }
+  // Pretend viewers chat while you watch (the app's chat; the demo has no chat server).
+  const COMMENTS = [
+    "hiii from São Paulo 👋",
+    "this is so good",
+    "❤️❤️❤️",
+    "first time here!",
+    "lol 😂",
+    "how long have you been streaming?",
+    "the vibes tonight 🔥",
+    "hello everyone",
+  ];
+  let chatter = 0;
   let room: RoomHandle | null = null;
   const modeParam = opts.get("mode");
   let liveMode: RoomMode = (Object.keys(rooms) as RoomMode[]).includes(modeParam as RoomMode)
@@ -434,6 +724,12 @@ async function main(): Promise<void> {
         resolveUsers: resolveDemoUsers,
         reducedMotion: reduced,
         theme,
+        // A tap on a side opens the comment bar's tray with that side picked (spec 21.4).
+        onPressSide: (id) => {
+          const h = armBar[m]?.();
+          h?.selectReceiver(id);
+          h?.open();
+        },
       }),
     ]),
   ) as Record<(typeof BATTLES)[number], GiftBattleBar>;
@@ -444,6 +740,8 @@ async function main(): Promise<void> {
     }
     room?.leave();
     room = null;
+    window.clearInterval(chatter);
+    for (const list of panels.live!.querySelectorAll(".live-chat")) list.replaceChildren();
   };
   const joinLive = (): void => {
     if (room) return;
@@ -451,7 +749,11 @@ async function main(): Promise<void> {
     const here = block(mode);
     const stateEl = q(here, ".live-state");
     const viewersEl = q(here, ".live-viewers");
-    const feed = q(here, ".room-feed");
+    chatter = window.setInterval(() => {
+      const who = watchers[Math.floor(Math.random() * watchers.length)]!;
+      const text = COMMENTS[Math.floor(Math.random() * COMMENTS.length)]!;
+      chatLine(mode, `<b>${esc(displayName(who))}</b> ${esc(text)}`);
+    }, 2600);
     const show = (): void => {
       const st = room?.getState();
       if (!st) return;
@@ -470,13 +772,15 @@ async function main(): Promise<void> {
       effects,
       resolveName: displayName,
       WebSocket: rooms[mode].socket,
-      onEvent: (e) => {
-        const li = document.createElement("li");
-        const to = e.receiverId && mode !== "live" ? ` to ${esc(firstName(e.receiverId))}` : "";
-        li.innerHTML = `<b>${esc(e.sender ?? "Someone")}</b> sent ${e.quantity > 1 ? `${e.quantity} x ` : ""}${esc(e.gift.name)}${to}`;
-        feed.prepend(li);
-        while (feed.children.length > 30) feed.lastElementChild?.remove();
-      },
+      // Every gift of the room lands in the chat column, between the comments.
+      onEvent: (e) =>
+        giftChat(
+          mode,
+          e.sender ?? "Someone",
+          e.gift.name,
+          e.quantity,
+          mode === "live" ? undefined : (e.receiverId ?? undefined),
+        ),
       onViewers: show,
       onState: show,
     });
@@ -578,7 +882,7 @@ async function main(): Promise<void> {
   // ?tab=feed|live|top|inbox|me opens that tab (?mode=battle|battle4: the Live tab shows the battle, or the four-way battle), ?away=1 shows the away card now (0: never),
   // ?tray=1 opens the gift tray on the first post, ?embed=1 hides the demo's footer.
   if (opts.get("embed") === "1") document.documentElement.classList.add("embed");
-  const TABS = ["feed", "live", "top", "inbox", "me"];
+  const TABS = ["feed", "live", "chat", "top", "inbox", "me"];
 
   // ---- tabs and layout
   let tab = TABS.includes(opts.get("tab") ?? "") ? opts.get("tab")! : "feed";
@@ -596,7 +900,7 @@ async function main(): Promise<void> {
   };
   const place = (): void => {
     const isWide = wide.matches;
-    const centre = tab === "me" ? "me" : tab === "live" ? "live" : "feed";
+    const centre = tab === "me" || tab === "live" || tab === "chat" ? tab : "feed";
     // Wide: both sit in the right column; the one the page asked for (?tab=) comes first.
     for (const name of tab === "inbox" ? ["inbox", "top"] : ["top", "inbox"]) {
       const p = panels[name]!;
@@ -605,7 +909,8 @@ async function main(): Promise<void> {
     }
     for (const [name, p] of Object.entries(panels))
       p.hidden = isWide
-        ? (name === "feed" || name === "me" || name === "live") && name !== centre
+        ? (name === "feed" || name === "me" || name === "live" || name === "chat") &&
+          name !== centre
         : name !== tab;
     for (const t of app.querySelectorAll<HTMLElement>("[data-tab]")) {
       const on = t.dataset.tab === (isWide ? centre : tab);
@@ -617,7 +922,7 @@ async function main(): Promise<void> {
     else leaveRoom();
     awayOpened();
     refreshBadge();
-    if (!handle) effects.setOptions({ noticeBottom: baseNotice() });
+    placeNoticeSoon();
   };
   for (const t of app.querySelectorAll<HTMLElement>("[data-tab]"))
     t.addEventListener("click", () => {
@@ -853,6 +1158,7 @@ async function main(): Promise<void> {
       app.dataset.theme = name;
       effects.setOptions({ theme });
       handle?.tray.update({ theme });
+      for (const b of barButtons) b.update({ theme });
       for (const w of walls) w.wall.update({ theme });
       board.update({ theme });
       inbox.update({ theme });

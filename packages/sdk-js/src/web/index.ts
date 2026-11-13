@@ -3,6 +3,10 @@ export type { GiftEffectLayerOptions } from "./GiftEffectLayer";
 export { GiftTray } from "./GiftTray";
 export type { GiftTrayOptions } from "./GiftTray";
 export { createGiftTray } from "./createGiftTray";
+export { GIFT_BUTTON_SIZES, GIFT_GLYPH_PATH, GiftButton } from "./GiftButton";
+export { resolveReceiver } from "../core";
+export type { TrayReceiver } from "../core";
+export type { GiftButtonOptions, GiftButtonSize } from "./GiftButton";
 export type { CreateGiftTrayOptions, GiftTrayHandle } from "./createGiftTray";
 export { prefetch } from "./images";
 export { configureStyles } from "./styles";
@@ -12,6 +16,7 @@ export type { GiftTheme, ThemeMode } from "./theme";
 export {
   GiftAwaySummaryElement,
   GiftBattleBarElement,
+  GiftButtonElement,
   GiftEffectLayerElement,
   GiftLeaderboardElement,
   GiftRoomElement,

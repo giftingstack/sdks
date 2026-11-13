@@ -5,7 +5,7 @@ GiftingStack API. Flutter port of
 `@giftingstack/sdk` (React Native), built from the shared contract in `packages/sdk-spec`
 (spec 1.0.0). Dart 3, null-safe. Dependencies: `flutter` and `http`.
 
-Status: 0.1.4, a preview: the API can still change before 1.0 (see `CHANGELOG.md`). The logic is
+Status: 0.1.6, a preview: the API can still change before 1.0 (see `CHANGELOG.md`). The logic is
 machine-checked; how the animations and the sheet drag feel is not checked on a device yet (see
 "Verification"). The newest Flutter demo was not run on a phone or an emulator at all.
 
@@ -19,7 +19,7 @@ or in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  giftingstack: ^0.1.4
+  giftingstack: ^0.1.6
 ```
 
 The pure Dart part (no Flutter imports) is `package:giftingstack/giftingstack_core.dart`. The whole
@@ -127,6 +127,64 @@ reports an inset of 0; opening shows it at `initialSnap`. `GiftTray(open:)` lets
 ```dart
 GiftTray(tray: tray, scrim: true, scrimTap: ScrimTap.dismiss, collapseOnSelect: true);
 // onPressed: tray.toggle
+```
+
+### Gift button in your message bar (SPEC 20)
+
+GiftingStack has no chat; it fits into yours. Put `GiftButton` into your message bar next to the text
+field (like an emoji button) and give the tray the field's `FocusNode`. The button closes the keyboard
+and opens the tray in its place; a tap on the field closes the tray and the keyboard comes back; the
+button toggles.
+
+```dart
+final field = FocusNode();
+final tray = GiftTrayNotifier(client: client, receiver: 'mateo', input: field);
+
+Stack(children: [
+  Column(children: [
+    Expanded(child: yourMessages),
+    Padding(
+      padding: EdgeInsets.only(bottom: inset), // the bar rides on the tray
+      child: Row(children: [
+        Expanded(child: TextField(focusNode: field)),
+        GiftButton(tray: tray),
+        yourSendButton,
+      ]),
+    ),
+  ]),
+  GiftTray(
+    tray: tray,
+    collapseOnSelect: true,
+    onInsetChange: (px) => setState(() => inset = px),
+  ),
+]);
+```
+
+With `input` bound the tray starts closed (an explicit `open` wins), keeps `scrim` off by default, and
+its default state is as tall as the last keyboard seen (`MediaQuery.viewInsetsOf(context).bottom`, at
+least 120; 300 before any; at most 60 % of the box), unless you pass `snaps` with a
+`SheetSnap.standard` value. `tray.toggle()` blurs the field before it opens and focuses it after it
+closes; `open()` blurs it too; `close()` never moves focus. `tray.inputBound` and
+`tray.keyboardHeight` tell you the state. The pure rules are `inputSwapStep` and
+`keyboardPlaceHeight`.
+
+`GiftButton`: `tray`, `onPressed` (after the toggle; alone without a tray), `label` ("Send a gift"),
+`filled` (accent background), `size` (a `GiftButtonSize`, default `medium`; the touch target is at least 44), `icon`, `disabled`, `theme`.
+It shows the tray's state: active (the `selected` colour) while the tray is open, and "expanded" for
+screen readers. Leaving the screen: `tray.close()`.
+
+Custom icon and sizes: `size` is one of `GiftButtonSize.small` (32), `medium` (36, default) or `large` (44), the
+circle's diameter; no other size can be set. `icon: (context, color) => Widget` replaces the gift glyph.
+It is centred in the fixed glyph box (`22 * size / 36`) and fitted into it: scaled down, never up, aspect
+ratio kept, anything outside clipped, so your artwork cannot change the button's size. `color` is the
+glyph colour (`accent`, or `accentText` when `filled`; `accent` while active).
+
+```dart
+GiftButton(
+  tray: tray,
+  size: GiftButtonSize.large,
+  icon: (context, color) => Icon(Icons.card_giftcard, color: color),
+)
 ```
 
 The layer draws the gift picture bigger in a wide layer (a tablet): `pictureScale` is 1 on a phone and
@@ -309,6 +367,43 @@ Without a room pass `view: myBattleView`. The pure model (`battleBarModel`, `for
 `formatBattleClock`, `battleSideColors`) is in `giftingstack_core.dart`; the numbers are the shared
 fixture `battle-bar.json`. Reduced motion: no sliding, counting or pulse.
 
+### One gift button for a battle: the receiver picker (SPEC 21)
+
+In a battle one gift button is enough (usually the `GiftButton` of your comment bar): give the tray
+the round's sides and it shows a "Send to" row under its header (only with two or more), and the
+bar's sides become buttons that open the tray with that side picked.
+
+```dart
+final tray = GiftTrayNotifier(
+  client: client,
+  receiver: 'mira',                             // the fallback (and the only receiver without a battle)
+  roomId: 'live_1',
+  receiverOf: room.receiverFor,                 // your own gift says who got it
+  receivers: [                                  // the round's sides, colours as the bar's sideColors
+    TrayReceiver(id: 'mira', name: 'Mira', color: '#e0457b'),
+    TrayReceiver(id: 'noor', name: 'Noor', avatarUrl: 'https://...'),
+  ],
+  onReceiverChange: (id) {},
+  input: commentField,
+);
+GiftTray(tray: tray, sendToLabel: 'Send to');
+GiftBattleBar(
+  room: room,
+  onPressSide: (id) => tray..selectReceiver(id)..open(),
+  pressSideLabel: 'Send {name} a gift',      // the button's label for screen readers
+);
+// A new round: tray.receivers = [...]; the pick stays when the side is still there.
+```
+
+Every send goes to `tray.receiver`: the side picked (a tap in the row or `selectReceiver`; an id that
+is not a side is ignored), else the side this tray gifted last, else `receiver` when it is a side,
+else the first side (`resolveReceiver`, fixture `receivers.json`). A side is a 30 dp avatar in a ring
+of its colour (default the battle palette) and its name; the picked one is opaque with an outer ring,
+the others at 55 %. A tap picks; it neither sends nor moves the sheet. Screen readers get a radio group
+labelled `sendToLabel`. The row is part of the block above the grid, so the peek height grows by it.
+The bar's side buttons have at least a 44 dp touch target. Without `receivers` and `onPressSide`
+nothing changes.
+
 ## Limits
 
 - At most 6 small, 2 medium and 1 large effect on screen at once. Extra small/medium gifts show only
@@ -364,6 +459,7 @@ What is proven by which test, and what only a person with a phone can judge.
 | `GiftAwaySummary` widget: card content, replay through `GiftEffectController` at the planned times, at most `maxEffects` within the budget, ack timing for `ackOn` shown / finished / manual, auto and tap dismissal, `resolveUsers` (1.5 s cap), reduced motion, focus, foreground throttle                                             | `test/gift_away_summary_test.dart` (44 widget tests, fake clock)                                                                        | L3            |
 | `GiftLeaderboard` widget: loading / ready / empty / error, medals with `noticeBigText`, highlight and pinned row (`#417`, `1,000+`), tabs and their keyboard (arrows, Home, End, wrap), metric switch, stale rows and spinner, polling, row labels, `onPressUser`, names                                                                 | `test/gift_leaderboard_test.dart` (47 widget tests)                                                                                     | L3            |
 | `GiftBattleBar` widget: hidden states, sides, clock urgency, boundary, crown and banner, short scores, labels, theme and `sideColors`, count-up, reduced motion, spoken label, follows a `GiftRoom`                                                                                                                                      | `test/gift_battle_bar_test.dart`                                                                                                        | L3            |
+| receiver picker (SPEC 21): `resolveReceiver` (`receivers.json`), the "Send to" row only with 2+ sides, a tap picks and the next send goes there, the side gifted last is the default, `selectReceiver`, radio semantics, peek grows by the row, `GiftBattleBar(onPressSide:)` with a 44 dp target, nothing changes without receivers     | `test/receiver_picker_test.dart`, `test/receivers_conformance_test.dart`                                                                | L3            |
 | Battle bar model: split, clock, urgent, winner, short scores, side colours (`battle-bar.json`)                                                                                                                                                                                                                                           | `test/battle_bar_conformance_test.dart` (40 cases)                                                                                      | L1            |
 | example app: gift wall under the post counts what you send, Away summary (demo), Leaderboard (demo) with ties and a pinned viewer, debug bar stays in one Wrap (the demo buttons are pressed by calling their handler: in the test font the sheet covers the third row)                                                                  | `example/test/widget_test.dart` (15 tests in total)                                                                                     | L3            |
 | how the wall, the card, the replay and the leaderboard LOOK and FEEL on a phone (chip size, card slide, 44 dp cells in a feed, tab wrapping on a 360 dp phone, real fonts); the new demo on a device                                                                                                                                     | nothing: only read from the code and the widget tree; nothing was run on a phone or an emulator                                         | L4            |

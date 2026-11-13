@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.giftingstack.core.GiftRef
 import com.giftingstack.core.InboxItem
@@ -45,6 +47,7 @@ import com.giftingstack.ui.GiftLeaderboard
 import com.giftingstack.ui.GiftLeaderboardHandle
 import com.giftingstack.ui.GiftWall
 import com.giftingstack.ui.GiftingTheme
+import com.giftingstack.ui.GiftTrayHolder
 import com.giftingstack.ui.LeaderboardUser
 import kotlinx.coroutines.delay
 
@@ -111,58 +114,76 @@ private fun PostCard(post: Post, client: MockClient, theme: GiftingTheme, wallKe
 
 private fun fmtLikes(n: Int): String = fmt(n)
 
+/** The Live tab's streams: a plain room, a two-host battle, a four-host battle. */
+enum class LiveMode { Room, Battle, Battle4 }
+
 /**
  * The live room: other viewers' gifts arrive as effects (the real rememberGiftRoom against the
  * pretend rooms server FakeRoomServer), and a gift sent here carries the room id, so everyone in the room sees it.
  */
 @Composable
-internal fun LiveScreen(room: GiftRoom, state: RoomState, theme: GiftingTheme, reduced: Boolean?, battle4: Boolean, onBattle4: (Boolean) -> Unit, onGift: (Post) -> Unit) {
-    val hosts = if (battle4) LIVE_HOSTS else LIVE_HOSTS.take(2)
+internal fun LiveScreen(
+    room: GiftRoom,
+    state: RoomState,
+    theme: GiftingTheme,
+    reduced: Boolean?,
+    mode: LiveMode,
+    onMode: (LiveMode) -> Unit,
+    sideColors: List<Color>,
+    onPressSide: (String) -> Unit,
+    tray: GiftTrayHolder,
+    comments: List<ChatMessage>,
+    trayInset: Dp,
+    below: Dp,
+    onComment: (String) -> Unit,
+) {
+    val hosts = when (mode) { LiveMode.Room -> LIVE_HOSTS.take(1); LiveMode.Battle -> LIVE_HOSTS.take(2); LiveMode.Battle4 -> LIVE_HOSTS }
+    Column(Modifier.fillMaxSize()) {
+    Box(Modifier.weight(1f)) {
     TabColumn {
-        // The two modes: "Battle" (two hosts) and "Battle 4+" (four hosts in every round, a free-for-all).
+        // (The stream and the battle scroll; the comment bar below stays put.)
+        // The three modes: "Live room" (one host, the default), "Battle" (two hosts) and "Battle 4+" (four hosts in every round).
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Pill("Battle", theme, filled = !battle4, modifier = Modifier.testTag("live-mode-battle")) { onBattle4(false) }
-            Pill("Battle 4+", theme, filled = battle4, modifier = Modifier.testTag("live-mode-battle4")) { onBattle4(true) }
+            Pill("Live room", theme, filled = mode == LiveMode.Room, modifier = Modifier.testTag("live-mode-room")) { onMode(LiveMode.Room) }
+            Pill("Battle", theme, filled = mode == LiveMode.Battle, modifier = Modifier.testTag("live-mode-battle")) { onMode(LiveMode.Battle) }
+            Pill("Battle 4+", theme, filled = mode == LiveMode.Battle4, modifier = Modifier.testTag("live-mode-battle4")) { onMode(LiveMode.Battle4) }
         }
         Card(theme) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Avatar(LIVE_HOST, 40.dp)
                     Column {
-                        Txt(hosts.joinToString(if (battle4) ", " else " vs ") { firstName(it) }, theme.text, 15f, bold = true)
+                        Txt(hosts.joinToString(if (mode == LiveMode.Battle4) ", " else " vs ") { firstName(it) }, theme.text, 15f, bold = true)
+                        if (mode == LiveMode.Room) Txt("Evening stream", theme.muted, 12f)
                         Txt(liveStatusLine(state), theme.muted, 12f, modifier = Modifier.testTag("live-status"))
                     }
                 }
                 // The SDK's battle bar, driven by the room: a round between two hosts, nothing drawn between rounds.
-                GiftBattleBar(
+                if (mode != LiveMode.Room) GiftBattleBar(
                     room,
                     users = LIVE_HOSTS.associateWith { BattleBarUser(displayName(it)) },
                     reducedMotion = reduced,
                     theme = theme,
+                    // The bar's colours, the tray's "Send to" row and the comment column share one list (SPEC 21.5).
+                    sideColors = sideColors,
+                    // A tap on a side picks it in the tray and opens the tray (SPEC 21.4).
+                    onPressSide = onPressSide,
                 )
-                Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f).clip(RoundedCornerShape(12.dp))) { PostArt(LIVE_POST.art) }
-                Txt("Gifts that other viewers send show up here as effects. Send one yourself: everyone in the room sees it.", theme.text, 15f)
-                // One Gift button per side of the battle, the host on the left like the bar.
-                if (hosts.size > 2) {
-                    // Three or more sides: two columns, so a name never wraps or leaves the screen.
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (pair in LIVE_HOST_POSTS.take(hosts.size).chunked(2)) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                for (post in pair) {
-                                    Pill("Gift ${firstName(post.author)}", theme, filled = true, modifier = Modifier.weight(1f), icon = { GiftIcon(it) }) { onGift(post) }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        for (post in LIVE_HOST_POSTS.take(hosts.size)) {
-                            Pill("Gift ${firstName(post.author)}", theme, filled = true, icon = { GiftIcon(it) }) { onGift(post) }
-                        }
-                    }
+                Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f).clip(RoundedCornerShape(12.dp))) {
+                    PostArt(LIVE_POST.art)
+                    // The stream's own comment column (the app's, not GiftingStack's): comments and gifts in one column;
+                    // a gift line takes the colour of the side that got it.
+                    LiveComments(comments, Modifier.align(Alignment.BottomStart).padding(10.dp), sideColor = { liveSideColor(it, sideColors) })
                 }
+                Txt(if (mode == LiveMode.Room) "Gifts that other viewers send show up here as effects and in the comment column. Send one yourself with the gift button of the comment bar: it goes to the host." else "Gifts that other viewers send show up here as effects. Send one yourself with the gift button of the comment bar (its \"Send to\" row picks the host), or tap a host on the bar.", theme.text, 15f)
             }
         }
+    }
+    }
+        // The comment bar under the stream: type a comment, or the gift button for the tray (it takes the
+        // keyboard's place, as on the Chat tab). The field is bound to the tray with Modifier.giftTrayInput.
+        MessageBar(tray, theme, "Say something...", "live", onComment)
+        Spacer(Modifier.height(barLift(tray.isOpen, trayInset, imeHeight(), below)))
     }
 }
 

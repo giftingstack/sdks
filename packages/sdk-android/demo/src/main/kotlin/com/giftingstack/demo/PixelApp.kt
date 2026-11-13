@@ -49,6 +49,7 @@ import com.giftingstack.core.parseIsoTimeMs
 import com.giftingstack.ui.GiftAwaySummary
 import com.giftingstack.ui.GiftEffectLayer
 import com.giftingstack.ui.GiftTray
+import com.giftingstack.ui.GiftTrayHolder
 import com.giftingstack.ui.GiftWallLoaders
 import com.giftingstack.ui.GiftingTheme
 import com.giftingstack.ui.formatCoins
@@ -87,6 +88,8 @@ fun PixelApp(awayOnce: AwayOnce) {
     var dev by remember { mutableStateOf(DevMenuState()) }
     val settings = dev.settings
     val theme = remember(settings.theme) { settings.theme.toTheme() }
+    // The Live tab's side colours: the battle bar, the room's notices, the tray's "Send to" row and the comment column.
+    val sideColors = remember(theme) { liveSideColors(theme) }
     val reduced = settings.motion.reduced
     var tab by remember { mutableStateOf(PixelTab.Feed) }
     // The badge on the Inbox tab: gifts newer than the newest row shown when the tab was last viewed.
@@ -127,9 +130,46 @@ fun PixelApp(awayOnce: AwayOnce) {
     val fakeRoom = remember { FakeRoomServer(gifts = { giftsRef.value }, timers = Timers.forScope(scope)) }
     // "Battle 4+": the same pretend server with four hosts in every round (a free-for-all).
     val fakeRoom4 = remember { FakeRoomServer(gifts = { giftsRef.value }, timers = Timers.forScope(scope), sides = 4) }
-    var battle4 by remember { mutableStateOf(false) }
-    val liveRoomId = if (battle4) LIVE_ROOM_4 else LIVE_ROOM
-    val liveServer = if (battle4) fakeRoom4 else fakeRoom
+    // "Live room" (one host, no battle bar), the default; "Battle"; "Battle 4+".
+    val fakeRoomPlain = remember { FakeRoomServer(gifts = { giftsRef.value }, timers = Timers.forScope(scope), battle = false) }
+    var liveMode by remember { mutableStateOf(LiveMode.Room) }
+    val liveRoomId = when (liveMode) { LiveMode.Room -> LIVE_ROOM_PLAIN; LiveMode.Battle -> LIVE_ROOM; LiveMode.Battle4 -> LIVE_ROOM_4 }
+    val liveServer = when (liveMode) { LiveMode.Room -> fakeRoomPlain; LiveMode.Battle -> fakeRoom; LiveMode.Battle4 -> fakeRoom4 }
+
+    // The Chat tab: the app's own conversation (GiftingStack carries no chat) with a gift button in its message bar.
+    var chat by remember { mutableStateOf(CHAT_START) }
+    var chatThanks by remember { mutableIntStateOf(0) }
+    var chatInset by remember { mutableStateOf(0.dp) }
+    // The stream's comment column on the Live tab: your comments, your gifts and the other viewers' gifts.
+    var liveComments by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
+
+    // The main tray, made below: a chat send refreshes its balance (the header shows it).
+    val mainTray = remember { arrayOfNulls<GiftTrayHolder>(1) }
+    // The chat's own tray: its text field is bound (Modifier.giftTrayInput in ChatScreen), so it starts closed, the
+    // gift button swaps the keyboard for it and a tap on the field swaps back (SPEC 20). No dim: the chat stays in sight.
+    val chatTray =
+        rememberGiftTrayHolder(
+            client = client,
+            receiver = CHAT_PEER,
+            effects = effects,
+            reference = CHAT_REFERENCE,
+            onSent = { tx ->
+                // Quick repeats of the same gift (a combo) add up in one bubble.
+                val before = chat
+                chat = addGiftLine(chat, null, tx.gift.id, tx.gift.name, tx.gift.iconUrl, tx.quantity.toLong(), moveDown = false)
+                if (needsThanks(before, chat)) chatThanks++
+                // Two trays, one balance: the header (the main tray's balance) follows the chat's sends.
+                mainTray[0]?.refresh()
+                refreshWalls()
+            },
+        )
+    // One thank-you after the sending stops, not one per tap.
+    LaunchedEffect(chatThanks) {
+        if (chatThanks > 0) {
+            delay(1800)
+            chat = chat + ChatText(CHAT_PEER, CHAT_THANKS)
+        }
+    }
 
     // The tray belongs to the post whose Gift button was pressed (the post id is the gift's `reference`).
     val forPost = trayPost ?: POSTS.first()
@@ -147,13 +187,18 @@ fun PixelApp(awayOnce: AwayOnce) {
             roomId = if (tab == PixelTab.Live) liveRoomId else null,
             onSent = { tx ->
                 refreshWalls()
+                chatTray.refresh()
                 if (tab == PixelTab.Live) {
                     giftsRef.value.firstOrNull { it.id == tx.gift.id }?.let { liveServer.publish(DEMO_VIEWER, it, tx.quantity, tx.receiver) }
+                    // Your own gift in the stream's comment column (the room skips your own events).
+                    // It names the side that got it and takes its colour (the "Send to" row picked it, SPEC 21).
+                    liveComments = keepLast(addGiftLine(liveComments, null, tx.gift.id, tx.gift.name, tx.gift.iconUrl, tx.quantity.toLong(), tx.receiver))
                 }
                 // The tray stays open after a send, like a live app: tap again for a combo, the Gift button
                 // again to close it.
             },
         )
+    mainTray[0] = tray
     val state by tray.state.collectAsState()
     val gifts = state.gifts.ifEmpty { demoGifts }
 
@@ -166,10 +211,27 @@ fun PixelApp(awayOnce: AwayOnce) {
             getToken = { demoRoomToken(DEMO_VIEWER) },
             client = client,
             effects = effects,
+            // The other viewers' gifts land in the stream's comment column too.
+            onEvent = { e -> liveComments = keepLast(addGiftLine(liveComments, e.senderId, e.gift.id, e.gift.name, e.gift.icon, e.quantity, e.receiverId)) },
+            // The notice borders a battle gift in the same colours as the bar and the "Send to" row.
+            sideColors = sideColors,
             resolveName = ::displayName,
             socket = liveServer.factory,
         )
     val roomState by room.state.collectAsState()
+
+    // One gift button for the battle (SPEC 21.5): the tray's "Send to" row lists the round's sides (names from the app,
+    // colours = the bar's), and every gift goes to the side picked there. Off the Live tab, or between rounds, no row.
+    val battle by room.battle.collectAsState()
+    val liveSides = remember(battle) { room.battleView()?.sides?.map { it.id }.orEmpty() }
+    val trayReceivers = if (tab == PixelTab.Live) liveReceivers(liveSides, sideColors) else emptyList()
+    SideEffect { tray.receivers = trayReceivers }
+
+    // Leaving the Chat tab closes its tray (SPEC 20.5). On the Live tab the comment bar's gift button gifts the host.
+    LaunchedEffect(tab) {
+        if (tab != PixelTab.Chat) chatTray.close()
+        if (tab == PixelTab.Live && LIVE_HOST_POSTS.none { it.author == trayPost?.author }) trayPost = LIVE_HOST_POSTS.first()
+    }
 
     roomForTray[0] = room
 
@@ -218,6 +280,7 @@ fun PixelApp(awayOnce: AwayOnce) {
             client.offline = after.offline
             if (!after.offline) {
                 tray.refresh()
+                chatTray.refresh()
                 refreshWalls()
                 board.refresh()
                 inboxTick++
@@ -261,6 +324,7 @@ fun PixelApp(awayOnce: AwayOnce) {
                 tray.close()
                 client.reset()
                 tray.refresh()
+                chatTray.refresh()
                 received = START_RECEIVED
                 hidden = false
                 inboxItems = emptyList()
@@ -274,7 +338,18 @@ fun PixelApp(awayOnce: AwayOnce) {
             change = ::change,
         )
 
-    val noticeBottom = if (tray.isOpen) inset + 12.dp else TAB_BAR_HEIGHT + navBar + 12.dp
+    // Below the tab content: the tab bar and the navigation bar (the message bars lift by what is above them).
+    val belowContent = TAB_BAR_HEIGHT + navBar
+    // The gift notice sits above what covers the bottom: the tray's top edge, else the keyboard, else the tab bar;
+    // on the Chat and Live tabs also above their message bar (it rides on the tray or the keyboard), as on the web.
+    val ime = imeHeight()
+    val barAbove = if (tab == PixelTab.Chat || tab == PixelTab.Live) MESSAGE_BAR_HEIGHT else 0.dp
+    val noticeBottom =
+        when {
+            chatTray.isOpen && tab == PixelTab.Chat -> chatInset
+            tray.isOpen -> inset
+            else -> maxOf(belowContent, ime)
+        } + barAbove + 12.dp
 
     Box(Modifier.fillMaxSize().background(theme.background)) {
         Column(Modifier.fillMaxSize()) {
@@ -283,7 +358,23 @@ fun PixelApp(awayOnce: AwayOnce) {
             Box(Modifier.weight(1f)) {
                 when (tab) {
                     PixelTab.Feed -> FeedScreen(client, theme, wallKey, reduced, onGift = { if (trayPost?.id == it.id) tray.toggle() else openTray(it) }, onChip = { p, g -> openTray(p, g.id) })
-                    PixelTab.Live -> LiveScreen(room, roomState, theme, reduced, battle4, onBattle4 = { battle4 = it; tray.close() }, onGift = { post -> if (trayPost?.author == post.author) tray.toggle() else openTray(post) })
+                    PixelTab.Live ->
+                        LiveScreen(
+                            room, roomState, theme, reduced, liveMode,
+                            onMode = { liveMode = it; tray.close() },
+                            sideColors = sideColors,
+                            // A tap on a host of the bar picks that host in the tray and opens it (SPEC 21.4).
+                            onPressSide = { id ->
+                                tray.selectReceiver(id)
+                                tray.open()
+                            },
+                            tray = tray,
+                            comments = liveComments,
+                            trayInset = inset,
+                            below = belowContent,
+                            onComment = { liveComments = keepLast(liveComments + ChatText(null, it)) },
+                        )
+                    PixelTab.Chat -> ChatScreen(chat, chatTray, theme, chatInset, belowContent) { chat = chat + ChatText(null, it) }
                     PixelTab.Top -> TopScreen(client, theme, reduced, board)
                     PixelTab.Inbox ->
                         InboxScreen(client, theme, inboxHandle) { items ->
@@ -334,6 +425,7 @@ fun PixelApp(awayOnce: AwayOnce) {
                     // come from the holder.
                     tray = tray,
                     // The dim behind the sheet (it fades in with the sheet, goes away at peek); a tap on it closes the tray.
+                    // On the Live tab too: a tap on the stream closes the tray (the comment bar's gift button is a SPEC 20.3 host that passes scrim true, so SPEC 9.4 applies). Only the Chat tab's own tray has none.
                     scrim = true,
                     scrimTap = ScrimTap.Dismiss,
                     // A real app opens ITS coin store here; the demo's pretend store ADDS the coins.
@@ -346,6 +438,20 @@ fun PixelApp(awayOnce: AwayOnce) {
                     // The tab bar stays in view and in reach below the tray.
                     bottomInset = navBar + TAB_BAR_HEIGHT,
                     collapseOnSelect = true,
+                )
+            }
+            // The Chat tab's tray takes the keyboard's place: over the tab bar, as the keyboard is.
+            if (tab == PixelTab.Chat) {
+                BackHandler(enabled = chatTray.isOpen) { chatTray.close() }
+                GiftTray(
+                    tray = chatTray,
+                    onTopUp = { store = true },
+                    theme = theme,
+                    // Picking a gift lowers the sheet, so the conversation stays in sight; no dim.
+                    collapseOnSelect = true,
+                    // The message bar sits on the sheet's top edge, as on the keyboard.
+                    onInsetChange = { chatInset = it },
+                    bottomInset = navBar,
                 )
             }
             // The tab bar stays above the dim and the tray while the tray is open.
@@ -376,6 +482,7 @@ fun PixelApp(awayOnce: AwayOnce) {
                     store = false
                     client.credit(coins)
                     tray.refresh()
+                    chatTray.refresh()
                 },
                 onClose = { store = false },
             )

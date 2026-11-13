@@ -18,7 +18,7 @@ pick the `GiftingStack` product. In a `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/giftingstack/sdks.git", from: "0.1.4"),
+    .package(url: "https://github.com/giftingstack/sdks.git", from: "0.1.6"),
 ],
 targets: [
     .target(name: "YourApp", dependencies: [.product(name: "GiftingStack", package: "sdks")]),
@@ -146,6 +146,54 @@ data, the uptime clock as a required-reason API).
 
 Errors are `GiftingError` (`status`, `type`, `message`, `requestId`, `retryable`,
 `insufficientBalance`). `retryable` is true for network failures (status 0), 429 and 5xx.
+
+### Gift button in your message bar (spec 20)
+
+GiftingStack has no chat: it fits into yours. Put `GiftButton` in your message bar and bind your text field
+to the tray. The button closes the keyboard and opens the tray in its place; a tap on the field closes the
+tray and the keyboard comes back.
+
+```swift
+@FocusState private var typing: Bool
+@State private var text = ""
+...
+ZStack {
+    VStack {
+        Conversation()
+        HStack {
+            TextField("Message", text: $text)
+                .giftTrayInput(tray, focused: $typing) // applies .focused($typing) itself
+            GiftButton(tray: tray, theme: .dark)       // tray.toggle(); shows the open state
+            Button("Send") { /* your chat */ }
+        }
+        .padding(.bottom, trayInset)                    // above the tray, as above the keyboard
+    }
+    GiftTray(tray: tray, theme: .dark, onInsetChange: { trayInset = $0 }, collapseOnSelect: true)
+        .ignoresSafeArea()
+}
+```
+
+With a bound field the tray starts closed (an explicit `GiftTrayModel(open:)` wins), `toggle()` blurs the field
+before it opens and closes before it focuses the field again, `open()` blurs first, `close()` never moves the
+focus, and the sheet's default height is the last keyboard height seen (`model.keyboardHeight`, at least 120 pt;
+300 before any; at most 60 % of the area) unless you pass `snaps.default`. `scrim` stays off. `GiftButton`:
+`label` ("Send a gift"), `filled`, `size` (`.small` 32 / `.medium` 36 / `.large` 44, see below; the touch area is at least 44 x 44), `icon`, `disabled`, `theme`, `onPress`
+(after the toggle). Pure core: `inputSwapStep(open:event:)`, `keyboardPlaceHeight(keyboardHeight:containerHeight:)`.
+The chat itself (messages, a "you sent a gift" line) is your app's, from `onSent` and the room's events.
+
+#### Custom icon and sizes
+
+`size` is a fixed `GiftButtonSize` (`.small` = 32 pt, `.medium` = 36 pt, default, `.large` = 44 pt circle); the glyph box
+is always `22 * size / 36` square (19.56, 22, 26.89 pt) and you cannot pick other sizes. `icon` replaces the gift
+glyph: it gets the glyph's colour (`accent` when plain or active, `accentText` when filled) and is drawn centred in
+the glyph box and clipped to it, so your artwork can never change the button's size. Fit it into the box yourself
+(`.resizable()` and `.scaledToFit()` on an image).
+
+```swift
+GiftButton(tray: tray, size: .large, icon: { color in
+    AnyView(Image("heart").renderingMode(.template).resizable().scaledToFit().foregroundColor(color))
+})
+```
 
 ### Gift wall, "while you were away", leaderboard (spec 14-16, 0.3.0)
 
@@ -289,6 +337,49 @@ The gift notice of a battle says who got the gift: `sent Rose to Mia`, with a 2 
 
 The pure model (`battleBarModel`, `formatBattleScore`, `formatBattleClock`, `battleSideColors`) is in the core; the numbers are the shared fixture `battle-bar.json` (`BattleBarConformanceTests`). Reduced motion: no sliding, counting or pulse. The view uses only iOS 15 APIs: `TimelineView`, `AsyncImage`, `Animation.timingCurve`, `Animatable`, `onChange(of:perform:)`, `Task.sleep(nanoseconds:)`, `accessibilityReduceMotion`.
 
+### One gift button for a battle: the receiver picker (spec 21)
+
+In a battle the viewer needs one gift button, not one per side: give the tray the round's sides as `receivers`.
+With two or more, `GiftTray(tray:)` shows a "Send to" row under its header (each side a 30 pt avatar in a ring of
+its colour, the picked one at full opacity with an outer ring and its name in the accent colour, the others
+dimmed); a tap picks the side, it does not send. Every send goes to `tray.receiver`: the picked side, else the
+side this tray last sent to, else the plain `receiver` when it is a side, else the first side. A new list (the next
+round) keeps the pick when that side is still in it. Without `receivers` nothing changes.
+
+```swift
+@StateObject var tray = GiftTrayModel(
+    client: client,
+    receiver: "mia",                                // the fallback
+    effects: effects,
+    roomId: "stream_42",
+    receiverOf: { room.receiverFor($0) },           // your own gift says who got it
+    receivers: [                                    // the round's sides, in the bar's order
+        TrayReceiver(id: "mia", name: "Mia", color: "#e0457b"),
+        TrayReceiver(id: "theo", name: "Theo", color: "#3a8dff", avatarUrl: "https://..."),
+    ],
+    onReceiverChange: { id in print("next gift goes to", id) }
+)
+
+// The comment bar's one gift button (spec 20) opens it; a tap on a side of the bar picks that side and opens it.
+GiftBattleBar(
+    room: room,
+    sideColors: ["#e0457b", "#3a8dff"],             // the same colours as the receivers
+    onPressSide: { id in tray.selectReceiver(id); tray.open() },
+    pressSideLabel: "Send {name} a gift"            // VoiceOver label of each side's button (default)
+)
+GiftTray(tray: tray, sendToLabel: "Send to")        // the row's label (default)
+```
+
+`tray.receivers` is settable (a new round: assign the new sides); `selectReceiver(_:)` ignores an id that is not
+in the list; `selectedReceiver` and `lastReceiver` are published. A `TrayReceiver` without `color` takes the
+battle palette of its place (accent, coin, teal, pink, as the bar). With `onPressSide` each avatar of the bar
+(both layouts) is a button with a 44 x 44 touch area and VoiceOver reads the clock as the scores; without it the
+bar is one read-only element as before. A presentational `GiftTray(gifts:...)` takes `receivers:`,
+`selectedReceiver:`, `onSelectReceiver:` and `sendToLabel:`. Core: `resolveReceiver(ids:selected:last:fallback:)`,
+`defaultSendToLabel`, `defaultPressSideLabel` (fixture `receivers.json`, `ReceiversConformanceTests`); model and
+row: `ReceiverPickerTests`. Colour the gift lines of your comment column with the receiving side's colour (the
+room event's `receiverId`, or `GiftTransaction.receiver` for your own).
+
 ## Limits (from the contract)
 
 - At most 6 small, 2 medium and 1 large effect on screen; up to 5 large gifts wait, a 6th drops
@@ -309,7 +400,13 @@ mock client with 250 ms latency and 60,000 coins, about 90 gifts from the live l
 `PixelData.swift` and `DemoComponentData.swift` (same people, posts, leaderboard and away summary
 as the web demo). Tabs: Feed (four posts with drawn pictures; a Gift button opens the tray sheet
 for the post's author with `reference` = post id, it closes after a send; each post has its gift
-wall), Top (`GiftLeaderboard`, gifters or creators, you pinned at #417), Inbox (gifts from others,
+wall), Chat (a one-to-one conversation the demo draws itself; the message bar has a text field bound
+with `.giftTrayInput`, `GiftButton` and its own Send: the tray opens in the keyboard's place with no dim and
+`collapseOnSelect`, each gift adds a "You sent Rose" bubble, repeats add up as x2, x3, and the bar sits above
+the tray through `onInsetChange`), Live (a gift room with a battle, "Battle" or "Battle 4+": one gift button in
+the comment bar opens a tray whose "Send to" row holds the round's sides, a tap on a side of the battle bar picks
+it and opens the tray, and the comment column over the stream colours each gift line with the receiving side's
+colour), Top (`GiftLeaderboard`, gifters or creators, you pinned at #417), Inbox (gifts from others,
 newest first, a badge on the tab), Me (balance, "Get coins", received-gifts wall, "Hide me from
 leaderboards"). The coin store ADDS coins. The "While you were away" card shows the first time
 after install only (`UserDefaults`). Gifts from others do not arrive by themselves

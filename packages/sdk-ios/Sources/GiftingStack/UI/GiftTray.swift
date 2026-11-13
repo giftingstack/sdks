@@ -59,10 +59,22 @@ public struct GiftTray: View {
     let initialSnap: SheetSnap
     /// Closes the model of `GiftTray(tray:)` when a scrim tap dismisses and `open` was not given.
     var closeOwnTray: (() -> Void)?
+    /// `GiftTray(tray:)` with a text field bound (spec 20.3): the sheet's default snap is the keyboard's place.
+    var inputBound = false
+    /// The model's last keyboard height seen (nil: none yet, the fallback 300 is used).
+    var boundKeyboardHeight: Double?
+    /// The sides of the "Send to" row (spec 21.3; two or more draw it), the side shown as picked (nil: the view's own
+    /// pick, else the first), what a tap on a side calls, and the row's label.
+    let receivers: [TrayReceiver]
+    let selectedReceiver: String?
+    let onSelectReceiver: ((String) -> Void)?
+    let sendToLabel: String
 
     /// What the models that are alive report about the token (`GiftTrayModel.testMode`).
     @ObservedObject private var testModeFollow = GiftTrayTestModeRegistry.shared
     @State var selectedId: String?
+    /// The side picked in the "Send to" row while `selectedReceiver` is nil (a tray without a model).
+    @State var receiverPick: String?
     @State var gridHeight: CGFloat = 0
     @State var trayWidth: CGFloat = 0
     // Sheet measurements and gesture (GiftTray+Sheet.swift).
@@ -115,6 +127,11 @@ public struct GiftTray: View {
     ///     `.dismiss` dismisses from every state. A dismissal closes the `tray` model (when `open` was not given) and
     ///     then calls `onDismiss`.
     ///   - onDismiss: a tap on the dim asked to close. With a `tray` it is already closed when this runs.
+    ///   - receivers: (spec 21) the sides of a battle. Two or more: a "Send to" row under the header, above the grid;
+    ///     a tap picks a side (it does not send). Empty (default): no row, the tray is as before.
+    ///   - selectedReceiver: the side shown as picked. nil: the side tapped last in this view, else the first.
+    ///   - onSelectReceiver: a side was tapped and the pick changed. Send the next gifts to that side.
+    ///   - sendToLabel: the row's label (default "Send to"), also its accessibility label.
     public init(
         gifts: [Gift],
         balance: Int,
@@ -144,8 +161,16 @@ public struct GiftTray: View {
         open: Bool? = nil,
         scrim: Bool = false,
         scrimTap: ScrimTap = .lower,
-        onDismiss: (() -> Void)? = nil
+        onDismiss: (() -> Void)? = nil,
+        receivers: [TrayReceiver] = [],
+        selectedReceiver: String? = nil,
+        onSelectReceiver: ((String) -> Void)? = nil,
+        sendToLabel: String = defaultSendToLabel
     ) {
+        self.receivers = receivers
+        self.selectedReceiver = selectedReceiver
+        self.onSelectReceiver = onSelectReceiver
+        self.sendToLabel = sendToLabel
         self.gifts = gifts
         self.balance = balance
         self.onSend = onSend
@@ -183,6 +208,8 @@ public struct GiftTray: View {
     /// Anything you pass yourself wins; every other parameter is the one of the main initialiser.
     ///   - testMode: nil follows the model: a test token shows the badge (also after `tray.stop()`, for as long as
     ///     this view lives); `true` / `false` force it.
+    ///   - sendToLabel: the label of the "Send to" row, drawn while the model has two or more `receivers` (spec 21);
+    ///     a tap on a side is `tray.selectReceiver(id)`.
     @MainActor
     public init(
         tray: GiftTrayModel,
@@ -214,7 +241,8 @@ public struct GiftTray: View {
         open: Bool? = nil,
         scrim: Bool = false,
         scrimTap: ScrimTap = .lower,
-        onDismiss: (() -> Void)? = nil
+        onDismiss: (() -> Void)? = nil,
+        sendToLabel: String = defaultSendToLabel
     ) {
         self.init(
             gifts: gifts ?? tray.gifts,
@@ -246,12 +274,18 @@ public struct GiftTray: View {
             open: open ?? tray.isOpen,
             scrim: scrim,
             scrimTap: scrimTap,
-            onDismiss: onDismiss
+            onDismiss: onDismiss,
+            receivers: tray.receivers,
+            selectedReceiver: tray.receivers.isEmpty ? nil : tray.receiver,
+            onSelectReceiver: { [weak tray] id in tray?.selectReceiver(id) },
+            sendToLabel: sendToLabel
         )
         // `open` given: the host owns the state and never has it closed behind its back.
         if open == nil {
             closeOwnTray = { [weak tray] in tray?.close() }
         }
+        inputBound = tray.inputBound
+        boundKeyboardHeight = tray.keyboardHeight
     }
 
     /// The gift shown as selected: the chosen one, else the first gift.
@@ -314,6 +348,9 @@ public struct GiftTray: View {
     private var fixedBody: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            if showsReceiverRow {
+                receiverRow
+            }
             fixedGrid
             sendButton
         }

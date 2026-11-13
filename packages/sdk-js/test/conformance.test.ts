@@ -23,6 +23,12 @@ import {
   type SheetSnap,
   TraySheetController,
   TrayOpenState,
+  KEYBOARD_MIN_HEIGHT,
+  KEYBOARD_PLACE_FALLBACK,
+  KEYBOARD_PLACE_MAX_FRACTION,
+  inputSwapStep,
+  keyboardPlaceHeight,
+  resolveReceiver,
   SCRIM_FADE_MS,
   SCRIM_OPACITY,
   scrimFadeMs,
@@ -478,6 +484,57 @@ describe("conformance: tray-scrim.json", () => {
           expect(changes, `${at} changes`).toEqual(step.expect.changes);
         } else throw new Error(`${at}: unknown step`);
       }
+    });
+  }
+});
+
+// ---------------------------------------------------------------- input swap (spec 20)
+
+describe("conformance: input-swap.json", () => {
+  const f = fixture("input-swap.json");
+  it("constants", () => {
+    expect(KEYBOARD_PLACE_FALLBACK).toBe(f.constants.fallback);
+    expect(KEYBOARD_MIN_HEIGHT).toBe(f.constants.minKeyboard);
+    expect(KEYBOARD_PLACE_MAX_FRACTION).toBe(f.constants.maxFraction);
+  });
+  for (const [i, c] of (f.step as Json[]).entries()) {
+    it(`step #${i + 1}: ${c.event} when open=${c.open}`, () => {
+      expect(inputSwapStep(c.open, c.event)).toEqual(c.expect);
+    });
+  }
+  for (const [i, c] of (f.place as Json[]).entries()) {
+    it(`place #${i + 1}: ${c.note}`, () => {
+      expect(
+        keyboardPlaceHeight({
+          keyboardHeight: c.keyboardHeight,
+          containerHeight: c.containerHeight,
+        }),
+      ).toBe(c.expect);
+    });
+  }
+  for (const s of f.sequence as Json[]) {
+    it(`sequence: ${s.name}`, () => {
+      let open: boolean = s.open;
+      for (const [i, step] of (s.steps as Json[]).entries()) {
+        const got = inputSwapStep(open, step.event);
+        expect(got, `${s.name}, step ${i + 1}`).toEqual(step.expect);
+        if (got.tray === "open") open = true;
+        else if (got.tray === "close") open = false;
+        expect(open, `${s.name}, step ${i + 1} open`).toBe(step.open);
+      }
+    });
+  }
+});
+
+// ---------------------------------------------------------------- receiver picker (spec 21)
+
+describe("conformance: receivers.json", () => {
+  const f = fixture("receivers.json");
+  for (const [i, c] of (f.resolve as Json[]).entries()) {
+    it(`resolve #${i + 1}: ${c.note}`, () => {
+      expect(
+        resolveReceiver(c.ids, { selected: c.selected, last: c.last, fallback: c.fallback }),
+      ).toBe(c.expect);
     });
   }
 });

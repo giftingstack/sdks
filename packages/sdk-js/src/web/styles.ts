@@ -4,7 +4,7 @@
  * theme as fallback, so a `theme` option or your own CSS can override them.
  */
 export const CSS: string = `
-.gs-layer, .gs-tray, .gs-wall, .gs-away, .gs-board, .gs-battle {
+.gs-layer, .gs-tray, .gs-wall, .gs-away, .gs-board, .gs-battle, .gs-gift-button {
   --gs-background: #14141f; --gs-surface: #1e1e2e; --gs-border: #2d2d44; --gs-text: #f4f2ff;
   --gs-muted: #a3a1c2; --gs-accent: #8b7bff; --gs-accent-text: #ffffff; --gs-coin: #ffd27a;
   --gs-danger: #ff8fa3; --gs-notice-background: rgba(123, 107, 255, 0.92);
@@ -397,6 +397,77 @@ button.gs-chip::after { content: ""; position: absolute; inset: -10px -3px; }
   button.gs-row-main:hover { background: var(--gs-background); }
   .gs-retry:hover { filter: brightness(1.08); }
 }
+
+/* The gift button in the app's message bar (spec 20.4). */
+.gs-gift-button {
+  --gs-size: 36px; display: inline-grid; place-items: center; flex: none; width: var(--gs-size);
+  height: var(--gs-size); padding: 0; margin: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--gs-accent); cursor: pointer; position: relative;
+  -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out;
+}
+.gs-gift-button::after { content: ""; position: absolute; inset: min(0px, calc((var(--gs-size) - 44px) / 2)); }
+.gs-gift-button[data-gs-filled] { background: var(--gs-accent); color: var(--gs-accent-text); }
+.gs-gift-button[aria-expanded="true"] { background: var(--gs-selected); color: var(--gs-accent); }
+.gs-gift-button:disabled, .gs-gift-button[aria-disabled="true"] { opacity: 0.5; cursor: default; }
+.gs-gift-button:focus-visible { outline: 2px solid var(--gs-accent); outline-offset: 2px; }
+.gs-gift-glyph {
+  display: grid; place-items: center; flex: none; overflow: hidden; color: inherit; pointer-events: none;
+  width: calc(var(--gs-size) * 22 / 36); height: calc(var(--gs-size) * 22 / 36);
+  /* A definite cell: the percentages below resolve against the fixed box, not against the icon. */
+  grid-template: 100% / 100%;
+}
+.gs-gift-glyph > * { display: block; min-width: 0; min-height: 0; max-width: 100%; max-height: 100%; }
+.gs-gift-glyph > svg.gs-gift-default {
+  width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linejoin: round; stroke-linecap: round;
+}
+.gs-gift-glyph > img { object-fit: contain; }
+@media (hover: hover) {
+  .gs-gift-button:not(:disabled):hover { filter: brightness(1.12); }
+}
+
+/* The "Send to" row of a battle (spec 21.3). */
+.gs-receivers {
+  position: relative; flex: none; display: flex; align-items: center; gap: 8px; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; padding: 2px 2px 4px; margin-top: 10px;
+}
+.gs-receivers[hidden] { display: none; }
+.gs-receivers::-webkit-scrollbar { display: none; }
+/* The row never shrinks (a popover or inline tray is a height-capped column): the avatars stay round. */
+.gs-receivers > * { flex-shrink: 0; }
+.gs-receivers-label { flex: none; font-size: 12px; font-weight: 700; color: var(--gs-muted); }
+.gs-receiver {
+  flex: none; display: flex; align-items: center; gap: 6px; padding: 3px; margin: 0;
+  border: 0; border-radius: 999px; background: transparent; color: var(--gs-text); cursor: pointer;
+  font: inherit; opacity: 0.55; -webkit-tap-highlight-color: transparent;
+  transition: opacity 120ms ease-out;
+}
+.gs-receiver[aria-checked="true"] { opacity: 1; padding-right: 8px; }
+.gs-receiver:not([aria-checked="true"]) .gs-receiver-name { display: none; }
+.gs-receiver:focus-visible { outline: 2px solid var(--gs-accent); outline-offset: 2px; }
+.gs-receiver-avatar {
+  display: grid; place-items: center; overflow: hidden; flex: none; width: 30px; height: 30px;
+  border-radius: 50%; background: var(--gs-side); color: var(--gs-side-text); font-size: 13px;
+  font-weight: 800; box-shadow: 0 0 0 2px var(--gs-side);
+}
+.gs-receiver[aria-checked="true"] .gs-receiver-avatar {
+  box-shadow: 0 0 0 2px var(--gs-side), 0 0 0 4px var(--gs-text);
+}
+.gs-receiver-avatar .gs-avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.gs-receiver-avatar .gs-avatar-letter { grid-area: 1 / 1; }
+.gs-receiver-name {
+  max-width: 72px; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gs-receiver[aria-checked="true"] .gs-receiver-name { color: var(--gs-accent); }
+/* A tappable side of the battle bar (spec 21.4). */
+.gs-vs-pick {
+  display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0;
+  margin: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.gs-vs-pick:focus-visible { outline: 2px solid var(--gs-accent); outline-offset: 2px; }
+.gs-vs-pick:active .gs-vs-avatar { transform: scale(0.94); }
 `;
 
 /** How the stylesheet reaches the page (see `configureStyles`). */

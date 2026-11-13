@@ -28,6 +28,8 @@ final class FixtureCoverageTests: XCTestCase {
         "battle-bar.json": "BattleBarConformanceTests.swift",
         "pictures.json": "PicturesConformanceTests.swift",
         "tray-scrim.json": "TrayScrimConformanceTests.swift",
+        "input-swap.json": "InputSwapConformanceTests.swift",
+        "receivers.json": "ReceiversConformanceTests.swift",
     ]
 
     /// Web only by the SPEC (9.3). The component fixtures (wall, away, leaderboard) and the five

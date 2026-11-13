@@ -6,6 +6,7 @@ import 'package:giftingstack/giftingstack.dart';
 
 import 'art.dart';
 import 'catalog.dart';
+import 'chat.dart';
 import 'coin_store.dart';
 import 'demo_data.dart';
 import 'dev_menu.dart';
@@ -89,20 +90,17 @@ class _DemoAppState extends State<DemoApp> {
 /// The room of the Live tab.
 const String liveRoomId = 'live_demo';
 
-/// What a gift sent in the Live tab is addressed to: one of the two sides of the battle.
-Post _livePostOf(String id) => Post(
-      'live_demo',
-      id,
-      '${nameOf(id)} is live',
-      PostArt.aurora,
-      'now',
-      0,
-    );
-
 /// The height of the bottom navigation bar the live tray stays above.
 const double _navHeight = 54;
 
-enum _Tab { feed, top, live, inbox, me }
+enum _Tab { feed, chat, top, live, inbox, me }
+
+/// The modes of the Live tab: a plain room (one host), a battle of two hosts
+/// and a free-for-all of four.
+enum _LiveMode { room, battle, battle4 }
+
+/// The person on the other end of the Chat tab.
+const String _chatWith = 'mateo';
 
 class DemoScreen extends StatefulWidget {
   const DemoScreen({
@@ -144,7 +142,14 @@ class _DemoScreenState extends State<DemoScreen> {
 
   /// The Live tab's room, joined while the tab is open.
   GiftRoom? _room;
-  bool _battle4 = false;
+  _LiveMode _mode = _LiveMode.room;
+
+  /// The room id of the mode on screen (every mode is its own room).
+  String get _liveRoom => switch (_mode) {
+        _LiveMode.room => '${liveRoomId}_room',
+        _LiveMode.battle => liveRoomId,
+        _LiveMode.battle4 => '${liveRoomId}_4',
+      };
 
   List<Gift> _catalog = const [];
   String _selectedId = 'sun-dragon';
@@ -152,7 +157,6 @@ class _DemoScreenState extends State<DemoScreen> {
   // The page stays in sight: picking a gift lowers the sheet (collapseOnSelect),
   // the SDK's scrim goes away while it is low, a tap on the scrim closes the
   // tray (scrimTap: dismiss) and the Gift button is tray.toggle().
-  bool _trayLive = false;
   String? _trayTo;
   double? _inset;
 
@@ -175,6 +179,27 @@ class _DemoScreenState extends State<DemoScreen> {
 
   GiftingTheme get _theme => _themeOf(widget.theme);
   bool? get _reduced => _menu.reducedMotion ? true : null;
+
+  // ---- the gift button in a message bar (SPEC 20): the Chat tab's message bar
+  // and the Live tab's comment bar. The tray is bound to the bar's text field:
+  // the gift button puts it where the keyboard was, a tap on the field brings
+  // the keyboard back. The chat and the comments are this app's, not the SDK's.
+  final FocusNode _chatField = FocusNode();
+  final TextEditingController _chatText = TextEditingController();
+  final List<ChatLine> _chat = [
+    ChatLine.text(false, 'Did you catch my stream last night?'),
+    ChatLine.text(true, 'Yes! The ending was wild'),
+    ChatLine.text(false, 'Right?? Going live again on Friday'),
+  ];
+  GiftTrayNotifier? _chatTray;
+  double _chatInset = 0;
+  Timer? _thanks;
+
+  final FocusNode _commentField = FocusNode();
+  final TextEditingController _commentText = TextEditingController();
+  final List<ChatLine> _comments = [];
+  GiftTrayNotifier? _liveTray;
+  double _liveInset = 0;
 
   @override
   void initState() {
@@ -209,8 +234,182 @@ class _DemoScreenState extends State<DemoScreen> {
     _tray?.dispose();
     _room?.dispose();
     _menu.dispose();
+    _thanks?.cancel();
+    _chatTray?.dispose();
+    _liveTray?.dispose();
+    _chatField.dispose();
+    _chatText.dispose();
+    _commentField.dispose();
+    _commentText.dispose();
     super.dispose();
   }
+
+  /// A tray bound to a message bar's text field (SPEC 20): it starts closed,
+  /// no scrim, and a pick lowers it so the conversation stays in sight.
+  GiftTrayNotifier _boundTrayFor(
+    String receiver, {
+    required FocusNode field,
+    required String reference,
+    String? roomId,
+    List<TrayReceiver> receivers = const [],
+    GiftEffectReceiver? Function(String receiver)? receiverOf,
+    required ValueChanged<GiftTransaction> onSent,
+    required VoidCallback onClosed,
+  }) =>
+      GiftTrayNotifier(
+        client: _client,
+        receiver: receiver,
+        effects: _effects,
+        reference: reference,
+        roomId: roomId,
+        receivers: receivers,
+        receiverOf: receiverOf,
+        input: field,
+        onOpenChange: (open) {
+          if (!open && mounted) setState(onClosed);
+        },
+        onSent: (tx) {
+          if (!mounted) return;
+          setState(() {
+            _balance = tx.senderBalanceAfter;
+            onSent(tx);
+          });
+        },
+      );
+
+  GiftTrayNotifier _makeChatTray() => _boundTrayFor(
+        _chatWith,
+        field: _chatField,
+        reference: 'dm_ava_$_chatWith',
+        onClosed: () => _chatInset = 0,
+        onSent: (tx) {
+          // One thank-you after the sending stops, not one per tap, and one per
+          // combo: a combo that went on after its thank-you gets no second one.
+          if (addSentGift(_chat, tx, moveDown: false)) return;
+          _thanks?.cancel();
+          _thanks = Timer(const Duration(milliseconds: 1800), () {
+            if (mounted) {
+              setState(() => _chat.add(ChatLine.text(false, 'Thank you!!')));
+            }
+          });
+        },
+      );
+
+  GiftTrayNotifier _makeLiveTray() {
+    return _boundTrayFor(
+      'mira',
+      field: _commentField,
+      reference: 'live_demo',
+      roomId: _liveRoom,
+      // One gift button for the battle (SPEC 21): the tray's "Send to" row
+      // picks the side, and your own gift says who got it.
+      receivers: _liveReceivers(),
+      receiverOf: (r) => _room?.receiverFor(r),
+      onClosed: () => _liveInset = 0,
+      onSent: (tx) {
+        // In a real room the server counts the gift into the battle.
+        scoreOwnGift(tx.receiver, tx.unitPrice, tx.quantity);
+        addSentGift(_comments, tx);
+        keepLast(_comments);
+        _wallRefresh++;
+      },
+    );
+  }
+
+  /// The side colours of the battle: the bar, the tray's "Send to" row and
+  /// the comment column use the same list (the room's notice uses the same
+  /// default palette).
+  List<Color> _sideColors(int n) => [
+        for (var i = 0; i < n; i++)
+          switch (i % 4) {
+            0 => _theme.accent,
+            1 => _theme.coin,
+            final k => Color(0xFF000000 |
+                int.parse(battleExtraColors[k - 2].substring(1), radix: 16)),
+          },
+      ];
+
+  /// The round's sides as the tray's receivers: names from this app's users,
+  /// colours from [_sideColors].
+  List<TrayReceiver> _liveReceivers() {
+    final sides = _room?.battleView?.sides ?? const <BattleSide>[];
+    final colors = _sideColors(sides.length);
+    return [
+      for (var i = 0; i < sides.length; i++)
+        TrayReceiver(
+          id: sides[i].id,
+          name: nameOf(sides[i].id),
+          color:
+              '#${(colors[i].toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}',
+        ),
+    ];
+  }
+
+  /// A new round (or the first frame of one): the tray's sides follow it.
+  void _syncLiveReceivers() {
+    final tray = _liveTray;
+    if (tray != null) tray.receivers = _liveReceivers();
+  }
+
+  /// The colour of [receiver]'s side in the round on screen, if any.
+  Color? _sideColorOf(String? receiver) {
+    final sides = _room?.battleView?.sides ?? const <BattleSide>[];
+    final i = sides.indexWhere((s) => s.id == receiver);
+    return i < 0 ? null : _sideColors(sides.length)[i];
+  }
+
+  /// A side of the battle bar was tapped: the comment bar's tray opens with
+  /// that side picked (SPEC 21.4).
+  void _pressSide(String id) {
+    final tray = _liveTray;
+    if (tray == null) return;
+    _closeTray();
+    tray
+      ..selectReceiver(id)
+      ..open();
+  }
+
+  void _dropLiveTray() {
+    final n = _liveTray;
+    if (n == null) return;
+    _liveTray = null;
+    _liveInset = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) => n.dispose());
+  }
+
+  /// The bound tray fills the tab above the bottom bar. It is in the tree
+  /// while it is open or its field has focus (then it learns the keyboard's
+  /// height).
+  Widget _boundTray(
+    GiftTrayNotifier tray,
+    FocusNode field,
+    ValueChanged<double> onInset, {
+    bool scrim = false,
+  }) =>
+      ListenableBuilder(
+        listenable: Listenable.merge([tray, field]),
+        builder: (context, _) => tray.isOpen || field.hasFocus
+            ? ClipRect(
+                child: GiftTray(
+                  tray: tray,
+                  collapseOnSelect: true,
+                  // The Live tab dims the stream and a tap on it closes the
+                  // tray; the Chat tab keeps its conversation undimmed.
+                  scrim: scrim,
+                  scrimTap: ScrimTap.dismiss,
+                  onTopUp: _store,
+                  defaultSelectedId: _selectedId,
+                  theme: _theme,
+                  reducedMotion: _reduced,
+                  onSelect: (g) => _selectedId = g.id,
+                  // The message bar sits on the sheet's top edge.
+                  onInsetChange: (px) {
+                    if (mounted) setState(() => onInset(px));
+                  },
+                ),
+              )
+            : const SizedBox.shrink(),
+      );
 
   String _randomSender() => _senders[_random.nextInt(_senders.length)];
 
@@ -225,7 +424,10 @@ class _DemoScreenState extends State<DemoScreen> {
 
   // ---- the gift tray: made when a Gift button is pressed, gone after a send
 
-  void _openTray(Post post, {String? giftId, String? roomId}) {
+  void _openTray(Post post, {String? giftId}) {
+    // One tray at a time.
+    _chatTray?.close();
+    _liveTray?.close();
     final old = _tray;
     if (old != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
@@ -235,18 +437,11 @@ class _DemoScreenState extends State<DemoScreen> {
       receiver: post.author,
       effects: _effects,
       reference: post.id,
-      roomId: roomId,
-      // In a battle your own gift says who got it too (the room knows the sides).
-      receiverOf: (r) => _room?.receiverFor(r),
       // A tap on the scrim or the Gift button (toggle) closes the tray: let go of it.
       onOpenChange: (open) {
         if (!open) _closeTray();
       },
       onSent: (tx) {
-        // In a real room the server counts the gift into the battle; the pretend one is told here.
-        if (roomId != null) {
-          scoreOwnGift(tx.receiver, tx.unitPrice, tx.quantity);
-        }
         if (!mounted) return;
         setState(() {
           _balance = tx.senderBalanceAfter;
@@ -272,7 +467,6 @@ class _DemoScreenState extends State<DemoScreen> {
     );
     setState(() {
       _tray = notifier;
-      _trayLive = roomId != null;
       _trayTo = post.author;
       if (giftId != null) _selectedId = giftId;
     });
@@ -458,9 +652,17 @@ class _DemoScreenState extends State<DemoScreen> {
       // Joined while the Live tab is open, left when you go elsewhere.
       if (t == _Tab.live) {
         _room ??= _joinRoom();
+        _liveTray ??= _makeLiveTray();
       } else {
         _room?.dispose();
         _room = null;
+        _dropLiveTray();
+      }
+      // The chat's tray stays made; leaving the screen closes it (SPEC 20.5).
+      if (t == _Tab.chat) {
+        _chatTray ??= _makeChatTray();
+      } else {
+        _chatTray?.close();
       }
     });
     // Opened again: ask again (the first visit loads by itself).
@@ -469,31 +671,58 @@ class _DemoScreenState extends State<DemoScreen> {
 
   /// A real [GiftRoom] on a pretend server: a real app passes no `socket:`
   /// and its own `getToken` (the token carries `rooms` and `name`).
-  GiftRoom _joinRoom() => GiftRoom(
-        room: _battle4 ? '${liveRoomId}_4' : liveRoomId,
+  GiftRoom _joinRoom() => _makeRoom()..addListener(_syncLiveReceivers);
+
+  GiftRoom _makeRoom() => GiftRoom(
+        room: _liveRoom,
         getToken: ({required bool forceRefresh}) async => demoRoomToken('ava'),
         client: _client,
         effects: _effects,
         // The battle notice says who got the gift: names like the bar's, and
         // (the bar has no override) the theme's accent / coin side colours.
         resolveName: nameOf,
+        // The other viewers' gifts land in the comment column too.
+        onEvent: _roomGift,
         socket: fakeRoomSocketFactory(
           gifts: () => _catalog,
           senders: _senders,
           nameOf: nameOf,
-          sides: _battle4 ? 4 : 2,
+          sides: _mode == _LiveMode.battle4 ? 4 : 2,
+          battle: _mode != _LiveMode.room,
         ),
       );
 
-  /// The two modes of the Live tab: "Battle" (two hosts) and "Battle 4+" (four
-  /// hosts every round, a free-for-all). Changing it joins a fresh room.
-  void _setBattle4(bool on) {
-    if (_battle4 == on) return;
+  /// A gift another viewer sent into the room (the room skips your own): a
+  /// line in the comment column, a running combo counts up and moves down.
+  void _roomGift(RoomGiftEvent e) {
+    if (!mounted) return;
     setState(() {
-      _battle4 = on;
+      addGiftLine(
+        _comments,
+        from: e.senderId,
+        giftId: e.gift.id,
+        name: e.gift.name,
+        to: e.receiverId,
+        quantity: e.quantity ?? 1,
+      );
+      keepLast(_comments);
+    });
+  }
+
+  /// The three modes of the Live tab: "Live room" (one host), "Battle" (two
+  /// hosts) and "Battle 4+" (four hosts every round, a free-for-all).
+  /// Changing it joins a fresh room.
+  void _setMode(_LiveMode mode) {
+    if (_mode == mode) return;
+    setState(() {
+      _mode = mode;
+      _comments.clear();
       _room?.dispose();
       _room = _joinRoom();
       _closeTray();
+      // The comment bar's tray sends into the new room.
+      _dropLiveTray();
+      _liveTray = _makeLiveTray();
     });
   }
 
@@ -529,6 +758,10 @@ class _DemoScreenState extends State<DemoScreen> {
                 const SizedBox(height: 3),
                 Text(
                   label,
+                  // Six tabs on a narrow phone: one line, never taller.
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.fade,
                   style: TextStyle(
                     color: color,
                     fontSize: 11,
@@ -553,6 +786,7 @@ class _DemoScreenState extends State<DemoScreen> {
       child: Row(
         children: [
           item(_Tab.feed, Icons.home_outlined, Icons.home, 'Feed'),
+          item(_Tab.chat, Icons.chat_bubble_outline, Icons.chat_bubble, 'Chat'),
           item(
               _Tab.top, Icons.emoji_events_outlined, Icons.emoji_events, 'Top'),
           item(_Tab.live, Icons.sensors_outlined, Icons.sensors, 'Live'),
@@ -573,6 +807,12 @@ class _DemoScreenState extends State<DemoScreen> {
     final insets = MediaQuery.paddingOf(context);
     final t = _theme;
     final tray = _tray;
+    // A bound tray open in this tab: the notice goes above its message bar.
+    final barInset = switch (_tab) {
+      _Tab.chat when _chatTray?.isOpen ?? false => _chatInset,
+      _Tab.live when _liveTray?.isOpen ?? false => _liveInset,
+      _ => null,
+    };
     return Scaffold(
       backgroundColor: t.background,
       // `expand`: a tab can be shorter than the screen, and a loose Stack
@@ -675,7 +915,13 @@ class _DemoScreenState extends State<DemoScreen> {
               reducedMotion: _reduced,
               noticeBottom: tray != null && _inset != null
                   ? _inset!
-                  : _baseNotice(insets),
+                  : barInset != null
+                      ? barInset +
+                          messageBarHeight +
+                          16 +
+                          _navHeight +
+                          insets.bottom
+                      : _baseNotice(insets),
             ),
           ),
         ],
@@ -685,6 +931,7 @@ class _DemoScreenState extends State<DemoScreen> {
 
   Widget _tabBody(_Tab tab) => switch (tab) {
         _Tab.feed => _feed(),
+        _Tab.chat => _chatTab(),
         _Tab.top => _top(),
         _Tab.live => _liveTab(),
         _Tab.inbox => _inboxTab(),
@@ -702,10 +949,9 @@ class _DemoScreenState extends State<DemoScreen> {
               _PostCard(
                 post: post,
                 theme: _theme,
-                onGift: () =>
-                    _tray != null && _trayTo == post.author && !_trayLive
-                        ? _tray!.toggle()
-                        : _openTray(post),
+                onGift: () => _tray != null && _trayTo == post.author
+                    ? _tray!.toggle()
+                    : _openTray(post),
                 wall: GiftWall(
                   key: ValueKey<String>('wall-${post.id}'),
                   client: _client,
@@ -721,6 +967,83 @@ class _DemoScreenState extends State<DemoScreen> {
           ],
         ),
       );
+
+  // ---- Chat: a one-to-one conversation. The conversation, the message bar and
+  // the bubbles are this app's own chat (GiftingStack carries no chat); from the
+  // SDK come the GiftButton, the tray in the keyboard's place and the effects.
+
+  Widget _chatTab() {
+    final t = _theme;
+    final tray = _chatTray;
+    final lines = _chat.reversed.toList();
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Row(
+                children: [
+                  const _Avatar(_chatWith, size: 36),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        nameOf(_chatWith),
+                        style: TextStyle(
+                          color: t.text,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'online',
+                        style: TextStyle(color: t.muted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              // A tap on the conversation puts the tray (or the keyboard)
+              // away, as chat apps do; no dim over the chat.
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  _chatTray?.close();
+                  FocusScope.of(context).unfocus();
+                },
+                child: ListView.builder(
+                  key: const ValueKey<String>('chat-list'),
+                  reverse: true,
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                  itemCount: lines.length,
+                  itemBuilder: (context, i) =>
+                      ChatBubble(line: lines[i], theme: t),
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.only(bottom: _chatInset),
+              child: MessageBar(
+                key: const ValueKey<String>('chat-bar'),
+                field: _chatField,
+                controller: _chatText,
+                tray: tray,
+                theme: t,
+                onSubmit: (text) =>
+                    setState(() => _chat.add(ChatLine.text(true, text))),
+                onGift: _closeTray,
+              ),
+            ),
+          ],
+        ),
+        if (tray != null) _boundTray(tray, _chatField, (px) => _chatInset = px),
+      ],
+    );
+  }
 
   // ---- Top
 
@@ -782,34 +1105,81 @@ class _DemoScreenState extends State<DemoScreen> {
 
   // ---- Live (a gift room)
 
-  /// One side's Gift button: opens the tray for that side, closes it when it is
-  /// already open for the same side.
-  Widget _liveGift(String id, Key key, {bool fill = false}) => GestureDetector(
-        key: key,
-        onTap: () => _tray != null && _trayLive && _trayTo == id
-            ? _tray!.toggle()
-            : _openTray(_livePostOf(id),
-                roomId: _battle4 ? '${liveRoomId}_4' : liveRoomId),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          alignment: fill ? Alignment.center : null,
-          decoration: BoxDecoration(
-            color: _theme.accent,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Text(
-            'Gift ${nameOf(id)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: _theme.accentText,
-              fontWeight: FontWeight.w700,
+  /// The Live tab: the stream and its battle above, the comment bar (the
+  /// app's, with the SDK's GiftButton) pinned under it, on the tray's top
+  /// edge while the tray is open.
+  Widget _liveTab() {
+    final tray = _liveTray;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Column(
+          children: [
+            Expanded(child: _liveContent()),
+            Padding(
+              padding: EdgeInsets.only(bottom: _liveInset),
+              child: MessageBar(
+                key: const ValueKey<String>('comment-bar'),
+                field: _commentField,
+                controller: _commentText,
+                tray: tray,
+                theme: _theme,
+                hint: 'Say something...',
+                onSubmit: (text) => setState(() {
+                  _comments.add(ChatLine.text(true, text));
+                  keepLast(_comments);
+                }),
+                onGift: _closeTray,
+              ),
             ),
+          ],
+        ),
+        if (tray != null)
+          _boundTray(
+            tray,
+            _commentField,
+            (px) => _liveInset = px,
+            scrim: true,
           ),
+      ],
+    );
+  }
+
+  /// The comment column over the stream: your comments and your gifts
+  /// (`onSent`), the newest at the bottom.
+  Widget _commentColumn() => Positioned(
+        left: 10,
+        right: 60,
+        bottom: 8,
+        child: Column(
+          key: const ValueKey<String>('live-comments'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final c in _comments)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(
+                  c.isGift ? c.giftText(nameOf) : 'Ava: ${c.text}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    // A gift line takes the receiving side's colour.
+                    color: (c.isGift ? _sideColorOf(c.to) : null) ??
+                        const Color(0xFFFFFFFF),
+                    fontSize: 13,
+                    fontWeight: c.isGift ? FontWeight.w700 : FontWeight.w500,
+                    shadows: const [
+                      Shadow(color: Color(0x99000000), blurRadius: 4),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
       );
 
-  Widget _liveTab() {
+  Widget _liveContent() {
     final room = _room;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -818,11 +1188,16 @@ class _DemoScreenState extends State<DemoScreen> {
         children: [
           _title('Live'),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              _seg('Battle', !_battle4, () => _setBattle4(false)),
-              const SizedBox(width: 8),
-              _seg('Battle 4+', _battle4, () => _setBattle4(true)),
+              _seg('Live room', _mode == _LiveMode.room,
+                  () => _setMode(_LiveMode.room)),
+              _seg('Battle', _mode == _LiveMode.battle,
+                  () => _setMode(_LiveMode.battle)),
+              _seg('Battle 4+', _mode == _LiveMode.battle4,
+                  () => _setMode(_LiveMode.battle4)),
             ],
           ),
           const SizedBox(height: 12),
@@ -830,88 +1205,51 @@ class _DemoScreenState extends State<DemoScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
+                SizedBox(
                   height: 180,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF3A2A6B), Color(0xFFE0457B)],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'Mira is live',
-                    style: TextStyle(
-                      color: Color(0xFFFFFFFF),
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF3A2A6B), Color(0xFFE0457B)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Mira is live',
+                          style: TextStyle(
+                            color: Color(0xFFFFFFFF),
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      _commentColumn(),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 10),
-                if (room != null) ...[
-                  // The SDK's battle bar, driven by the room.
-                  GiftBattleBar(
-                    room: room,
-                    theme: _theme,
-                    users: {
-                      for (final id in const ['mira', 'noor', 'lina', 'owen'])
-                        id: BattleBarUser(name: nameOf(id)),
-                    },
-                  ),
-                  // Each side's Gift button sits under that side of the bar.
-                  const SizedBox(height: 14),
-                  if (_battle4)
-                    // "Battle 4+": four hosts every round, one Gift button and
-                    // one cell of the bar each, in two columns so a name
-                    // never wraps or leaves the screen.
-                    LayoutBuilder(
-                      builder: (context, box) {
-                        final w = (box.maxWidth - 8) / 2;
-                        return Wrap(
-                          runSpacing: 8,
-                          spacing: 8,
-                          children: [
-                            for (final (id, key) in const [
-                              ('mira', 'live-gift'),
-                              ('noor', 'live-gift-noor'),
-                              ('lina', 'live-gift-lina'),
-                              ('owen', 'live-gift-owen'),
-                            ])
-                              SizedBox(
-                                width: w,
-                                child: _liveGift(
-                                  id,
-                                  ValueKey<String>(key),
-                                  fill: true,
-                                ),
-                              ),
-                          ],
-                        );
+                if (room != null && _mode != _LiveMode.room) ...[
+                  // The SDK's battle bar, driven by the room. One gift
+                  // button for the battle: the comment bar's; a tap on a side
+                  // opens its tray with that side picked (SPEC 21).
+                  ListenableBuilder(
+                    listenable: room,
+                    builder: (_, __) => GiftBattleBar(
+                      room: room,
+                      theme: _theme,
+                      sideColors:
+                          _sideColors(room.battleView?.sides.length ?? 0),
+                      onPressSide: _pressSide,
+                      users: {
+                        for (final id in const ['mira', 'noor', 'lina', 'owen'])
+                          id: BattleBarUser(name: nameOf(id)),
                       },
-                    )
-                  else
-                    // Two sides: two equal columns, each button centred under
-                    // its own half of the bar (like the web demo).
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _liveGift(
-                            'mira',
-                            const ValueKey<String>('live-gift'),
-                            fill: true,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _liveGift(
-                            'noor',
-                            const ValueKey<String>('live-gift-noor'),
-                            fill: true,
-                          ),
-                        ),
-                      ],
                     ),
+                  ),
                   const SizedBox(height: 10),
                 ],
                 if (room == null)

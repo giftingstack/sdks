@@ -40,6 +40,11 @@ export interface SheetViewOptions {
   container: HTMLElement;
   initialSnap?: SheetSnap;
   snaps?: SheetLayout["snaps"];
+  /**
+   * Adds to `snaps` at every measurement, from the container's height then (spec 20.3: the
+   * keyboard's place is a height, the layout wants a fraction).
+   */
+  snapsFor?: (containerHeight: number) => SheetLayout["snaps"];
   columns: () => number;
   onSnapChange?: (snap: SheetSnap) => void;
   onInsetChange?: (px: number) => void;
@@ -189,9 +194,10 @@ export class SheetView {
     const first = grid.firstElementChild as HTMLElement | null;
     const rowHeight = first ? first.offsetHeight + 8 : 0; // cell margins 4 + 4
     const rows = Math.ceil(grid.children.length / Math.max(1, this.o.columns()));
+    const extra = this.o.snapsFor?.(containerHeight);
     this.controller.setLayout({
       containerHeight,
-      snaps: this.snaps,
+      snaps: extra ? { ...extra, ...this.snaps } : this.snaps,
       peekMinHeight,
       defaultMinHeight: peekMinHeight + Math.min(2, rows) * rowHeight,
       contentHeight: peekMinHeight + rows * rowHeight,

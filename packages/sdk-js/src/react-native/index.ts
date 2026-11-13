@@ -9,7 +9,11 @@ export type { GiftEffectLayerHandle, GiftEffectLayerProps } from "./GiftEffectLa
 export { GiftTray } from "./GiftTray";
 export type { GiftTrayHandle, GiftTrayProps, GiftTrayState } from "./GiftTray";
 export { useGiftTray } from "./useGiftTray";
-export type { UseGiftTray, UseGiftTrayOptions } from "./useGiftTray";
+export { GIFT_BUTTON_SIZES, GiftButton, GiftGlyph, giftIconFitScale } from "./GiftButton";
+export { resolveReceiver } from "../core";
+export type { TrayReceiver } from "../core";
+export type { GiftButtonProps, GiftButtonSize } from "./GiftButton";
+export type { FocusableInput, UseGiftTray, UseGiftTrayOptions } from "./useGiftTray";
 export { darkTheme, defaultTheme, lightTheme, themeFromAccent } from "./theme";
 export type { GiftTheme, ThemeMode } from "./theme";
 export { GiftWall } from "./GiftWall";

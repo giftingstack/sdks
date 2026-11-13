@@ -6,11 +6,15 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/widgets.dart';
 
+import '../core/battle_bar.dart' show battleExtraColors, battleReadableOn;
+import '../core/input_swap.dart';
+import '../core/receivers.dart';
 import '../core/scrim.dart';
 import '../core/sheet.dart';
 import '../core/tray.dart';
 import '../core/types.dart';
 import 'effect_timeline.dart' show outCubic;
+import 'gift_parts.dart' show initialOf;
 import 'gift_tray_notifier.dart';
 import 'images.dart';
 import 'theme.dart';
@@ -106,6 +110,7 @@ class GiftTray extends StatefulWidget {
     this.scrim = false,
     this.scrimTap = ScrimTap.lower,
     this.onDismiss,
+    this.sendToLabel = kSendToLabel,
     super.key,
   }) : assert(
           tray != null || (gifts != null && balance != null && onSend != null),
@@ -183,7 +188,10 @@ class GiftTray extends StatefulWidget {
   final SheetSnap initialSnap;
 
   /// Sheet only: snap heights as fractions of the container height (0 = fit
-  /// the content). Defaults: peek 0, default 0, expanded 0.9.
+  /// the content). Defaults: peek 0, default 0, expanded 0.9. With a [tray]
+  /// that has a bound text field (`GiftTrayNotifier(input:)`, SPEC 20.3) the
+  /// default state takes the keyboard's place (`keyboardPlaceHeight`) unless
+  /// you give `SheetSnap.standard` here.
   final Map<SheetSnap, double?> snaps;
 
   /// Sheet only: the settled state changed (release, tap, accessibility
@@ -232,6 +240,10 @@ class GiftTray extends StatefulWidget {
   /// closed when this runs.
   final VoidCallback? onDismiss;
 
+  /// The label of the "Send to" row (SPEC 21.3), shown when the [tray] has
+  /// two or more `receivers`.
+  final String sendToLabel;
+
   /// The person picked another gift (not called for the first selection).
   /// Handy for a debug control such as "incoming: same as tray".
   final void Function(Gift gift)? onSelect;
@@ -273,6 +285,15 @@ class GiftTrayWidgetState extends State<GiftTray>
   final GlobalKey _gridKey = GlobalKey();
   final GlobalKey _rowKey = GlobalKey();
   final GlobalKey _footerKey = GlobalKey();
+
+  // ---- "Send to" row (SPEC 21.3)
+  final ScrollController _sendToScroll = ScrollController();
+  final GlobalKey _sendToContentKey = GlobalKey();
+  final Map<String, GlobalKey> _chipKeys = <String, GlobalKey>{};
+
+  /// What the row last brought into sight (pick, list, open): a change
+  /// scrolls the row again.
+  String? _sendToShown;
   double _containerHeight = 0;
   double _footerHeight = 0;
   String _layoutSignature = '';
@@ -452,6 +473,7 @@ class GiftTrayWidgetState extends State<GiftTray>
     _unsubscribe();
     _y.dispose();
     _gridScroll.dispose();
+    _sendToScroll.dispose();
     _count.dispose();
     super.dispose();
   }
@@ -554,7 +576,7 @@ class GiftTrayWidgetState extends State<GiftTray>
     final rows = (_gifts.length / math.max(1, widget.columns)).ceil();
     final layout = SheetLayout(
       containerHeight: widget.containerHeight ?? _containerHeight,
-      snaps: widget.snaps,
+      snaps: _snaps,
       peekMinHeight: peek,
       defaultMinHeight: peek + math.min(2, rows) * rowHeight,
       contentHeight: peek + rows * rowHeight,
@@ -778,6 +800,223 @@ class GiftTrayWidgetState extends State<GiftTray>
     );
   }
 
+  /// The default colour of side [i] of [n]: the battle palette (SPEC 18.7).
+  Color _sideColor(int i) {
+    final theme = widget.theme;
+    final defaults = <Color>[
+      theme.accent,
+      theme.coin,
+      for (final c in battleExtraColors) giftColor(c),
+    ];
+    return defaults[i % defaults.length];
+  }
+
+  Color _sideText(Color color, int i) {
+    final theme = widget.theme;
+    final d = i % (2 + battleExtraColors.length);
+    if (d == 0 && color == theme.accent) return theme.accentText;
+    if (d == 1 && color == theme.coin) return theme.coinText;
+    return battleReadableOn(giftColorCss(color)) == '#ffffff'
+        ? const Color(0xFFFFFFFF)
+        : const Color(0xFF000000);
+  }
+
+  /// The "Send to" row (SPEC 21.3): only with two or more receivers.
+  Widget? _sendTo() {
+    final tray = widget.tray;
+    if (tray == null || tray.receivers.length < 2) return null;
+    final theme = widget.theme;
+    final receivers = tray.receivers;
+    final current = tray.receiver;
+    // The selection changed (a tap, selectReceiver, a new list, the tray
+    // opened): bring the whole selected chip into sight after this frame.
+    final shown = '$current|${identityHashCode(receivers)}|$_open';
+    if (shown != _sendToShown) {
+      _sendToShown = shown;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _revealReceiver(current);
+      });
+    }
+    _chipKeys.removeWhere((id, _) => !receivers.any((r) => r.id == id));
+    return Semantics(
+      key: const ValueKey<String>('gift-send-to'),
+      container: true,
+      explicitChildNodes: true,
+      label: widget.sendToLabel,
+      child: Row(
+        children: <Widget>[
+          ExcludeSemantics(
+            child: Text(
+              widget.sendToLabel,
+              maxLines: 1,
+              style: _style(theme.muted, 12, FontWeight.w700),
+            ),
+          ),
+          // 6 + the content's 2 dp padding: 8 to the first side.
+          const SizedBox(width: 6),
+          Expanded(
+            child: SingleChildScrollView(
+              key: const ValueKey<String>('gift-send-to-scroll'),
+              controller: _sendToScroll,
+              scrollDirection: Axis.horizontal,
+              // Room for the picked side's outer ring, which is drawn outside
+              // the chip's box (so the chips never move on a pick).
+              child: Padding(
+                key: _sendToContentKey,
+                padding: const EdgeInsets.all(2),
+                child: Row(
+                  children: <Widget>[
+                    for (var i = 0; i < receivers.length; i++) ...<Widget>[
+                      if (i > 0) const SizedBox(width: 8),
+                      KeyedSubtree(
+                        key: _chipKeys.putIfAbsent(
+                          receivers[i].id,
+                          GlobalKey.new,
+                        ),
+                        child: _receiverChip(
+                          receivers[i],
+                          i,
+                          receivers[i].id == current,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Scrolls the row's own offset (never an ancestor: no
+  /// Scrollable.ensureVisible) the least distance that shows the whole chip
+  /// of [id], its outer ring included; animated unless reduced motion.
+  void _revealReceiver(String? id) {
+    if (id == null || !_sendToScroll.hasClients) return;
+    final chip = _chipKeys[id]?.currentContext?.findRenderObject();
+    final content = _sendToContentKey.currentContext?.findRenderObject();
+    if (chip is! RenderBox || content is! RenderBox) return;
+    if (!chip.hasSize || !content.hasSize) return;
+    final position = _sendToScroll.position;
+    if (position.maxScrollExtent <= 0) return;
+    final left = chip.localToGlobal(Offset.zero, ancestor: content).dx - 2;
+    final right = left + chip.size.width + 4;
+    final offset = position.pixels;
+    final view = position.viewportDimension;
+    var target = offset;
+    if (left < offset) {
+      target = left;
+    } else if (right > offset + view) {
+      target = right - view;
+    }
+    target = target.clamp(position.minScrollExtent, position.maxScrollExtent);
+    if ((target - offset).abs() < 0.5) return;
+    if (_reduced) {
+      _sendToScroll.jumpTo(target);
+    } else {
+      unawaited(
+        _sendToScroll.animateTo(
+          target,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        ),
+      );
+    }
+  }
+
+  Widget _receiverChip(TrayReceiver r, int i, bool selected) {
+    final theme = widget.theme;
+    Color color;
+    try {
+      color = r.color == null || r.color!.isEmpty
+          ? _sideColor(i)
+          : giftColor(r.color!);
+    } on FormatException {
+      color = _sideColor(i);
+    }
+    final textOn = _sideText(color, i);
+    const size = 30.0;
+    final disc = Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      child: Text(
+        initialOf(r.name),
+        style: _style(textOn, 13, FontWeight.w700),
+      ),
+    );
+    final url = r.avatarUrl;
+    final picture = (url == null || url.isEmpty)
+        ? disc
+        : ClipOval(
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: Image(
+                image: widget.imageProvider(url),
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => disc,
+              ),
+            ),
+          );
+    // A 30 dp avatar in a 2 dp ring of the side colour (34 dp). The picked
+    // side's outer ring (2 dp, text colour) is a shadow: it takes no room, so
+    // nothing moves when the pick changes.
+    final avatar = Container(
+      width: size + 4,
+      height: size + 4,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: color, width: 2),
+        boxShadow: selected
+            ? <BoxShadow>[BoxShadow(color: theme.text, spreadRadius: 2)]
+            : null,
+      ),
+      child: picture,
+    );
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: selected,
+      label: r.name,
+      excludeSemantics: true,
+      onTap: () => widget.tray?.selectReceiver(r.id),
+      child: GestureDetector(
+        key: ValueKey<String>('gift-receiver-${r.id}'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => widget.tray?.selectReceiver(r.id),
+        child: Opacity(
+          opacity: selected ? 1 : 0.55,
+          // Only the picked side shows its name (SPEC 21.3: four sides fit a
+          // 375 dp phone); the others are their avatar, named for screen
+          // readers by the Semantics above.
+          child: selected
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    avatar,
+                    const SizedBox(width: 6),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 72),
+                      child: Text(
+                        r.name,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        style: _style(theme.accent, 12, FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                )
+              : avatar,
+        ),
+      ),
+    );
+  }
+
   Widget _grid(Gift? selected) => LayoutBuilder(
         builder: (context, constraints) {
           final cell = constraints.maxWidth / widget.columns;
@@ -855,6 +1094,51 @@ class GiftTrayWidgetState extends State<GiftTray>
     return _buildFixed(selected, button, label);
   }
 
+  // ---- the keyboard's place (SPEC 20.3)
+
+  /// The last keyboard inset sampled, to tell a rising keyboard from one going
+  /// down (its frames on the way down are not its height).
+  double _keyboardSample = 0;
+
+  /// With a bound text field, records the keyboard's height on the notifier:
+  /// `MediaQuery.viewInsetsOf(context).bottom`, or the view's own inset when a
+  /// `Scaffold` above already took it out of the MediaQuery. Only while the
+  /// inset rises or holds, and only from [kKeyboardMinHeight] up.
+  void _sampleKeyboard(BuildContext context) {
+    final tray = widget.tray;
+    if (tray == null || !tray.inputBound) return;
+    var v = MediaQuery.maybeViewInsetsOf(context)?.bottom ?? 0.0;
+    final view = View.maybeOf(context);
+    if (view != null && view.devicePixelRatio > 0) {
+      v = math.max(v, view.viewInsets.bottom / view.devicePixelRatio);
+    }
+    final rising = v >= _keyboardSample;
+    _keyboardSample = v;
+    if (rising && v >= kKeyboardMinHeight && tray.recordKeyboardHeight(v)) {
+      _queueMeasure();
+    }
+  }
+
+  /// The snaps the sheet uses: the host's, plus (with a bound text field and
+  /// no `default` from the host) the keyboard's place as `default`.
+  Map<SheetSnap, double?> get _snaps {
+    final tray = widget.tray;
+    if (tray == null ||
+        !tray.inputBound ||
+        widget.snaps[SheetSnap.standard] != null) {
+      return widget.snaps;
+    }
+    final fraction = keyboardPlaceSnap(
+      keyboardHeight: tray.keyboardHeight,
+      containerHeight: widget.containerHeight ?? _containerHeight,
+    );
+    if (fraction == null) return widget.snaps;
+    return <SheetSnap, double?>{
+      ...widget.snaps,
+      SheetSnap.standard: fraction,
+    };
+  }
+
   Widget _buildFixed(Gift? selected, SendButtonState button, String label) {
     final theme = widget.theme;
     return Container(
@@ -871,6 +1155,10 @@ class GiftTrayWidgetState extends State<GiftTray>
         children: <Widget>[
           _head(),
           const SizedBox(height: 12),
+          if (_sendTo() case final row?) ...<Widget>[
+            row,
+            const SizedBox(height: 12),
+          ],
           ConstrainedBox(
             constraints: BoxConstraints(maxHeight: widget.gridMaxHeight),
             child: SingleChildScrollView(child: _grid(selected)),
@@ -890,6 +1178,9 @@ class GiftTrayWidgetState extends State<GiftTray>
         _containerHeight = constraints.maxHeight.isFinite
             ? constraints.maxHeight
             : MediaQuery.sizeOf(context).height;
+        // Here and not in build: a Scaffold that takes the keyboard out of the
+        // MediaQuery still resizes this box, and that runs this builder.
+        _sampleKeyboard(context);
         _queueMeasure();
         final st = _sheet.state;
         final bodyHeight = math.max(0.0, st.heights.expanded - _footerHeight);
@@ -917,6 +1208,15 @@ class GiftTrayWidgetState extends State<GiftTray>
                 child: _head(),
               ),
               const SizedBox(height: 12),
+              // Part of the block above the grid: the peek height grows by it
+              // (SPEC 21.3), _measure takes the grid's top.
+              if (_sendTo() case final row?) ...<Widget>[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: row,
+                ),
+                const SizedBox(height: 12),
+              ],
               Expanded(
                 child: ExcludeSemantics(
                   excluding: settledPeek,

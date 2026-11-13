@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.1.6 (preview)
+
+- Gift button in your message bar (SPEC 20): `GiftButton(tray:label:filled:size:disabled:theme:onPress:)`, a round
+  gift glyph button (36 pt circle, touch area at least 44 x 44) that calls `tray.toggle()` and shows the tray's open
+  state (selected background; VoiceOver value "expanded" / "collapsed"). Plain: accent glyph, no background; filled:
+  accent circle; disabled: half opacity.
+- `GiftButton` custom icon and fixed sizes (SPEC 20.4): `size` is now the enum `GiftButtonSize` (`.small` 32 pt,
+  `.medium` 36 pt default, `.large` 44 pt; no free numbers) and `icon: ((Color) -> AnyView)?` replaces the gift glyph,
+  drawn centred in the fixed glyph box and clipped to it.
+- Bind your text field: `.giftTrayInput(tray, focused: $isFocused)` (it applies `.focused` itself). While bound the
+  tray starts closed (an explicit `GiftTrayModel(open:)` wins; `open` is now `Bool?`, nil by default, which keeps the
+  old default of open without a bound field), `toggle()` blurs the field before it opens the tray and closes the tray
+  before it focuses the field, `open()` blurs first, the field's focus closes an open tray, `close()` never moves
+  focus. `GiftTrayModel.inputBound` and `keyboardHeight` (the last keyboard height seen from
+  `keyboardWillChangeFrameNotification`, at least 120 pt, kept when the keyboard goes down) are published.
+  `GiftTray(tray:)` with a bound field uses that height as the sheet's default snap (`keyboardPlaceHeight`, 300 before
+  any, at most 60 % of the area) unless you pass `snaps.default`; `scrim` stays off by default. Nothing changes
+  without a bound field.
+- Core (`Core/InputSwap.swift`, fixture `input-swap.json`): `inputSwapStep(open:event:)`, `keyboardPlaceHeight`,
+  `keyboardPlaceSnap`, `keyboardPlaceFallback` (300), `keyboardMinHeight` (120), `keyboardPlaceMaxFraction` (0.6).
+- Demo: a Chat tab (a conversation the demo draws itself; the message bar with the bound field, `GiftButton` and
+  its own Send; the tab bar makes room while you type or the tray is open).
+- Tests: `InputSwapConformanceTests`, `GiftButtonTests` (swap order with an injected focus setter, keyboard height
+  memory, the keyboard's place, the button). Written without a Swift compiler: not compiled or run here.
+- One gift button for a battle (SPEC 21): `GiftTrayModel(receivers:onReceiverChange:)` with `receivers`
+  (settable: a new round keeps the pick when that side is still there), `selectReceiver(_:)` (an id that is not a
+  side is ignored), `receiver` (the side the next gift goes to: the pick, else the side of the last successful send,
+  else the plain `receiver` when it is a side, else the first), published `selectedReceiver` / `lastReceiver`.
+  Every send goes to `receiver`; without `receivers` the tray is as before. `GiftTrayController.send(_:to:)` takes
+  the receiver and returns whether the server accepted it (`@discardableResult`).
+- `GiftTray`: a "Send to" row (two or more sides) under the header, above the grid, counted in the peek height: a
+  30 pt avatar in a 2 pt ring of the side colour (`TrayReceiver.color`, else the battle palette), gap 8; the others
+  are the avatar only at 0.55 (the name is the accessibility label), the picked side is at full opacity with an
+  outer ring in the text colour and its name after it (12, bold, accent, at most 72 pt), so four sides fit a 375 pt
+  phone; 44 pt tall touch areas; when the pick changes (a tap, `selectReceiver`, a new list, the tray opening) the
+  row scrolls itself (its own `ScrollViewReader`, least distance, animated unless reduced motion) so the picked side
+  is in sight; a tap picks (no send, no snap change); VoiceOver: a group labelled `sendToLabel`,
+  each side a button with the selected trait. `GiftTray(tray:sendToLabel:)`; the presentational initialiser takes
+  `receivers:selectedReceiver:onSelectReceiver:sendToLabel:`.
+- `GiftBattleBar(onPressSide:pressSideLabel:)`: every side's avatar (versus and multi layout) is a button (44 x 44
+  touch area, label "Send {name} a gift") that calls `onPressSide(id)`; VoiceOver reads the clock as the scores and
+  the result. Without `onPressSide` the bar is unchanged.
+- Core (`Core/Receivers.swift`, fixture `receivers.json`): `TrayReceiver(id:name:color:avatarUrl:)`,
+  `resolveReceiver(ids:selected:last:fallback:)`, `defaultSendToLabel`, `defaultPressSideLabel`.
+- Demo: the Live tab has one gift button in a new comment bar (bound with `.giftTrayInput`) instead of one per
+  side; its tray's "Send to" row holds the round's sides in the bar's colours, a tap on a side of the bar picks it
+  and opens the tray, and a comment column over the stream colours each gift line with the receiving side's colour.
+- Tests: `ReceiversConformanceTests`, `ReceiverPickerTests`. Written without a Swift compiler: not compiled or run
+  here.
+
 ## 0.1.4 (preview)
 
 - The tray title stays on one line and ends with "…" when it does not fit (SPEC 9): a long or translated `title` no longer wraps and pushes the small (peek) tray taller.

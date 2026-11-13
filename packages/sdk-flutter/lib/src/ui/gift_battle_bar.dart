@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../core/battle_bar.dart';
+import '../core/receivers.dart' show kPressSideLabel;
 import '../core/rooms.dart' show BattleSide, BattleView;
 import 'gift_parts.dart';
 import 'gift_room.dart' show GiftRoom;
@@ -53,6 +54,8 @@ class GiftBattleBar extends StatefulWidget {
     this.theme = const GiftingTheme(),
     this.labels = const BattleBarLabels(),
     this.imageProvider = defaultGiftImageProvider,
+    this.onPressSide,
+    this.pressSideLabel = kPressSideLabel,
     super.key,
   });
 
@@ -89,6 +92,15 @@ class GiftBattleBar extends StatefulWidget {
 
   /// Makes the provider for a picture URL.
   final GiftImageProviderBuilder imageProvider;
+
+  /// A side's avatar was pressed (SPEC 21.4), with the side's id. With it
+  /// every avatar is a button ([pressSideLabel]); open the tray with that
+  /// side picked: `tray..selectReceiver(id)..open()`. Null (the default):
+  /// the bar is one read-only element, as before.
+  final void Function(String id)? onPressSide;
+
+  /// The label of a side's button; `{name}` is replaced.
+  final String pressSideLabel;
 
   @override
   State<GiftBattleBar> createState() => _GiftBattleBarState();
@@ -239,8 +251,11 @@ class _GiftBattleBarState extends State<GiftBattleBar> {
             theme: theme,
             labels: labels,
             imageProvider: w.imageProvider,
+            onPress: w.onPressSide,
+            pressLabel: w.pressSideLabel,
           ),
         );
+    final pressable = w.onPressSide != null;
 
     final clockColumn = Column(
       mainAxisSize: MainAxisSize.min,
@@ -281,10 +296,15 @@ class _GiftBattleBarState extends State<GiftBattleBar> {
     final spoken = <String>[model.spoken, model.banner]
         .where((s) => s.isNotEmpty)
         .join('. ');
+    // With onPressSide the side buttons stay for screen readers; every other
+    // part is read through `spoken` only.
+    Widget quiet(Widget child) =>
+        pressable ? ExcludeSemantics(child: child) : child;
     return Semantics(
       container: true,
       liveRegion: true,
-      excludeSemantics: true,
+      excludeSemantics: !pressable,
+      explicitChildNodes: pressable,
       label: spoken,
       child: Column(
         key: const ValueKey<String>('gift-battle-bar'),
@@ -294,7 +314,7 @@ class _GiftBattleBarState extends State<GiftBattleBar> {
           if (multi) ...<Widget>[
             // Three or more sides (SPEC 18.7): the clock, a row of cells, a
             // bar of proportional segments.
-            Center(child: clockColumn),
+            Center(child: quiet(clockColumn)),
             const SizedBox(height: 10),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,7 +337,7 @@ class _GiftBattleBarState extends State<GiftBattleBar> {
               children: <Widget>[
                 side(0),
                 const SizedBox(width: 8),
-                clockColumn,
+                quiet(clockColumn),
                 const SizedBox(width: 8),
                 side(1),
               ],
@@ -335,7 +355,7 @@ class _GiftBattleBarState extends State<GiftBattleBar> {
           ],
           if (model.banner.isNotEmpty) ...<Widget>[
             const SizedBox(height: 10),
-            Text(
+            quiet(Text(
               model.banner,
               key: const ValueKey<String>('gift-battle-banner'),
               textAlign: TextAlign.center,
@@ -344,7 +364,7 @@ class _GiftBattleBarState extends State<GiftBattleBar> {
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
               ),
-            ),
+            )),
           ],
         ],
       ),
@@ -518,6 +538,8 @@ class _SideView extends StatefulWidget {
     required this.theme,
     required this.labels,
     required this.imageProvider,
+    this.onPress,
+    this.pressLabel = kPressSideLabel,
   });
 
   final BattleBarSide side;
@@ -534,6 +556,8 @@ class _SideView extends StatefulWidget {
   final GiftingTheme theme;
   final BattleBarLabels labels;
   final GiftImageProviderBuilder imageProvider;
+  final void Function(String id)? onPress;
+  final String pressLabel;
 
   @override
   State<_SideView> createState() => _SideViewState();
@@ -557,6 +581,12 @@ class _SideViewState extends State<_SideView>
       ),
     ],
   );
+
+  bool _pressed = false;
+
+  void _setPressed(bool v) {
+    if (_pressed != v && mounted) setState(() => _pressed = v);
+  }
 
   @override
   void didUpdateWidget(_SideView old) {
@@ -632,6 +662,36 @@ class _SideViewState extends State<_SideView>
           ),
       ],
     );
+    final onPress = w.onPress;
+    final Widget face = onPress == null
+        ? avatar
+        : Semantics(
+            button: true,
+            label: w.pressLabel.replaceAll('{name}', side.name),
+            excludeSemantics: true,
+            onTap: () => onPress(side.id),
+            child: GestureDetector(
+              key: ValueKey<String>('gift-battle-side-${w.index}'),
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (_) => _setPressed(true),
+              onTapUp: (_) => _setPressed(false),
+              onTapCancel: () => _setPressed(false),
+              onTap: () => onPress(side.id),
+              // At least a 44 dp touch target (SPEC 21.4).
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                child: Center(
+                  widthFactor: 1,
+                  heightFactor: 1,
+                  child: AnimatedOpacity(
+                    opacity: _pressed ? 0.6 : 1,
+                    duration: const Duration(milliseconds: 90),
+                    child: avatar,
+                  ),
+                ),
+              ),
+            ),
+          );
     final crowded = cell != null && cell < 36;
     final who = Column(
       mainAxisSize: MainAxisSize.min,
@@ -672,17 +732,19 @@ class _SideViewState extends State<_SideView>
         ? Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              avatar,
+              face,
               const SizedBox(height: 4),
-              who,
+              ExcludeSemantics(excluding: onPress != null, child: who),
             ],
           )
         : Row(
             textDirection: w.right ? TextDirection.rtl : TextDirection.ltr,
             children: <Widget>[
-              avatar,
+              face,
               const SizedBox(width: 8),
-              Flexible(child: who),
+              Flexible(
+                child: ExcludeSemantics(excluding: onPress != null, child: who),
+              ),
             ],
           );
     return Opacity(

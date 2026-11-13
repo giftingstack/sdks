@@ -2301,6 +2301,258 @@ on an error. `resolveUsers(ids)` (optional, as the away card) turns sender ids i
 badge with `inboxUnread`). Follows the theme tokens of section 9 and the accessibility rules of
 the leaderboard (each row one element with its full sentence and time).
 
+## 20. Gift button in the app's message bar (the keyboard swap)
+
+Added on 2026-11-13. GiftingStack carries no chat; it fits into the
+app's own chat or comment bar. The app puts a **gift button** into its message bar, inside or next
+to its own text field, like an emoji button. Tapping it closes the keyboard and opens the gift
+tray **in the keyboard's place**; tapping the text field closes the tray and the keyboard comes
+back; the button toggles. Before this section every demo wired that by hand (blur on the button,
+`close()` on the field's focus, no dim). It is an SDK feature now: the app passes its text field
+to the tray and draws `GiftButton`. Nothing changes for an app that passes no text field.
+
+Not in this section (and not in the SDK): the chat itself, its messages, a gift line in the chat.
+The app draws those from `onSent` and its room events.
+
+Reference: `packages/sdk-js/src/core/inputSwap.ts` (pure), `src/web/GiftButton.ts`,
+`src/web/GiftTray.ts` (option `input`), `src/react-native/GiftButton.tsx`, `useGiftTray.ts`
+(option `input`) and `GiftTray.tsx`. Fixture: `conformance/input-swap.json`.
+
+### 20.1 Names (use these, in the platform's idiom)
+
+| concept                   | web                                                                                         | React Native                                     | Flutter                                | Android (Compose)                                   | iOS (SwiftUI)                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
+| the button                | `new GiftButton(container, options)`, `<gift-button>`                                       | `<GiftButton tray={tray} />`                     | `GiftButton(tray: notifier)`           | `GiftButton(tray = holder)`                         | `GiftButton(tray: model)`                                       |
+| bind the app's text field | tray option `input` (`HTMLInputElement \| HTMLTextAreaElement`); `<gift-tray input="#sel">` | `useGiftTray({ input: textInputRef })`           | `GiftTrayNotifier(input: focusNode)`   | `Modifier.giftTrayInput(holder)` on the `TextField` | `.giftTrayInput(model, focused: $isFocused)` on the `TextField` |
+| the button that swaps     | the tray's `anchor` (a `GiftButton`'s `element`, or any element)                            | `GiftButton tray={tray}` (calls `tray.toggle()`) | `GiftButton(tray:)` (calls `toggle()`) | `GiftButton(tray =)` (calls `toggle()`)             | `GiftButton(tray:)` (calls `toggle()`)                          |
+| a field is bound          | `tray.hasInput()`                                                                           | `tray.inputBound`                                | `notifier.inputBound`                  | `holder.inputBound`                                 | `model.inputBound`                                              |
+| last keyboard height seen | (inside the tray)                                                                           | `tray.keyboardHeight`                            | `notifier.keyboardHeight`              | `holder.keyboardHeight`                             | `model.keyboardHeight`                                          |
+
+Pure core names (all platforms port them; Dart and Swift in their idiom): `inputSwapStep(open,
+event)`, `keyboardPlaceHeight({ keyboardHeight, containerHeight })`, the constants
+`KEYBOARD_PLACE_FALLBACK = 300`, `KEYBOARD_MIN_HEIGHT = 120`, `KEYBOARD_PLACE_MAX_FRACTION = 0.6`
+(Dart `kKeyboardPlaceFallback`, `kKeyboardMinHeight`, `kKeyboardPlaceMaxFraction`).
+
+### 20.2 Pure functions (fixture-tested)
+
+```text
+inputSwapStep(open, event) -> { tray, input }      tray: open | close | keep
+                                                   input: blur | focus | keep
+  event "button" (the gift button, toggle()):
+     open = false  -> { tray: open,  input: blur }  the keyboard leaves, the tray takes its place
+     open = true   -> { tray: close, input: focus } the tray leaves, the keyboard comes back
+  event "inputFocus" (the text field got focus: a tap on it, or the app focused it):
+     open = true   -> { tray: close, input: keep }
+     open = false  -> { tray: keep,  input: keep }
+
+  Order: "blur" runs BEFORE "open" (the keyboard starts to go down first); "close" runs BEFORE
+  "focus" (the tray is gone when the keyboard rises). The focus that "focus" causes is itself an
+  "inputFocus" event; the tray is already closed, so it is { keep, keep }.
+
+keyboardPlaceHeight({ keyboardHeight, containerHeight }) -> integer, the layout unit
+  k = keyboardHeight if finite and >= KEYBOARD_MIN_HEIGHT (120), else KEYBOARD_PLACE_FALLBACK (300)
+      (a smaller inset is not a keyboard: a hardware keyboard's accessory bar, a desktop browser)
+  if containerHeight is finite and > 0: k = min(k, floor(containerHeight * 0.6))
+  return round(k)
+```
+
+### 20.3 The tray with a bound text field
+
+Everything of sections 9 to 9.4 stays (gifts, Send, combos, `collapseOnSelect`, `onSent`,
+`onInsetChange`, the theme, the web placements). A bound text field adds this:
+
+- **Starts closed.** The default of `open` becomes `false` (an explicit `open` still wins). The
+  tray appears when the button is pressed.
+- **No dim by default.** `scrim` keeps its default `false`: the chat stays visible and touchable
+  above the tray. (A host may still pass `scrim: true`; then 9.4 applies unchanged.)
+- **The keyboard's place.** On the sheet, the `default` snap is
+  `keyboardPlaceHeight({ keyboardHeight: last keyboard height seen, containerHeight })` as a
+  fraction of the container height, unless the host gave `snaps.default` itself. The sheet's own
+  floor (`defaultMinHeight`: header, two rows, Send) still applies, so a short keyboard never
+  cuts the tray. `initialSnap` keeps its default `"default"`; peek and expanded work as before
+  (the handle still drags). The sheet is docked at the bottom of its container as always.
+- **Last keyboard height seen.** The platform records the keyboard's height whenever it is shown
+  and at least `KEYBOARD_MIN_HEIGHT` tall, and keeps the last such value (it is not cleared when
+  the keyboard goes down: that is the point). Before any is seen the fallback 300 is used.
+  Sources: web `visualViewport` (`innerHeight - visualViewport.height - visualViewport.offsetTop`)
+  or `navigator.virtualKeyboard.boundingRect.height` where present; React Native `Keyboard`
+  `keyboardWillShow`/`keyboardDidShow` `endCoordinates.height`; Flutter
+  `MediaQuery.viewInsetsOf(context).bottom`; Android `WindowInsets.ime`; iOS
+  `keyboardWillChangeFrameNotification`.
+- **The button** runs `inputSwapStep(isOpen, "button")`: `toggle()` IS that step whenever a field
+  is bound (`open()` and `close()` keep their meaning). "blur" takes the focus away from the field
+  and hides the keyboard (web `input.blur()`; RN `input.blur()` + `Keyboard.dismiss()`; Flutter
+  `unfocus()`; Android `clearFocus` + keyboard controller `hide()`; iOS the focus binding set to
+  `false`). "focus" focuses the field and shows the keyboard.
+- **The field's focus** runs `inputSwapStep(isOpen, "inputFocus")`. Web: a `focus` listener on
+  the field. React Native: the keyboard-show event while `input.isFocused()`. Flutter: the
+  `FocusNode` listener (`hasFocus` true). Android: `onFocusChanged` of the bound field. iOS: the
+  focus binding turning `true`.
+- **Every way the tray opens** (`open()`, `toggle()`, a host call) blurs the field first, so the
+  keyboard and the tray are never up together. Only the button (`toggle()` from open) focuses the
+  field again; `close()`, a scrim dismissal and the field's own focus do not move focus.
+- **Wide screens (web).** The popover of 9.3 stays: the button (its `anchor`) opens and closes it;
+  with a bound field the tray handles the anchor's clicks itself through `inputSwapStep` (the same
+  rules: focus on the field closes the popover, the button closing it puts focus back on the
+  field). The inline tray ignores the binding (it is always shown).
+- **The button's state** follows the tray: web sets `aria-expanded` on the anchor (sheet and
+  popover; its previous value comes back on destroy); native `GiftButton(tray:)` reads `isOpen`.
+- Unbinding: web `destroy()` removes the listeners; native: the binding ends with the holder or
+  the modifier. A destroyed field is never focused.
+
+### 20.4 `GiftButton` (UI)
+
+A small round button with a gift glyph, made to sit in a message bar next to a text field or an
+emoji button. Parameters: `tray?` (native: the holder; press = `tray.toggle()`, active = its
+`isOpen`), `onPress?` (called after the toggle; without `tray` it is the only action), `label`
+(default `"Send a gift"`), `filled` (default `false`), `size` (one of three fixed sizes, default
+`medium`, see below), `icon?` (a custom glyph, see below), `disabled` (default `false`), `theme`
+(the tray's `GiftTheme` tokens, section 9). Web: `new GiftButton(container, { label, filled,
+size, icon, disabled, theme, onPress })` with `element` (the `<button>`), `update()` and
+`destroy()`; with a tray, pass `element` as the tray's `anchor`. `<gift-button>`: attributes
+`label`, `filled`, `size`, `disabled`, properties `theme` and `icon`, event
+`gift-button-press`; a `<gift-tray anchor="...">` that names a `<gift-button>` uses its inner
+button.
+
+**Sizes are fixed.** `size` is a name, never a number the host picks: `small` = 32, `medium` = 36
+(default), `large` = 44 (dp / px circle diameter). An unknown name falls back to `medium`. The
+glyph box is always `22 * circle / 36` square (small 19.6, medium 22, large 26.9) and the host
+cannot change it. (Web: `size` attribute/option is `"small" | "medium" | "large"`; native: an enum
+`GiftButtonSize { small, medium, large }` in the platform's idiom.)
+
+**The icon slot.** `icon` replaces the gift glyph; everything else (circle, colours, states,
+accessibility, hit target) stays. It is drawn centred in the fixed glyph box and _fitted_ into it:
+scaled down (never up) to fit, aspect ratio kept, anything outside the box clipped, so the host's
+artwork can never change the button's size. The slot is given the colour the glyph would have
+(`accent` when plain or active, `accentText` when filled) so a single-colour icon follows the
+theme. Platform forms: web `icon: string | Node` (a string is SVG markup, `currentColor` follows
+that colour; a Node such as an `<svg>` or `<img>` is used as is and an `<img>` is not tinted); React
+Native `icon: ReactNode | ((color: string) => ReactNode)`; Flutter `icon: Widget Function(BuildContext,
+Color)?`; Android `icon: (@Composable (color: Color) -> Unit)?`; iOS `icon: ((Color) -> AnyView)?`.
+An `<svg>` that has only a `viewBox` (no width and height of its own) fills the box. Without `icon`
+the gift glyph of the Look list below is drawn.
+
+Look (dp; the same on every platform):
+
+- A circle `size` x `size` (a fixed size, above). Glyph 22 x 22 centred (scaled with `size / 36`),
+  drawn as strokes of width 1.8, round joins and caps, no fill, in a 24 x 24 box:
+  `rect (4,11)-(20,21)`; `rect (3,7)-(21,11)`; `line (12,7)-(12,21)`; left bow
+  `M12 7 C10 7 8 6 8 4.5 C8 3 10 3 12 7`; right bow `M12 7 C14 7 16 6 16 4.5 C16 3 14 3 12 7`.
+- Plain (default, like an emoji button): no background, glyph `accent`.
+  Filled: background `accent`, glyph `accentText`.
+- Active (its tray is open): background `selected`, glyph `accent` (both variants).
+- Disabled: opacity 0.5, no presses. Pressed: the platform's own feedback.
+- Accessibility: a button labelled `label`; with a tray, its expanded state (web `aria-expanded`
+  from the tray; native: "expanded"/"collapsed" or the platform's selected trait).
+- Touch target at least 44 x 44 where the platform asks for it (the circle stays `size`).
+
+### 20.5 Host patterns (what the demos do)
+
+- Chat screen: the app's message bar = text field + `GiftButton` + its own Send. The tray: the
+  field bound, `collapseOnSelect: true`, no scrim. `onInsetChange(px)` lifts the message bar
+  above the tray as the keyboard would (`px` is the sheet's top edge).
+- Live comment bar under a stream: the same, plus `roomId`; the app's comment column shows its
+  comments and the gifts (`onSent` for your own, the room's events for the others).
+- Leaving the screen: `close()` (or destroy the tray), as in 9.4.
+
+Component checks (L3): `test/web-gift-button.test.ts`, `test/react-native-gift-button.test.tsx`,
+Flutter `test/gift_button_test.dart`, Android `GiftButtonTest`, iOS `GiftButtonTests`.
+
+## 21. One gift button for a battle: the receiver picker
+
+Added on 2026-11-13. In a battle (18.7) the viewer used to get one Gift button per side. Now one
+gift button is enough (usually the `GiftButton` of the comment bar, section 20): the tray has a
+"Send to" row with every side, and the battle bar's sides can be tapped to open the tray with that
+side picked. Without `receivers` the tray is exactly as before (one `receiver`).
+
+Reference: `packages/sdk-js/src/core/receivers.ts` (pure), `src/web/GiftTray.ts` +
+`createGiftTray.ts` (option `receivers`), `src/web/GiftBattleBar.ts` (`onPressSide`),
+`src/react-native/GiftTray.tsx` + `useGiftTray.ts` + `BattleBar.tsx`. Fixture:
+`conformance/receivers.json`.
+
+### 21.1 Names (in the platform's idiom)
+
+| concept                        | web                                                 | React Native                        | Flutter                                        | Android                                    | iOS                                      |
+| ------------------------------ | --------------------------------------------------- | ----------------------------------- | ---------------------------------------------- | ------------------------------------------ | ---------------------------------------- |
+| the sides to pick from         | tray option `receivers: TrayReceiver[]`             | `useGiftTray({ receivers })`        | `GiftTrayNotifier(receivers:)`                 | holder `receivers`                         | model `receivers`                        |
+| one side                       | `{ id, name, color?, avatarUrl? }` (`TrayReceiver`) | same                                | `TrayReceiver(id:, name:, color:, avatarUrl:)` | `TrayReceiver(id, name, color, avatarUrl)` | `TrayReceiver(id:name:color:avatarUrl:)` |
+| pick one (from app code)       | `tray.selectReceiver(id)` (handle too)              | holder `selectReceiver(id)`         | `selectReceiver(id)`                           | `selectReceiver(id)`                       | `selectReceiver(_:)`                     |
+| the side the next gift goes to | `tray.getReceiver()`                                | holder `receiver`                   | `receiver`                                     | `receiver`                                 | `receiver`                               |
+| it changed                     | option `onReceiverChange(id)`                       | `useGiftTray({ onReceiverChange })` | `onReceiverChange`                             | `onReceiverChange`                         | `onReceiverChange`                       |
+| row label (default "Send to")  | option `sendToLabel`                                | `GiftTray` prop `sendToLabel`       | `GiftTray(sendToLabel:)`                       | `sendToLabel`                              | `sendToLabel`                            |
+| a side of the bar was tapped   | `GiftBattleBar` option `onPressSide(id)`            | `BattleBar` prop `onPressSide`      | `GiftBattleBar(onPressSide:)`                  | `GiftBattleBar(onPressSide =)`             | `GiftBattleBar(onPressSide:)`            |
+
+Updating `receivers` (web `tray.update({ receivers })`, holders: a new value) keeps the pick when
+it is still in the list, else resolves again (below).
+
+### 21.2 Pure function (fixture-tested)
+
+```text
+resolveReceiver(ids, { selected?, last?, fallback? }) -> id | null
+   ids        the receivers' ids, in order
+   selected   the pick so far (the person's tap, or selectReceiver)
+   last       the receiver this tray's last successful send went to
+   fallback   the plain `receiver` option (web createGiftTray, holders)
+   -> selected if it is in ids; else last if in ids; else fallback if in ids; else ids[0];
+      ids empty -> fallback ?? null
+```
+
+The holder (web: the tray) keeps `selected` and `last`: a tap on a side and `selectReceiver(id)` set
+`selected` (an id not in the list is ignored); every successful send sets `last` to the receiver it
+went to. So the default is "the side this viewer gifted last, else the first", and a new list after
+a round change starts there again. Every send goes to the resolved receiver (the `receiver` option is
+only the fallback) and the gift's effect says who got it (`receiverOf`, 18.4).
+
+### 21.3 The "Send to" row (UI)
+
+Only with two or more `receivers` (one receiver: no row, the send goes to it). Placed in the tray's
+body right under the header, above the grid. It counts as part of the block above the grid, so the
+peek height (9.1) grows by the row and the row is in sight in every snap state.
+
+- Row: the label (`sendToLabel`, 12, bold, `muted`) then the sides in order, gap 8 (also between the
+  label and the first side), scrolling sideways when they do not fit (no wrap). Sizing rule
+  (2026-11-13, a phone test: four sides did not fit at 375 px): only the SELECTED side shows its
+  name, so four sides and a long selected name fit in a 347 dp row (a 375 dp phone minus the tray's
+  padding): label about 50 + 4 x 34 + 3 x 8 + 8 + the selected name (at most 72 + 6) = at most 304.
+- A side: a 30 dp avatar (the picture, else the name's first letter, bold, on the side colour) in a
+  2 dp ring of the side colour (`color`, else `battleSidePalette(theme, n)[i]`, 18.7). Unselected:
+  the avatar only, opacity 0.55 (its name is its accessibility label and, on the web, its tooltip).
+  Selected: opacity 1, a 2 dp outer ring in `text` around the side ring, and its name after the
+  avatar (gap 6; 12, bold, `accent`, one line, ends with "…" after 72 dp).
+- The selected side is always in sight: whenever the selection changes (a tap, `selectReceiver`, a
+  new list, opening the tray) and the row overflows, the ROW scrolls (its own horizontal offset, the
+  least distance, animated unless reduced motion) so the whole selected chip is visible. Nothing
+  else scrolls: never the page, the sheet or the grid (web: the row's `scrollLeft`, never
+  `scrollIntoView`; Flutter: the row's own `ScrollController`, never `Scrollable.ensureVisible`;
+  React Native: the row's `scrollTo`; Compose: the row's `ScrollState`; SwiftUI: the row's own
+  `ScrollViewReader` proxy).
+- A tap selects it (`onReceiverChange(id)` if it changed). It does not send and does not change the
+  sheet's snap.
+- Accessibility: a radio group labelled `sendToLabel`; each side a radio with its name and its
+  checked state. Web: arrow keys move inside the group like the gift grid.
+- The selected gift, Send, combos and balance work as before; a combo is per receiver (the effect
+  layer's combo key includes the receiver, 7.4).
+
+### 21.4 Tappable sides on the battle bar
+
+With `onPressSide` the avatar of every side (versus and multi layout) is a button labelled
+`"Send {name} a gift"` (option `pressSideLabel`, `{name}` replaced), with the platform's pressed
+feedback and at least a 44 dp touch target; a press calls `onPressSide(id)`. The app opens the tray
+with that side picked: `tray.selectReceiver(id); tray.open()`. Without `onPressSide` nothing changes
+(the bar is one read-only element for screen readers, as before).
+
+### 21.5 Host pattern (what the demos do)
+
+A battle room: the comment bar's one `GiftButton` (section 20) and a tray with `roomId`,
+`receiverOf: room.receiverFor` and `receivers` = the round's sides (`battleView` sides, names from
+your users, colours from the same `sideColors` as the bar). The bar's `onPressSide` picks and opens.
+The app's comment column colours a gift line with the receiving side's colour (the room event's
+`receiverId`, or the transaction's `receiver` for your own).
+
+Component checks (L3): web `test/web-receivers.test.ts`, React Native
+`test/react-native-receivers.test.tsx`, Flutter `test/receiver_picker_test.dart`, Android
+`ReceiverPickerTest`, iOS `ReceiverPickerTests`.
+
 ## Open questions
 
 These are behaviours of the reference that look unintended or are under-specified. The fixtures

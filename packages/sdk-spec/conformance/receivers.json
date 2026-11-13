@@ -1,0 +1,49 @@
+{
+  "description": "The receiver picker of a battle tray (SPEC.md section 21): which side the next gift goes to. Pure function; no rendering. Format and matching rules: conformance/README.md.",
+  "resolve": [
+    {
+      "note": "the pick wins",
+      "ids": ["mia", "theo"],
+      "selected": "theo",
+      "last": "mia",
+      "expect": "theo"
+    },
+    {
+      "note": "no pick: the side gifted last",
+      "ids": ["mia", "theo"],
+      "last": "theo",
+      "expect": "theo"
+    },
+    { "note": "no pick, nothing sent: the first", "ids": ["mia", "theo", "ava"], "expect": "mia" },
+    {
+      "note": "a pick that left the list is ignored",
+      "ids": ["mia", "theo"],
+      "selected": "zoe",
+      "last": "theo",
+      "expect": "theo"
+    },
+    {
+      "note": "last gone too: the fallback receiver",
+      "ids": ["mia", "theo"],
+      "selected": "zoe",
+      "last": "ava",
+      "fallback": "theo",
+      "expect": "theo"
+    },
+    {
+      "note": "a fallback that is not a side: the first",
+      "ids": ["mia", "theo"],
+      "fallback": "zoe",
+      "expect": "mia"
+    },
+    {
+      "note": "no sides: the fallback",
+      "ids": [],
+      "selected": "mia",
+      "fallback": "zoe",
+      "expect": "zoe"
+    },
+    { "note": "no sides, no fallback", "ids": [], "expect": null },
+    { "note": "one side", "ids": ["mia"], "last": "theo", "expect": "mia" }
+  ]
+}

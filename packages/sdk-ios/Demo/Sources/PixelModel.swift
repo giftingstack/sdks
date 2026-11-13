@@ -23,6 +23,19 @@ enum PixelTheme: String, CaseIterable, Identifiable {
         rawValue
     }
 
+    /// The same theme as colour strings: the battle palette (`battleSidePalette`) of the bar, the tray's "Send to"
+    /// row and the live comment column.
+    var giftTheme: GiftTheme {
+        switch self {
+        case .dark:
+            return GiftTheme.darkTheme
+        case .light:
+            return GiftTheme.lightTheme
+        case .pink:
+            return (try? themeFromAccent("#ff4f9a", mode: .dark)) ?? GiftTheme.darkTheme
+        }
+    }
+
     var gifting: GiftingTheme {
         switch self {
         case .dark:
@@ -77,6 +90,7 @@ enum PixelTheme: String, CaseIterable, Identifiable {
 enum PixelTab: String, CaseIterable, Identifiable {
     case feed = "Feed"
     case live = "Live"
+    case chat = "Chat"
     case top = "Top"
     case inbox = "Inbox"
     case me = "Me"
@@ -91,6 +105,8 @@ enum PixelTab: String, CaseIterable, Identifiable {
             return "house.fill"
         case .live:
             return "dot.radiowaves.left.and.right"
+        case .chat:
+            return "bubble.left.and.bubble.right.fill"
         case .top:
             return "chart.bar.fill"
         case .inbox:
@@ -116,6 +132,18 @@ enum PixelIncomingMode: String, CaseIterable, Identifiable {
 enum PixelMotion: String, CaseIterable, Identifiable {
     case system = "System"
     case reduced = "Reduced"
+
+    var id: String {
+        rawValue
+    }
+}
+
+/// The three modes of the Live tab (as in web.ts and the Expo demo): one host without a battle, a battle of two
+/// hosts, a battle of four.
+enum PixelLiveMode: String, CaseIterable, Identifiable {
+    case room = "Live room"
+    case battle = "Battle"
+    case battle4 = "Battle 4+"
 
     var id: String {
         rawValue
@@ -149,6 +177,13 @@ final class PixelModel: ObservableObject {
     let client: MockGiftingClient
     let effects: GiftEffectController
     let tray: GiftTrayModel
+    /// The Chat tab's tray: its text field is bound with `.giftTrayInput`, so it starts closed and the gift
+    /// button in the message bar swaps it with the keyboard (SPEC 20).
+    let chatTray: GiftTrayModel
+    /// The Live tab's tray (SPEC 21.5): one gift button in the comment bar (its field is bound with
+    /// `.giftTrayInput`), `receivers` = the round's sides (the "Send to" row), `roomId` and `receiverOf` of the
+    /// room. A tap on a side of the battle bar picks that side and opens it.
+    let liveTray: GiftTrayModel
     /// One wall loader for the whole app (every `GiftWall` shares its batches and cache).
     let walls: GiftWallLoader
     let away: GiftAwayModel
@@ -162,12 +197,43 @@ final class PixelModel: ObservableObject {
     /// "Battle 4+": the same, with four hosts in every round (a free-for-all of four sides).
     let fakeRoom4: DemoFakeRoom
     let room4: GiftRoomModel
-    @Published var battle4 = false
+    /// "Live room": one host and no battle (no `battle` in the welcome, no `scores` frames).
+    let fakeRoom1: DemoFakeRoom
+    let room1: GiftRoomModel
+    /// The mode the Live tab is in; a plain live room first.
+    @Published var liveMode: PixelLiveMode = .room
 
     /// The room, its id and its pretend server of the mode the Live tab is in.
-    var liveRoom: GiftRoomModel { battle4 ? room4 : room }
-    var liveRoomId: String { battle4 ? PixelData.liveRoom4 : PixelData.liveRoom }
-    private var liveFake: DemoFakeRoom { battle4 ? fakeRoom4 : fakeRoom }
+    var liveRoom: GiftRoomModel {
+        switch liveMode {
+        case .room:
+            return room1
+        case .battle:
+            return room
+        case .battle4:
+            return room4
+        }
+    }
+    var liveRoomId: String {
+        switch liveMode {
+        case .room:
+            return PixelData.liveRoomSolo
+        case .battle:
+            return PixelData.liveRoom
+        case .battle4:
+            return PixelData.liveRoom4
+        }
+    }
+    private var liveFake: DemoFakeRoom {
+        switch liveMode {
+        case .room:
+            return fakeRoom1
+        case .battle:
+            return fakeRoom
+        case .battle4:
+            return fakeRoom4
+        }
+    }
 
     @Published var gifts: [Gift] = demoGifts
     /// The Live tab's feed of room gifts, newest first (30 at most).
@@ -196,11 +262,20 @@ final class PixelModel: ObservableObject {
     @Published var devMenuOpen = false
     @Published var incomingMode: PixelIncomingMode = .tray
     @Published var quality: EffectQuality = .high
-    @Published var theme: PixelTheme = .dark
+    @Published var theme: PixelTheme = .dark {
+        didSet {
+            // The side colours follow the theme (the bar's default palette).
+            updateLiveReceivers()
+        }
+    }
     @Published var motion: PixelMotion = .system
     @Published var offline = false
     @Published var hidden = false
     @Published var board: LeaderboardBoard = .senders
+    /// The Chat tab's conversation (the app's own chat; GiftingStack carries none).
+    @Published var chat: [PixelChatMessage] = PixelChatMessage.start
+    private var chatNextId = PixelChatMessage.start.count
+    private var chatThanks: Task<Void, Never>?
 
     private var started = false
     private var liveTask: Task<Void, Never>?
@@ -214,6 +289,10 @@ final class PixelModel: ObservableObject {
         self.awaySeen = seen
         // Closed until a Gift button opens it.
         self.tray = GiftTrayModel(client: client, receiver: "mateo", effects: effects, reference: "post_42", open: false)
+        // No `open:`: the bound message field makes it start closed.
+        self.chatTray = GiftTrayModel(client: client, receiver: "mateo", effects: effects, reference: "dm_ava_mateo")
+        // No `open:` either: the comment field is bound. `receivers` follow the round (`updateLiveReceivers`).
+        self.liveTray = GiftTrayModel(client: client, receiver: PixelData.liveHost, effects: effects, roomId: PixelData.liveRoomSolo)
         self.walls = GiftWallLoader(client: client)
         self.away = GiftAwayModel(
             client: client,
@@ -236,6 +315,21 @@ final class PixelModel: ObservableObject {
         self.fakeRoom = fakeRoom
         let fakeRoom4 = DemoFakeRoom(gifts: demoGifts, senders: liveSenders, receivers: PixelData.liveHosts)
         self.fakeRoom4 = fakeRoom4
+        let fakeRoom1 = DemoFakeRoom(
+            gifts: demoGifts,
+            senders: liveSenders,
+            receivers: [PixelData.liveHost],
+            battles: false
+        )
+        self.fakeRoom1 = fakeRoom1
+        self.room1 = GiftRoomModel(
+            room: PixelData.liveRoomSolo,
+            getToken: { _ in demoRoomToken(PixelData.me) },
+            client: client,
+            effects: effects,
+            resolveName: { PixelData.displayName($0) },
+            socket: fakeRoom1.socketFactory
+        )
         self.room4 = GiftRoomModel(
             room: PixelData.liveRoom4,
             getToken: { _ in demoRoomToken(PixelData.me) },
@@ -256,8 +350,14 @@ final class PixelModel: ObservableObject {
         tray.controller.onSent = { [weak self] tx in
             self?.didSend(tx)
         }
+        chatTray.controller.onSent = { [weak self] tx in
+            self?.chatSent(tx)
+        }
+        liveTray.controller.onSent = { [weak self] tx in
+            self?.liveSent(tx)
+        }
         // In a battle your own gift says who got it too (the room knows the sides).
-        tray.controller.receiverOf = { [weak self] user in
+        liveTray.controller.receiverOf = { [weak self] user in
             self?.liveRoom.receiverFor(user)
         }
         room.onEvent = { [weak self] event in
@@ -266,6 +366,17 @@ final class PixelModel: ObservableObject {
         room4.onEvent = { [weak self] event in
             self?.roomGift(event)
         }
+        room1.onEvent = { [weak self] event in
+            self?.roomGift(event)
+        }
+        // A new round: the tray's "Send to" row gets its sides.
+        room.onBattle = { [weak self] _ in
+            self?.updateLiveReceivers()
+        }
+        room4.onBattle = { [weak self] _ in
+            self?.updateLiveReceivers()
+        }
+        updateLiveReceivers()
         inbox.onLoaded = { [weak self] items in
             self?.inboxLoaded(items)
         }
@@ -310,27 +421,145 @@ final class PixelModel: ObservableObject {
     func leaveLive() {
         room.pause()
         room4.pause()
+        room1.pause()
     }
 
-    /// The two modes of the Live tab: "Battle" (two hosts) and "Battle 4+" (four hosts in every round). The
-    /// other room is left; the tray (if open) closes, since it sends into the room it was opened for.
-    func setBattle4(_ on: Bool) {
-        if battle4 == on {
+    /// The three modes of the Live tab: "Live room" (one host), "Battle" (two hosts) and "Battle 4+" (four hosts in
+    /// every round). The other room is left and the comment column starts empty; the tray (if open) closes, since it
+    /// sends into the room it was opened for.
+    func setLiveMode(_ mode: PixelLiveMode) {
+        if liveMode == mode {
             return
         }
         liveRoom.pause()
         closeTray()
-        battle4 = on
+        liveTray.close()
+        roomFeed = []
+        liveMode = mode
+        // The tray sends into the room on screen; its sides are the new room's.
+        liveTray.controller.roomId = liveRoomId
+        updateLiveReceivers()
         liveRoom.join()
     }
 
+    /// The live tray's "Send to" row (SPEC 21.5): the round's sides in the bar's order, names from the app's own
+    /// users, colours from the same palette as the bar (`liveSideColors`). Before the first round: the hosts.
+    func updateLiveReceivers() {
+        let ids = liveRoom.battleView()?.sides.map { $0.id } ?? liveHostsOnScreen
+        let colors = liveSideColors(count: ids.count)
+        let next = ids.enumerated().map { index, id in
+            TrayReceiver(id: id, name: PixelData.firstName(id), color: colors[index])
+        }
+        if next != liveTray.receivers {
+            liveTray.receivers = next
+        }
+    }
+
+    /// The hosts of the mode the Live tab is in: one, two, or all four.
+    var liveHostsOnScreen: [String] {
+        switch liveMode {
+        case .room:
+            return [PixelData.liveHost]
+        case .battle:
+            return Array(PixelData.liveHosts.prefix(2))
+        case .battle4:
+            return PixelData.liveHosts
+        }
+    }
+
+    /// The side colours of the battle bar, the tray's row and the comment column: one list for all three.
+    func liveSideColors(count: Int) -> [String] {
+        battleSidePalette(theme.giftTheme, count: count).map { $0.color }
+    }
+
+    /// The colour of a gift line in the comment column: the receiving side's, nil for a non-battle gift.
+    func liveSideColor(for receiver: String?) -> Color? {
+        guard let id = receiver, let side = liveTray.receivers.first(where: { $0.id == id }), let color = side.color else {
+            return nil
+        }
+        return Color(giftingCSS: color)
+    }
+
+    /// A tap on a side of the battle bar (SPEC 21.4): that side is picked and the tray opens.
+    func pressSide(_ id: String) {
+        liveTray.selectReceiver(id)
+        liveTray.open()
+    }
+
+    /// The comment bar's Send: a comment line in the column (the app's own chat, not GiftingStack's).
+    func sendComment(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return
+        }
+        chatNextId += 1
+        addRoomLine(PixelRoomFeedItem(id: "c\(chatNextId)", sender: PixelData.firstName(PixelData.me), what: trimmed, to: nil, comment: true))
+    }
+
     private func roomGift(_ event: RoomGiftEvent) {
-        let what = event.quantity > 1 ? "\(event.quantity) x \(event.gift.name)" : event.gift.name
-        let to = event.receiverId.map { PixelData.firstName($0) }
-        roomFeed.insert(PixelRoomFeedItem(id: event.tx, sender: event.sender ?? "Someone", what: what, to: to), at: 0)
+        addGiftLine(
+            id: event.tx,
+            sender: event.sender ?? "Someone",
+            giftName: event.gift.name,
+            quantity: event.quantity,
+            receiverId: event.receiverId
+        )
+    }
+
+    private func giftWhat(_ name: String, _ count: Int) -> String {
+        count > 1 ? "\(count) x \(name)" : name
+    }
+
+    /// One gift line of the comment column. The running combo of the same sender, gift and receiver (a line younger
+    /// than 5 s, wherever it is in the column: comments that came in between do not cut it) adds up ("5 x Rose")
+    /// and moves to the bottom (index 0, the newest) instead of a new line per tap. Without a battle (the plain
+    /// "Live room") a line names no receiver.
+    private func addGiftLine(id: String, sender: String, giftName: String, quantity: Int, receiverId: String?) {
+        let target: String? = liveMode == .room ? nil : receiverId
+        let key = "\(sender)|\(giftName)|\(target ?? "")"
+        let now = Date()
+        if let index = roomFeed.firstIndex(where: { $0.key == key && now.timeIntervalSince($0.at) < 5 }) {
+            var item = roomFeed.remove(at: index)
+            item.count += quantity
+            item.at = now
+            item.what = giftWhat(giftName, item.count)
+            roomFeed.insert(item, at: 0)
+            return
+        }
+        var item = PixelRoomFeedItem(
+            id: id,
+            sender: sender,
+            what: giftWhat(giftName, quantity),
+            to: target.map { PixelData.firstName($0) },
+            receiverId: target
+        )
+        item.key = key
+        item.count = quantity
+        item.at = now
+        addRoomLine(item)
+    }
+
+    private func addRoomLine(_ item: PixelRoomFeedItem) {
+        roomFeed.insert(item, at: 0)
         if roomFeed.count > 30 {
             roomFeed = Array(roomFeed.prefix(30))
         }
+    }
+
+    /// The live tray's `onSent`: what the API does after a send with `room_id` (the demo has no server), and your
+    /// own line in the column (the room leaves your own gifts out of its events).
+    private func liveSent(_ tx: GiftTransaction) {
+        balance = tx.senderBalanceAfter
+        if let gift = gifts.first(where: { $0.id == tx.gift.id }) {
+            liveFake.publish(sender: PixelData.me, gift: gift, quantity: tx.quantity, receiver: tx.receiver)
+        }
+        addGiftLine(
+            id: tx.id,
+            sender: PixelData.firstName(PixelData.me),
+            giftName: tx.gift.name,
+            quantity: tx.quantity,
+            receiverId: tx.receiver
+        )
     }
 
     /// The app is on screen (once).
@@ -340,6 +569,8 @@ final class PixelModel: ObservableObject {
         }
         started = true
         tray.start()
+        chatTray.start()
+        liveTray.start()
         syncBalance()
         Task { [weak self] in
             await self?.loadLibrary()
@@ -368,7 +599,10 @@ final class PixelModel: ObservableObject {
         gifts = list
         fakeRoom.gifts = list
         fakeRoom4.gifts = list
+        fakeRoom1.gifts = list
         tray.refresh()
+        chatTray.refresh()
+        liveTray.refresh()
     }
 
     func syncBalance() {
@@ -412,6 +646,12 @@ final class PixelModel: ObservableObject {
         if tray.isOpen && next != tab {
             closeTray()
         }
+        if chatTray.isOpen && next != .chat {
+            chatTray.close()
+        }
+        if liveTray.isOpen && next != .live {
+            liveTray.close()
+        }
         tab = next
         if next == .inbox {
             markInboxSeen()
@@ -451,12 +691,54 @@ final class PixelModel: ObservableObject {
     private func didSend(_ tx: GiftTransaction) {
         balance = tx.senderBalanceAfter
         bumpWall(tx.receiver, tx.reference)
-        // What the API does after a send with `room_id` (the demo has no server): the room gets it.
-        if tray.controller.roomId == liveRoomId, let gift = gifts.first(where: { $0.id == tx.gift.id }) {
-            liveFake.publish(sender: PixelData.me, gift: gift, quantity: tx.quantity, receiver: tx.receiver)
-        }
         // The tray stays open after a send, like a live app: tap again for a combo, the Gift
         // button again to close it.
+    }
+
+    // MARK: - Chat tab
+
+    /// The message bar's Send: a bubble of your own (the app's chat, not the SDK's).
+    func sendChat(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return
+        }
+        addChat(fromMe: true, text: trimmed)
+    }
+
+    private func addChat(fromMe: Bool, text: String, gift: GiftSummary? = nil, count: Int = 1) {
+        chatNextId += 1
+        chat.append(PixelChatMessage(id: chatNextId, fromMe: fromMe, text: text, gift: gift, count: count))
+    }
+
+    /// The chat tray's `onSent`: "You sent Rose" in the conversation. Quick repeats of the same gift (a combo) add
+    /// up in one bubble ("x5"), like the gift notice; one thank-you after the sending stops. The running bubble is
+    /// found wherever it is (a thank-you in between does not cut the count) while its last gift is under 5 s old;
+    /// it stays where it is, above its thank-you.
+    private func chatSent(_ tx: GiftTransaction) {
+        balance = tx.senderBalanceAfter
+        let now = Date()
+        // A combo that goes on after its thank-you (the bubble is not the last) gets no second one.
+        var thanked = false
+        if let index = chat.lastIndex(where: { $0.fromMe && $0.gift?.id == tx.gift.id && now.timeIntervalSince($0.at) < 5 }) {
+            thanked = index != chat.count - 1
+            chat[index].count += tx.quantity
+            chat[index].at = now
+        } else {
+            addChat(fromMe: true, text: "", gift: tx.gift, count: tx.quantity)
+            chat[chat.count - 1].at = now
+        }
+        if thanked {
+            return
+        }
+        chatThanks?.cancel()
+        chatThanks = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            if Task.isCancelled {
+                return
+            }
+            self?.addChat(fromMe: false, text: "Thank you!! 😍")
+        }
     }
 
     /// The pretend store's "buy": credit the coins (it ADDS), then reload the balance.
@@ -464,9 +746,13 @@ final class PixelModel: ObservableObject {
         storeOpen = false
         let client = self.client
         let tray = self.tray
+        let chatTray = self.chatTray
+        let liveTray = self.liveTray
         Task { [weak self] in
             await client.credit(coins)
             tray.refresh()
+            chatTray.refresh()
+            liveTray.refresh()
             self?.syncBalance()
         }
     }
@@ -615,12 +901,19 @@ final class PixelModel: ObservableObject {
             self.refreshBoards()
             self.syncBalance()
             self.tray.refresh()
+            self.chatTray.refresh()
+            self.liveTray.refresh()
         }
     }
 
     /// Back to the start: 60,000 coins, walls and inbox as at launch, the away card once more.
     func reset() {
         closeTray()
+        chatTray.close()
+        liveTray.close()
+        chatThanks?.cancel()
+        chat = PixelChatMessage.start
+        chatNextId = PixelChatMessage.start.count
         storeOpen = false
         received = PixelData.startReceived
         hidden = false
@@ -638,6 +931,8 @@ final class PixelModel: ObservableObject {
             self.refreshBoards()
             self.syncBalance()
             self.tray.refresh()
+            self.chatTray.refresh()
+            self.liveTray.refresh()
             self.showAway()
         }
     }

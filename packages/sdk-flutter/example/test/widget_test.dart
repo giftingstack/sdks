@@ -209,14 +209,12 @@ void main() {
     }
 
     testWidgets(
-        'live room: a pick lowers the tray and the SDK scrim goes, a tap on the '
+        'feed: a pick lowers the tray and the SDK scrim goes, a tap on the '
         'scrim closes it, the Gift button (toggle) closes it', (tester) async {
       await openDemo(tester);
-      await tab(tester, 'Live');
       final scrim = find.byKey(const ValueKey<String>('tray-scrim'));
-      final liveGift = find.byKey(const ValueKey<String>('live-gift'));
-      await tester.tap(liveGift);
-      await tester.pumpAndSettle(const Duration(seconds: 1));
+      final postGift = find.byKey(const ValueKey<String>('gift-post_42'));
+      await openTray(tester, 'post_42');
       expect(find.byType(GiftTray), findsOneWidget);
       double dim() => tester
           .widget<AnimatedOpacity>(find.descendant(
@@ -231,13 +229,12 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 1));
       expect(find.byType(GiftTray), findsOneWidget);
       expect(dim(), 0);
-      // The Gift button closes it.
-      await tester.tap(liveGift);
+      // The Gift button (the scrim takes the tap above the sheet) closes it.
+      await tester.tap(postGift, warnIfMissed: false);
       await tester.pumpAndSettle(const Duration(seconds: 1));
       expect(find.byType(GiftTray), findsNothing);
       // A tap on the dim of an open sheet closes it too.
-      await tester.tap(liveGift);
-      await tester.pumpAndSettle(const Duration(seconds: 1));
+      await openTray(tester, 'post_42');
       expect(find.byType(GiftTray), findsOneWidget);
       await tester.tapAt(const Offset(200, 120));
       await tester.pumpAndSettle(const Duration(seconds: 1));
@@ -245,67 +242,250 @@ void main() {
     });
 
     testWidgets(
-        'live room: both sides can be gifted and the bar stays in reach under '
-        'the tray', (tester) async {
+        'live room: one gift button; a tap on a side of the bar opens the tray '
+        'with that side picked, the gift goes there and its comment line '
+        'takes the side colour', (tester) async {
       await openDemo(tester);
       await tab(tester, 'Live');
-      await tester.tap(find.byKey(const ValueKey<String>('live-gift')));
+      await tester.tap(find.text('Battle'));
       await tester.pumpAndSettle(const Duration(seconds: 1));
-      expect(find.text('Gift Mira'), findsWidgets);
-      // A pick lowers the sheet to peek (the dim goes), so the page is in reach.
-      await tester.tap(
-          find.byKey(ValueKey<String>('gift-${fallbackGifts[2].id}')).first);
-      await tester.pumpAndSettle(const Duration(seconds: 1));
-      // The tray is at peek and the scrim takes the tap there (SPEC 9.4): the
-      // first tap on the other side's button closes the tray, the next one
-      // reopens it for that side.
-      await tester.tap(find.byKey(const ValueKey<String>('live-gift-noor')));
-      await tester.pumpAndSettle(const Duration(seconds: 1));
-      expect(find.byType(GiftTray), findsNothing);
-      await tester.tap(find.byKey(const ValueKey<String>('live-gift-noor')));
+      await settleFor(tester, 500);
+      // No Gift button per side any more.
+      expect(find.textContaining('Gift Mira'), findsNothing);
+      expect(find.textContaining('Gift Noor'), findsNothing);
+      final noorSide = find.byKey(const ValueKey<String>('gift-battle-side-1'));
+      expect(noorSide, findsOneWidget);
+      await tester.tap(noorSide);
       await tester.pumpAndSettle(const Duration(seconds: 1));
       expect(find.byType(GiftTray), findsOneWidget);
+      // The comment bar's tray (dimmed, Live tab) with the "Send to" row, Noor picked.
+      expect(find.byKey(const ValueKey<String>('tray-scrim')), findsOneWidget);
+      expect(
+          find.byKey(const ValueKey<String>('gift-send-to')), findsOneWidget);
+      double opacityOf(String id) => tester
+          .widget<Opacity>(find.descendant(
+            of: find.byKey(ValueKey<String>('gift-receiver-$id')),
+            matching: find.byType(Opacity),
+          ))
+          .opacity;
+      expect(opacityOf('noor'), 1);
+      expect(opacityOf('mira'), 0.55);
+
+      final cheap = fallbackGifts.first;
+      await tester.tap(find.byKey(ValueKey<String>('gift-${cheap.id}')).first);
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      await tester.tap(find.byKey(const ValueKey<String>('gift-send')));
+      await settleFor(tester, 800);
+      final line = find.descendant(
+        of: find.byKey(const ValueKey<String>('live-comments')),
+        matching: find.text('You sent ${cheap.name}'),
+      );
+      expect(line, findsOneWidget);
+      final bar = tester.widget<GiftBattleBar>(find.byType(GiftBattleBar));
+      expect(tester.widget<Text>(line).style!.color, bar.sideColors![1]);
       // The bar is above the tray: a tap on Top leaves Live and closes it.
       await tester.tap(find.text('Top').last);
       await tester.pumpAndSettle(const Duration(seconds: 1));
       expect(find.byType(GiftTray), findsNothing);
     });
 
-    testWidgets('live room: Battle 4+ has four sides, a Gift button for each',
+    testWidgets(
+        'chat: the gift button swaps the keyboard and the tray, the bar sits '
+        'on the tray, sends add up in one bubble', (tester) async {
+      await openDemo(tester);
+      await tab(tester, 'Chat');
+      final bar = find.byKey(const ValueKey<String>('chat-bar'));
+      final field = find.descendant(of: bar, matching: find.byType(TextField));
+      final button =
+          find.descendant(of: bar, matching: find.byType(GiftButton));
+      FocusNode node() => tester.widget<TextField>(field).focusNode!;
+      expect(find.text('Did you catch my stream last night?'), findsOneWidget);
+      expect(find.byType(GiftTray), findsNothing);
+
+      await tester.tap(field);
+      await tester.pump();
+      expect(node().hasFocus, isTrue);
+
+      await tester.tap(button);
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(node().hasFocus, isFalse);
+      expect(find.byType(GiftTray), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('tray-scrim')), findsNothing);
+      // The message bar sits on the sheet's top edge.
+      final sheetTop =
+          tester.getRect(find.byKey(const ValueKey<String>('gift-tray'))).top;
+      expect(tester.getRect(bar).bottom, closeTo(sheetTop, 1));
+
+      // A cheap gift (the pick lowers the sheet); two sends add up in one bubble.
+      final cheap = fallbackGifts.first;
+      await tester.tap(find.byKey(ValueKey<String>('gift-${cheap.id}')).first);
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      await tester.tap(find.byKey(const ValueKey<String>('gift-send')));
+      await settleFor(tester, 800);
+      expect(find.text('You sent ${cheap.name}'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey<String>('gift-send')));
+      await settleFor(tester, 800);
+      expect(find.text('You sent ${cheap.name} ×2'), findsOneWidget);
+      await settleFor(tester, 2000);
+      expect(find.text('Thank you!!'), findsOneWidget);
+
+      // The button again: the tray goes, the keyboard comes back.
+      await tester.tap(button);
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(node().hasFocus, isTrue);
+      expect(
+        find.descendant(
+          of: find.byType(GiftTray),
+          matching: find.byKey(const ValueKey<String>('gift-send')),
+        ),
+        findsWidgets,
+        reason: 'mounted while the field has focus (it learns the keyboard)',
+      );
+
+      // Open again, then a tap on the field closes the tray.
+      await tester.tap(button);
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(node().hasFocus, isFalse);
+      await tester.tap(field);
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(node().hasFocus, isTrue);
+      expect(
+          tester.getRect(bar).bottom,
+          closeTo(
+              tester.getRect(find.byKey(const ValueKey<String>('nav-bar'))).top,
+              1));
+
+      // A typed message is a bubble of the app.
+      await tester.enterText(field, 'See you Friday');
+      await tester.tap(find.byTooltip('Send').first);
+      await tester.pump();
+      expect(find.text('See you Friday'), findsOneWidget);
+    });
+
+    testWidgets(
+        'live room (the default mode): one host, no battle bar, no "Send to" '
+        'row, other viewers gifts in the comment column, a tap on empty '
+        'space closes the tray', (tester) async {
+      await openDemo(tester);
+      await tab(tester, 'Live');
+      await settleFor(tester, 500);
+      expect(find.text('Live room'), findsOneWidget);
+      expect(find.byType(GiftBattleBar), findsNothing);
+      final column = find.byKey(const ValueKey<String>('live-comments'));
+      // Another viewer's gift (the pretend room sends one every 8 to 16 s).
+      var seen = false;
+      for (var t = 0; t < 20000 && !seen; t += 100) {
+        await tester.pump(const Duration(milliseconds: 100));
+        seen = find
+            .descendant(of: column, matching: find.textContaining(' sent '))
+            .evaluate()
+            .isNotEmpty;
+      }
+      expect(seen, isTrue, reason: 'a room gift line in the comment column');
+
+      final bar = find.byKey(const ValueKey<String>('comment-bar'));
+      await tester
+          .tap(find.descendant(of: bar, matching: find.byType(GiftButton)));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(find.byType(GiftTray), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('gift-send-to')), findsNothing);
+      expect(find.byKey(const ValueKey<String>('tray-scrim')), findsOneWidget);
+      // Your gift goes to the host and shows as yours in the column.
+      await tester.tap(find.byKey(const ValueKey<String>('gift-send')));
+      await settleFor(tester, 800);
+      expect(
+        find.descendant(of: column, matching: find.textContaining('You sent')),
+        findsOneWidget,
+      );
+      // A tap on empty space closes the tray.
+      await tester.tapAt(const Offset(200, 140));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(find.byType(GiftTray), findsNothing);
+      await tab(tester, 'Feed');
+      await settleFor(tester, 4000);
+    });
+
+    testWidgets(
+        'live room: the comment bar has a gift button bound the same way',
         (tester) async {
       await openDemo(tester);
       await tab(tester, 'Live');
+      await tester.tap(find.text('Battle'));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      final bar = find.byKey(const ValueKey<String>('comment-bar'));
+      final field = find.descendant(of: bar, matching: find.byType(TextField));
+      await tester.enterText(field, 'Hi Mira');
+      await tester
+          .tap(find.descendant(of: bar, matching: find.byTooltip('Send')));
+      await tester.pump();
+      expect(find.text('Ava: Hi Mira'), findsOneWidget);
+
+      await tester
+          .tap(find.descendant(of: bar, matching: find.byType(GiftButton)));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(find.byType(GiftTray), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('tray-scrim')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey<String>('gift-send')));
+      await settleFor(tester, 800);
+      expect(find.textContaining('You sent'), findsOneWidget);
+      // A tap on empty space (the dim) closes the tray ...
+      await tester.tapAt(const Offset(200, 140));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(find.byType(GiftTray), findsNothing);
+      // ... and a tap on a side of the bar opens this one tray with that side.
+      await tester
+          .tap(find.byKey(const ValueKey<String>('gift-battle-side-1')));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      expect(find.byType(GiftTray), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('tray-scrim')), findsOneWidget);
       expect(
-          find.byKey(const ValueKey<String>('live-gift-lina')), findsNothing);
+          find.byKey(const ValueKey<String>('gift-send-to')), findsOneWidget);
+    });
+
+    testWidgets(
+        'live room: Battle 4+ has four sides, each a button that picks it in '
+        'the one tray', (tester) async {
+      await openDemo(tester);
+      await tab(tester, 'Live');
+      await tester.tap(find.text('Battle'));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      await settleFor(tester, 500);
+      Finder side(int i) => find.byKey(ValueKey<String>('gift-battle-side-$i'));
+      expect(side(2), findsNothing);
       await tester.tap(find.text('Battle 4+'));
       await tester.pumpAndSettle(const Duration(seconds: 1));
-      for (final id in [
-        'live-gift',
-        'live-gift-noor',
-        'live-gift-lina',
-        'live-gift-owen'
-      ]) {
-        expect(find.byKey(ValueKey<String>(id)), findsOneWidget, reason: id);
+      await settleFor(tester, 500);
+      for (var i = 0; i < 4; i++) {
+        expect(side(i), findsOneWidget, reason: 'side $i');
       }
-      // On a small phone (320 wide) the four buttons are two columns and stay on screen.
+      // On a small phone (320 wide) the four sides stay on screen.
       await tester.binding.setSurfaceSize(const Size(320, 700));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpAndSettle(const Duration(seconds: 1));
-      final mira =
-          tester.getRect(find.byKey(const ValueKey<String>('live-gift')));
-      final noor =
-          tester.getRect(find.byKey(const ValueKey<String>('live-gift-noor')));
-      final lina =
-          tester.getRect(find.byKey(const ValueKey<String>('live-gift-lina')));
-      expect(mira.top, noor.top, reason: 'two columns');
-      expect(lina.top, greaterThan(mira.top), reason: 'the second row');
-      expect(noor.right, lessThanOrEqualTo(320));
+      expect(tester.getRect(side(3)).right, lessThanOrEqualTo(320));
+      expect(tester.takeException(), isNull);
+      await tester.binding.setSurfaceSize(null);
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      await tester.tap(side(2));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      for (final id in ['mira', 'noor', 'lina', 'owen']) {
+        expect(
+            find.byKey(ValueKey<String>('gift-receiver-$id')), findsOneWidget,
+            reason: id);
+      }
+      expect(
+          tester
+              .widget<Opacity>(find.descendant(
+                of: find.byKey(const ValueKey<String>('gift-receiver-lina')),
+                matching: find.byType(Opacity),
+              ))
+              .opacity,
+          1,
+          reason: 'the tapped side is picked');
       expect(tester.takeException(), isNull);
       // Back to the two-sided battle.
-      await tester.tap(find.text('Battle').first);
+      await tester.tap(find.text('Battle').first, warnIfMissed: false);
       await tester.pumpAndSettle(const Duration(seconds: 1));
-      expect(
-          find.byKey(const ValueKey<String>('live-gift-owen')), findsNothing);
     });
 
     testWidgets('no debug surface on screen: tabs, posts and a Gift button',

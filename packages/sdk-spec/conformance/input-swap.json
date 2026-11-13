@@ -1,0 +1,71 @@
+{
+  "description": "The gift button in the app's message bar (SPEC.md section 20): what the button and the text field's focus do to the tray and the keyboard, and how tall the tray is in the keyboard's place. Pure functions; no rendering, no clock. Format and matching rules: conformance/README.md.",
+  "constants": { "fallback": 300, "minKeyboard": 120, "maxFraction": 0.6 },
+  "step": [
+    { "open": false, "event": "button", "expect": { "tray": "open", "input": "blur" } },
+    { "open": true, "event": "button", "expect": { "tray": "close", "input": "focus" } },
+    { "open": true, "event": "inputFocus", "expect": { "tray": "close", "input": "keep" } },
+    { "open": false, "event": "inputFocus", "expect": { "tray": "keep", "input": "keep" } }
+  ],
+  "place": [
+    { "note": "a phone keyboard", "keyboardHeight": 336, "containerHeight": 800, "expect": 336 },
+    {
+      "note": "never seen: the fallback",
+      "keyboardHeight": 0,
+      "containerHeight": 800,
+      "expect": 300
+    },
+    { "note": "missing", "keyboardHeight": null, "containerHeight": 800, "expect": 300 },
+    {
+      "note": "an accessory bar is not a keyboard",
+      "keyboardHeight": 44,
+      "containerHeight": 800,
+      "expect": 300
+    },
+    {
+      "note": "the threshold itself counts",
+      "keyboardHeight": 120,
+      "containerHeight": 800,
+      "expect": 120
+    },
+    {
+      "note": "capped at 60 % of the container",
+      "keyboardHeight": 420,
+      "containerHeight": 600,
+      "expect": 360
+    },
+    { "note": "the cap is floored", "keyboardHeight": 400, "containerHeight": 501, "expect": 300 },
+    {
+      "note": "the fallback is capped too",
+      "keyboardHeight": 0,
+      "containerHeight": 400,
+      "expect": 240
+    },
+    {
+      "note": "unknown container: no cap",
+      "keyboardHeight": 420,
+      "containerHeight": 0,
+      "expect": 420
+    },
+    {
+      "note": "unknown container (missing)",
+      "keyboardHeight": 280,
+      "containerHeight": null,
+      "expect": 280
+    },
+    { "note": "rounded", "keyboardHeight": 291.6, "containerHeight": 900, "expect": 292 }
+  ],
+  "sequence": [
+    {
+      "name": "button, button, field, button, field",
+      "open": false,
+      "steps": [
+        { "event": "button", "expect": { "tray": "open", "input": "blur" }, "open": true },
+        { "event": "button", "expect": { "tray": "close", "input": "focus" }, "open": false },
+        { "event": "inputFocus", "expect": { "tray": "keep", "input": "keep" }, "open": false },
+        { "event": "button", "expect": { "tray": "open", "input": "blur" }, "open": true },
+        { "event": "inputFocus", "expect": { "tray": "close", "input": "keep" }, "open": false }
+      ]
+    }
+  ]
+}

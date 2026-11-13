@@ -19,6 +19,8 @@ final class DemoFakeRoom {
     private let receivers: [String]
     private let roundMs: Int
     private let breakMs: Int
+    /// false: a plain room without a battle (no `battle` in `welcome`, no `scores` frames).
+    private let battles: Bool
     private var viewers = 38 + Int.random(in: 0..<20)
     private var sockets: [DemoFakeRoomSocket] = []
     private var nextId = Int(Date().timeIntervalSince1970 * 1000) * 1000
@@ -35,13 +37,15 @@ final class DemoFakeRoom {
         senders: [String],
         receivers: [String],
         roundMs: Int = 90_000,
-        breakMs: Int = 8_000
+        breakMs: Int = 8_000,
+        battles: Bool = true
     ) {
         self.gifts = gifts
         self.senders = senders
         self.receivers = receivers
         self.roundMs = roundMs
         self.breakMs = breakMs
+        self.battles = battles
     }
 
     /// For `GiftRoomModel(socket:)`: every "connection" is a socket of this room.
@@ -61,7 +65,7 @@ final class DemoFakeRoom {
     // MARK: - Used by the socket
 
     func welcomeFrame() -> String {
-        if battle == nil {
+        if battles && battle == nil {
             startRound()
         }
         var frame: [String: Any] = [

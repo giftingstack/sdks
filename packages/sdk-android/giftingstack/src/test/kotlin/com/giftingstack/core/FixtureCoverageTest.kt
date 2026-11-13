@@ -36,6 +36,8 @@ class FixtureCoverageTest {
             "battle-bar.json" to listOf("BattleBarConformanceTest.kt"),
             "pictures.json" to listOf("PicturesConformanceTest.kt"),
             "tray-scrim.json" to listOf("TrayScrimConformanceTest.kt"),
+            "input-swap.json" to listOf("InputSwapConformanceTest.kt"),
+            "receivers.json" to listOf("ReceiversConformanceTest.kt"),
         )
 
     /** Web only by the SPEC (9.3): native platforms skip these on purpose. */

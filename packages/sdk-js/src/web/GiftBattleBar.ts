@@ -6,6 +6,7 @@ import {
   battleBarModel,
   battleGains,
   battleSidePalette,
+  PRESS_SIDE_LABEL,
 } from "../core";
 import { acquireStyles, releaseStyles } from "./styles";
 import { type GiftTheme, applyTheme } from "./theme";
@@ -34,6 +35,13 @@ export interface GiftBattleBarOptions {
   onError?: (error: ReturnType<typeof asGiftingError>) => void;
   theme?: Partial<GiftTheme>;
   labels?: BattleBarLabelsInput;
+  /**
+   * Makes every side's avatar a button (spec 21.4): open your tray with that side picked,
+   * `tray.selectReceiver(id); tray.open()`. Without it the bar is read-only, as before.
+   */
+  onPressSide?: (id: string) => void;
+  /** The button's label; `{name}` is replaced. Default "Send {name} a gift". */
+  pressSideLabel?: string;
 }
 
 const CROWN =
@@ -153,6 +161,17 @@ export class GiftBattleBar {
     );
   }
 
+  /** With `onPressSide`, the avatar inside a button (spec 21.4). */
+  private pickable(av: HTMLElement, id: string): HTMLElement {
+    if (!this.o.onPressSide) return av;
+    const b = make(this.doc, "button", "gs-vs-pick") as HTMLButtonElement;
+    b.type = "button";
+    b.setAttribute("data-gs-side", id);
+    b.addEventListener("click", () => this.o.onPressSide?.(id));
+    b.append(av);
+    return b;
+  }
+
   private draw(): void {
     const model = battleBarModel(this.view, { nameOf: this.nameOf, labels: this.o.labels });
     const view = this.view;
@@ -165,13 +184,18 @@ export class GiftBattleBar {
     this.element.hidden = false;
     this.element.toggleAttribute("data-calm", this.calm());
     const ids = view.sides.map((s) => s.id);
-    const key = `${view.round}|${ids.join("|")}`;
+    const key = `${view.round}|${ids.join("|")}|${this.o.onPressSide ? "p" : ""}`;
     if (key !== this.key) {
       if (!this.key.startsWith(`${view.round}|`)) this.last = null; // a new round: nothing pulses
       this.build(model, key);
       this.lookUp(ids);
     }
     this.apply(model, view);
+    const label = this.o.pressSideLabel ?? PRESS_SIDE_LABEL;
+    for (const b of this.element.querySelectorAll<HTMLElement>(".gs-vs-pick")) {
+      const side = model.sides.find((x) => x.id === b.getAttribute("data-gs-side"));
+      if (side) b.setAttribute("aria-label", label.replace("{name}", side.name));
+    }
   }
 
   private build(model: BattleBarModel, key: string): void {
@@ -195,7 +219,7 @@ export class GiftBattleBar {
       const side = make(doc, "div", `gs-vs-side gs-vs-s${i}`);
       const av = avatar(doc, s.name, this.names.get(s.id)?.avatarUrl, 44);
       av.classList.add("gs-vs-avatar");
-      side.append(av);
+      side.append(this.pickable(av, s.id));
       const crown = make(doc, "span", "gs-vs-crown", side);
       crown.setAttribute("aria-hidden", "true");
       crown.innerHTML = CROWN;
@@ -239,7 +263,7 @@ export class GiftBattleBar {
       side.style.setProperty("--gs-side-text", `var(--gs-side-${i}-text)`);
       const av = avatar(doc, s.name, this.names.get(s.id)?.avatarUrl, n > 4 ? 30 : 36);
       av.classList.add("gs-vs-avatar");
-      side.append(av);
+      side.append(this.pickable(av, s.id));
       const crown = make(doc, "span", "gs-vs-crown", side);
       crown.setAttribute("aria-hidden", "true");
       crown.innerHTML = CROWN;

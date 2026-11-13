@@ -3,6 +3,32 @@
 All notable changes to `@giftingstack/sdk`. The shared contract (`packages/sdk-spec`) has its own
 version (`SPEC_VERSION`); this package states which one it passes.
 
+## 0.1.6
+
+- A gift button for your own message bar, like an emoji button (SPEC 20). `GiftButton` (web class
+  and `<gift-button>`, React Native component) is a small round gift icon in the tray's theme
+  colours; `filled`, `size`, `label`, `disabled`. Give the tray your text field (web
+  `createGiftTray({ input, anchor: button.element })` / `<gift-tray input="#msg" anchor="#gift">`,
+  React Native `useGiftTray({ input: textInputRef })` + `<GiftButton tray={tray} />`): the button
+  closes the keyboard and opens the tray in the keyboard's place (about the keyboard's height, no
+  dim, it starts closed), a tap on the field closes the tray and the keyboard comes back, the
+  button again does the same. Nothing changes without `input`. New pure helpers `inputSwapStep`,
+  `keyboardPlaceHeight`, `keyboardPlaceSnap` and their constants; fixture `input-swap.json`.
+- One gift button for a battle (SPEC 21): the tray's `receivers` option (`{ id, name, color?,
+avatarUrl? }` per side; web `createGiftTray` / `GiftTray`, React Native `useGiftTray`) shows a
+  "Send to" row under the header (avatars; only the picked side shows its name, so four sides fit a 375 px phone; the row scrolls itself, never the page, to keep the pick in sight); every send goes to the picked side (default: the side this tray
+  last sent to, else the first). `selectReceiver(id)`, `getReceiver()` / `tray.receiver`,
+  `onReceiverChange`, `sendToLabel`. The battle bar's sides become buttons with `onPressSide`
+  (web `GiftBattleBar`, `<gift-battle-bar pressable>` + `gift-side-press`, React Native
+  `BattleBar`), `pressSideLabel`. New pure `resolveReceiver`; fixture `receivers.json`.
+  Without `receivers` nothing changes.
+- `GiftButton`: a custom `icon` and fixed sizes (SPEC 20.4). `size` is now `"small"` (32) | `"medium"` (36, the
+  default) | `"large"` (44) instead of a number; an unknown value is `medium`. `icon` replaces the gift glyph
+  (web: SVG markup or a Node, also the `<gift-button>` `icon` property; React Native: a node or
+  `(color) => node`). It is centred in the fixed glyph box, scaled down to fit and clipped, and gets the
+  glyph colour (`accent`, `accentText` when filled).
+- All five SDKs share this version number from now on (Flutter, Android and iOS move to 0.1.6 too).
+
 ## 0.1.5
 
 - Web: a finger on the tray footer (selected gift and Send) no longer scrolls the page behind the sheet; the header already behaved that way. Taps still work.

@@ -141,6 +141,35 @@ again and again for a combo ("x2, x3…"). To show a gift someone else sent you,
 - Colors: pass `theme` to `GiftEffectLayer` and `GiftTray`: `darkTheme`, `lightTheme`, or
   `themeFromAccent("#ff4f9a", "light")` to build a readable theme (4.5:1 text contrast) from your brand colour.
 
+### Gift button in your message bar (React Native)
+
+GiftingStack has no chat; it fits into yours. Put `GiftButton` in your own message bar, like an
+emoji button, and give the tray your `TextInput`: the button closes the keyboard and opens the
+tray in the keyboard's place (no dim), a tap on the field brings the keyboard back (SPEC 20).
+
+```tsx
+const field = useRef<ElementRef<typeof TextInput>>(null);
+const tray = useGiftTray({ client, receiver, effects, input: field }); // starts closed
+
+<View style={styles.bar}>
+  <TextInput ref={field} placeholder="Message" />
+  <GiftButton tray={tray} />
+</View>
+<GiftTray tray={tray} collapseOnSelect onInsetChange={setInset} /> // lift your bar by the inset
+```
+
+`GiftButton`: `label`, `filled`, `size`, `icon`, `disabled`, `theme`. Draw your own "You sent X"
+line in the chat from `onSent`.
+
+**Custom icon and sizes.** `size` is `"small"` (32), `"medium"` (36, default) or `"large"` (44);
+anything else is `"medium"`. `icon` replaces the gift glyph: a node or a function that gets the glyph
+colour (`accent`, or `accentText` when `filled`). It is centred in a fixed, clipped glyph box
+(`22 * size / 36`), so your artwork never changes the button's size.
+
+```tsx
+<GiftButton tray={tray} size="large" icon={(color) => <Heart color={color} size={20} />} />
+```
+
 ### Gift wall, while you were away and leaderboard (React Native)
 
 Three more components with the same `client`, `theme` and `labels` conventions as the tray.
@@ -325,6 +354,44 @@ Limits: the flying effects need the Web Animations API (all current browsers). W
 shows only the notice, as with reduced motion, and does not break. Gifts played while the layer has no size
 (hidden container) wait until it has one. Not measured on a low-end phone or in older WebViews: check
 the frame rate there and use `quality: "low"`. In a background tab browsers pause animations.
+
+### Gift button in your message bar (web)
+
+```ts
+import { GiftButton, createGiftTray } from "@giftingstack/sdk/web";
+const button = new GiftButton(messageField.parentElement!, { theme });
+createGiftTray({
+  container: screen,
+  client,
+  receiver,
+  effects,
+  anchor: button.element, // the button opens and closes the tray
+  input: messageField, // ...in the keyboard's place; a tap on the field brings the keyboard back
+  collapseOnSelect: true,
+});
+```
+
+With `input` the sheet starts closed and has no dim; on a wide page the button opens the popover.
+Elements: `<gift-button id="gift">` and `<gift-tray anchor="#gift" input="#msg">`.
+
+**Custom icon and sizes.** `size` is `"small"` (32 px), `"medium"` (36, default) or `"large"` (44);
+anything else is `"medium"` (`<gift-button size="large">`). `icon` replaces the gift glyph: SVG
+markup (the root must be `<svg>`, otherwise the gift glyph stays; `currentColor` follows the glyph
+colour: `accent`, or `accentText` when `filled`) or a Node such as an `<svg>` or `<img>` (used as
+is, an `<img>` is not tinted). It is centred in a fixed glyph box and fitted into it (scaled down,
+never up, clipped), so it can never change the button's size. `button.update({ icon })` changes it,
+`icon: undefined` restores the gift glyph; `<gift-button>` has an `icon` property.
+
+```ts
+new GiftButton(bar, {
+  size: "large",
+  icon: '<svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-11a5 5 0 0 1 8-3 5 5 0 0 1 8 3c0 6-8 11-8 11z" fill="currentColor"/></svg>',
+});
+```
+
+A battle needs only that one button: pass `receivers` (the round's sides) and the tray shows a
+"Send to" row; `new GiftBattleBar(slot, { room, onPressSide: (id) => { handle.selectReceiver(id);
+handle.open(); } })` makes the bar's sides tappable (SPEC 21).
 
 ### Gift wall, while you were away and leaderboard (web)
 
@@ -808,7 +875,7 @@ GiftingStack's own repository, so it does not run from this repository.
   `react-native-web`, plus unit tests. **Not measured on an older or low-end phone**: check frame rate there
   before you rely on it, and use `quality="low"` if needed.
 - The pictures are still images. The effect is drawn around them.
-- Version 0.1.5 is a preview: the API can still change before 1.0. The package is ESM with types
+- Version 0.1.6 is a preview: the API can still change before 1.0. The package is ESM with types
   (`npm run build`); `npm run prepublishOnly` (tests, typecheck, build) runs before every publish.
 
 ## License

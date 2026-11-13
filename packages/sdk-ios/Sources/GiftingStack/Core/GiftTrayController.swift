@@ -160,9 +160,13 @@ public final class GiftTrayController {
     }
 
     /// Sends a gift. The coins leave the balance at once; a failure gives them back.
-    public func send(_ gift: Gift) async {
+    /// - Parameter target: who gets it; nil (default) is `receiver`. The receiver picker (SPEC 21) passes the
+    ///   side it resolved.
+    /// - Returns: whether the server accepted the send.
+    @discardableResult
+    public func send(_ gift: Gift, to target: String? = nil) async -> Bool {
         let client = self.client
-        let receiver = self.receiver
+        let receiver = target ?? self.receiver
         let reference = self.reference
         // An empty room id names no room (the reference sends it only when given).
         let roomId = (self.roomId?.isEmpty ?? true) ? nil : self.roomId
@@ -173,6 +177,7 @@ public final class GiftTrayController {
         // Take the coins at once so the number moves with every tap.
         state.balance = state.balance - gift.price
 
+        var sent = false
         var shownId: Int?
         if early {
             shownId = effects?()?.play(GiftEffectEvent(gift: gift, sender: user ?? "You", quantity: 1, receiver: receiverOf?(receiver)))
@@ -186,6 +191,7 @@ public final class GiftTrayController {
                 }
                 onSent?(tx)
             }
+            sent = true
         } catch {
             let e = asGiftingError(error)
             // The gift was shown before the server answered: take it back.
@@ -206,6 +212,7 @@ public final class GiftTrayController {
                 await self?.reconcile(client)
             }
         }
+        return sent
     }
 
     /// After a burst of taps the server's number is the truth.

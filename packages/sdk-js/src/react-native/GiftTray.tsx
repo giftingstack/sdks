@@ -1,4 +1,5 @@
 import {
+  type ElementRef,
   type Ref,
   useEffect,
   useImperativeHandle,
@@ -32,6 +33,10 @@ import {
   type SheetLayout,
   type SheetSnap,
   TraySheetController,
+  keyboardPlaceSnap,
+  SEND_TO_LABEL,
+  battleSidePalette,
+  revealOffset,
   pictureFailed,
   pictureSrc,
   scrimFadeMs,
@@ -47,7 +52,18 @@ import type { UseGiftTray } from "./useGiftTray";
 
 /** What `GiftTray` reads from `useGiftTray()` when you pass it as `tray`. */
 export type GiftTrayState = Pick<UseGiftTray, "gifts" | "balance" | "send" | "testMode"> &
-  Partial<Pick<UseGiftTray, "isOpen" | "close">>;
+  Partial<
+    Pick<
+      UseGiftTray,
+      | "isOpen"
+      | "close"
+      | "inputBound"
+      | "keyboardHeight"
+      | "receivers"
+      | "receiver"
+      | "selectReceiver"
+    >
+  >;
 
 export interface GiftTrayProps {
   /**
@@ -132,6 +148,8 @@ export interface GiftTrayProps {
   bottomInset?: number;
   /** Id of the gift selected first. Default: the first gift. */
   defaultSelectedId?: string;
+  /** A battle (spec 21): the "Send to" row's label. Default "Send to". */
+  sendToLabel?: string;
   /** Turn off sending, for example while a request is running. */
   disabled?: boolean;
   theme?: Partial<GiftTheme>;
@@ -215,18 +233,25 @@ function useSheet(props: GiftTrayProps, rows: number, open: boolean) {
     const v = key === "gridTop" ? y : height;
     setMeasured((m) => (m[key] === v ? m : { ...m, [key]: v }));
   };
+  // A bound text field (spec 20.3): `default` is the keyboard's place, unless the host set it.
+  const keyboard = props.tray?.inputBound ? (props.tray.keyboardHeight ?? 0) : null;
   const snapsKey = JSON.stringify(snaps ?? null);
   useEffect(() => {
     const peek = measured.gridTop + measured.footer;
+    const height = containerHeight ?? measured.container;
+    const place =
+      keyboard !== null && snaps?.default === undefined
+        ? keyboardPlaceSnap({ keyboardHeight: keyboard, containerHeight: height })
+        : undefined;
     sheet.setLayout({
-      containerHeight: containerHeight ?? measured.container,
-      snaps,
+      containerHeight: height,
+      snaps: place === undefined ? snaps : { ...snaps, default: place },
       peekMinHeight: peek,
       defaultMinHeight: peek + Math.min(2, rows) * measured.row,
       contentHeight: peek + rows * measured.row,
     });
     // `snaps` is compared by value (snapsKey), so a new object with the same numbers changes nothing.
-  }, [sheet, measured, rows, containerHeight, snapsKey]);
+  }, [sheet, measured, rows, containerHeight, snapsKey, keyboard]);
 
   // Until the container, the block above the grid, a row and the footer are measured, the snap
   // heights are guesses: the sheet would appear in the wrong place and glide to the right one.
@@ -368,6 +393,16 @@ function Scrim({
   );
 }
 
+/** The "Send to" row's scroll view, its width and offset, and where each chip sits. */
+function usePickRow() {
+  const scroll = useRef<ElementRef<typeof ScrollView>>(null);
+  const width = useRef(0);
+  const offset = useRef(0);
+  const chips = useRef<Record<string, { x: number; w: number }>>({});
+  const [layoutTick, setTick] = useState(0);
+  return { scroll, width, offset, chips, layoutTick, bump: () => setTick((n) => n + 1) };
+}
+
 /** A tray of gifts with the balance and a Send button. Presentational: you pass data and callbacks. */
 export function GiftTray(props: GiftTrayProps) {
   const {
@@ -400,6 +435,7 @@ export function GiftTray(props: GiftTrayProps) {
   const rows = Math.ceil(gifts.length / Math.max(1, columns));
   const open = props.open ?? tray?.isOpen ?? true;
   const s = useSheet(props, rows, open);
+  const pick = usePickRow();
   useImperativeHandle(props.ref, () => ({ snapTo: (snap) => s.sheet.snapTo(snap) }), [s.sheet]);
 
   // Warm up the pictures: small icons for the whole tray, the big picture for the selected gift.
@@ -445,6 +481,104 @@ export function GiftTray(props: GiftTrayProps) {
       }}
     />
   ) : null;
+
+  // A battle (spec 21.3): the "Send to" row, with two or more receivers.
+  const sides = tray?.receivers;
+  const sidePalette =
+    sides && sides.length >= 2 ? battleSidePalette(props.theme, sides.length) : [];
+  const picked = tray?.receiver ?? null;
+  // The picked side is always in sight (spec 21.3): the ROW scrolls (its own offset, least
+  // distance), never the sheet or the page.
+  useEffect(() => {
+    if (!sides || sides.length < 2 || !open || !picked) return;
+    const chip = pick.chips.current[picked];
+    const view = pick.width.current;
+    if (!chip || view <= 0) return;
+    const x = revealOffset({
+      scroll: pick.offset.current,
+      viewport: view,
+      start: chip.x,
+      end: chip.x + chip.w,
+    });
+    if (x === pick.offset.current) return;
+    pick.offset.current = x;
+    pick.scroll.current?.scrollTo({ x, animated: !s.reduced });
+  }, [picked, sides?.length, open, pick.layoutTick]);
+  const picker =
+    sides && sides.length >= 2 ? (
+      <ScrollView
+        ref={pick.scroll}
+        onLayout={(e) => {
+          pick.width.current = e.nativeEvent.layout.width;
+          pick.bump();
+        }}
+        onScroll={(e) => (pick.offset.current = e.nativeEvent.contentOffset.x)}
+        scrollEventThrottle={32}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.receivers}
+        contentContainerStyle={styles.receiversRow}
+        accessibilityRole="radiogroup"
+        accessibilityLabel={props.sendToLabel ?? SEND_TO_LABEL}
+        testID="gift-receivers"
+      >
+        <Text
+          style={[styles.receiversLabel, { color: theme.muted }]}
+          importantForAccessibility="no"
+        >
+          {props.sendToLabel ?? SEND_TO_LABEL}
+        </Text>
+        {sides.map((r, i) => {
+          const on = tray?.receiver === r.id;
+          const ring = r.color ?? sidePalette[i]!.color;
+          const url = pictureSrc(r.avatarUrl);
+          return (
+            <Pressable
+              key={r.id}
+              onPress={() => tray?.selectReceiver?.(r.id)}
+              accessibilityRole="radio"
+              accessibilityLabel={r.name}
+              accessibilityState={{ checked: on }}
+              aria-checked={on}
+              hitSlop={7}
+              testID={`gift-receiver-${r.id}`}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                const was = pick.chips.current[r.id];
+                if (was && was.x === x && was.w === width) return;
+                pick.chips.current[r.id] = { x, w: width };
+                pick.bump();
+              }}
+              style={[styles.receiver, { opacity: on ? 1 : 0.55 }]}
+            >
+              <View style={[styles.receiverRing, { borderColor: on ? theme.text : "transparent" }]}>
+                <View style={[styles.receiverAvatar, { backgroundColor: ring, borderColor: ring }]}>
+                  {url ? (
+                    <Image
+                      source={{ uri: url }}
+                      onError={() => pictureFailed(url)}
+                      fadeDuration={0}
+                      style={styles.receiverImage}
+                      accessible={false}
+                    />
+                  ) : (
+                    <Text style={[styles.receiverLetter, { color: sidePalette[i]!.text }]}>
+                      {(r.name.trim()[0] ?? "?").toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+              </View>
+              {/* Only the picked side shows its name, so four sides fit on a phone (21.3). */}
+              {on ? (
+                <Text numberOfLines={1} style={[styles.receiverName, { color: theme.accent }]}>
+                  {r.name}
+                </Text>
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    ) : null;
 
   const head = (
     <View style={styles.head}>
@@ -556,6 +690,7 @@ export function GiftTray(props: GiftTrayProps) {
       >
         {warmup}
         {head}
+        {picker}
         <ScrollView style={{ maxHeight: gridMaxHeight }} contentContainerStyle={styles.grid}>
           {cells}
         </ScrollView>
@@ -658,6 +793,7 @@ export function GiftTray(props: GiftTrayProps) {
             <View style={[styles.handlePill, { backgroundColor: theme.muted }]} />
           </Pressable>
           {head}
+          {picker}
           <ScrollView
             style={styles.sheetGrid}
             contentContainerStyle={styles.grid}
@@ -718,6 +854,23 @@ export function GiftTray(props: GiftTrayProps) {
 }
 
 const styles = StyleSheet.create({
+  receivers: { flexGrow: 0, marginTop: 10 },
+  receiversRow: { alignItems: "center", gap: 8, paddingHorizontal: 2, paddingVertical: 2 },
+  receiversLabel: { fontSize: 12, fontWeight: "700" },
+  receiver: { flexDirection: "row", alignItems: "center", gap: 6 },
+  receiverRing: { borderWidth: 2, borderRadius: 19, padding: 0 },
+  receiverAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  receiverImage: { width: 30, height: 30, borderRadius: 15 },
+  receiverLetter: { fontSize: 13, fontWeight: "800" },
+  receiverName: { maxWidth: 72, fontSize: 12, fontWeight: "700" },
   tray: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

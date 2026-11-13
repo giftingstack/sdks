@@ -231,10 +231,14 @@ class GiftTrayController {
     }
   }
 
-  /// Sends [gift] with an optimistic balance and the gift's effect.
-  Future<void> send(Gift gift) async {
+  /// Sends [gift] with an optimistic balance and the gift's effect, to
+  /// [receiver] (default: the options' `receiver`; the tray's receiver
+  /// picker passes the resolved side, SPEC 21.2). Completes with true when
+  /// the server accepted the gift.
+  Future<bool> send(Gift gift, {String? receiver}) async {
     final options = _options;
     final client = options.client;
+    final to = receiver ?? options.receiver;
     final user = _state.user;
     _pending++;
     // Take the coins at once so the number moves with every tap.
@@ -242,7 +246,7 @@ class GiftTrayController {
     int? show(String sender, int quantity) {
       GiftEffectReceiver? battleReceiver;
       try {
-        battleReceiver = options.receiverOf?.call(options.receiver);
+        battleReceiver = options.receiverOf?.call(to);
       } on Object {
         battleReceiver = null; // app code: never let it break a send
       }
@@ -267,25 +271,27 @@ class GiftTrayController {
     try {
       final tx = await client.sendGift(
         SendGiftInput(
-          receiver: options.receiver,
+          receiver: to,
           giftId: gift.id,
           reference: options.reference,
           roomId: (options.roomId?.isNotEmpty ?? false) ? options.roomId : null,
         ),
       );
-      if (!_alive) return;
+      if (!_alive) return true;
       _set(error: null);
       // App code from here on: a throwing callback must never look like a
       // failed send (the coins are spent), so it must not reach the catch below
       // that refunds the optimistic balance.
       if (!early) _safe(() => show(user ?? tx.sender, tx.quantity));
       _safe(() => _options.onSent?.call(tx));
+      return true;
     } on Object catch (err) {
       final e = asGiftingError(err);
       // The gift was shown before the server answered: take it back.
       if (shownId != null) _options.effects?.call()?.cancel(shownId);
       if (_alive) _set(balance: _state.balance + gift.price, error: e);
       _safe(() => _options.onError?.call(e));
+      return false;
     } finally {
       _pending--;
       if (_pending == 0) unawaited(_reconcile(client));

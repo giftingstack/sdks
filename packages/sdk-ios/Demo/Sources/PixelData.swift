@@ -25,12 +25,23 @@ struct PixelPost: Identifiable {
     let likes: Int
 }
 
-/// One line of the Live tab's room feed ("Ava sent 2 x Rose to Theo"), newest first.
+/// One line of the Live tab's comment column ("Ava sent 2 x Rose to Theo", or a comment), newest first.
 struct PixelRoomFeedItem: Identifiable {
     let id: String
     let sender: String
-    let what: String
+    /// "2 x Rose" (a combo line grows) or the comment's text.
+    var what: String
     let to: String?
+    /// The side that got the gift (the room event's `receiverId`, or your own send's receiver): the line takes
+    /// that side's colour.
+    var receiverId: String? = nil
+    /// A comment of the live chat (the app's own, not GiftingStack's): `what` is the text.
+    var comment = false
+    /// A gift line only: "sender|gift|receiver", the key of a running combo (`PixelModel.addGiftLine`).
+    var key: String? = nil
+    /// A gift line only: how many gifts the line adds up (a combo), and when it last grew.
+    var count = 1
+    var at = Date()
 }
 
 /// The single mock-data module of the iOS demo; the same content as
@@ -97,16 +108,14 @@ enum PixelData {
 
     /// The Live tab's room (a battle between `liveHost` and `liveRival`), as in web.ts.
     static let liveRoom = "pixel-live"
+    /// The room of the plain "Live room" mode: one host, no battle.
+    static let liveRoomSolo = "pixel-live-room"
     /// The room of the "Battle 4+" mode: four hosts in every round (a free-for-all).
     static let liveRoom4 = "pixel-live-4"
     static let liveHost = "mia"
     static let liveRival = "theo"
     /// The hosts of the battle: the first two play "Battle", all four play "Battle 4+".
     static let liveHosts = [liveHost, liveRival, "sofia", "kai"]
-    static func livePost(for author: String) -> PixelPost {
-        PixelPost(id: "live-1", author: author, text: "Evening stream", art: .aurora, ago: "live", likes: 0)
-    }
-    /// The posts the Live tab's "Gift Mia" / "Gift Theo" buttons open the tray for.
 
     /// The `resolveUsers` of the demo: what your app would answer from its own user table.
     static func lookUpNames(_ ids: [String]) async throws -> [String: GiftUserInfo] {

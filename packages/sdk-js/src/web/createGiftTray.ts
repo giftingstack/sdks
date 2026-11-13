@@ -52,6 +52,10 @@ export interface GiftTrayHandle {
   toggle(): void;
   /** `tray.isOpen()`. */
   isOpen(): boolean;
+  /** Battle (spec 21): pick the side the next gift goes to (`tray.selectReceiver`). */
+  selectReceiver(id: string): void;
+  /** The receiver the next gift goes to. */
+  getReceiver(): string | null;
   destroy(): void;
 }
 
@@ -78,6 +82,7 @@ export function createGiftTray(options: CreateGiftTrayOptions): GiftTrayHandle {
     sheet: options.sheet,
     placement: options.placement,
     anchor: options.anchor,
+    input: options.input,
     onOpenChange: options.onOpenChange,
     open: options.open,
     scrim: options.scrim,
@@ -89,8 +94,12 @@ export function createGiftTray(options: CreateGiftTrayOptions): GiftTrayHandle {
     onSnapChange: options.onSnapChange,
     collapseOnSelect: options.collapseOnSelect,
     onInsetChange: options.onInsetChange,
+    receivers: options.receivers,
+    receiver,
+    onReceiverChange: options.onReceiverChange,
+    sendToLabel: options.sendToLabel,
   };
-  const controller = new GiftTrayController({
+  const base: GiftTrayControllerOptions = {
     client,
     receiver,
     effects: typeof effects === "function" ? effects : () => effects,
@@ -98,11 +107,23 @@ export function createGiftTray(options: CreateGiftTrayOptions): GiftTrayHandle {
     reference,
     roomId: options.roomId,
     receiverOf: options.receiverOf,
-    onSent,
+    onSent: (tx: GiftTransaction) => {
+      // A battle (spec 21.2): the side this tray last sent to is the default next time.
+      tray.noteSent(tx.receiver);
+      onSent?.(tx);
+    },
     onError,
     prefetch,
+  };
+  const controller = new GiftTrayController(base);
+  const tray: GiftTray = new GiftTray(container, {
+    ...trayOptions,
+    onSend: (gift) => {
+      // Every send goes to the picked side (or the plain receiver).
+      controller.setOptions({ ...base, receiver: tray.getReceiver() ?? receiver });
+      return controller.send(gift);
+    },
   });
-  const tray = new GiftTray(container, { ...trayOptions, onSend: (gift) => controller.send(gift) });
   const unsubscribe = controller.subscribe(() => {
     const state = controller.getState();
     tray.update({ gifts: state.gifts, balance: state.balance, testMode: state.testMode });
@@ -118,6 +139,8 @@ export function createGiftTray(options: CreateGiftTrayOptions): GiftTrayHandle {
     close: () => tray.close(),
     toggle: () => tray.toggle(),
     isOpen: () => tray.isOpen(),
+    selectReceiver: (id) => tray.selectReceiver(id),
+    getReceiver: () => tray.getReceiver(),
     destroy() {
       controller.dispose();
       unsubscribe();

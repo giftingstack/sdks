@@ -9,6 +9,7 @@ import {
   View,
   type ViewStyle,
   Platform,
+  Pressable,
 } from "react-native";
 import {
   type BattleBarLabelsInput,
@@ -22,6 +23,7 @@ import {
   pictureFailed,
   pictureSrc,
   resolveBattleBarLabels,
+  PRESS_SIDE_LABEL,
 } from "../core";
 import { initialOf } from "./ui-parts";
 import { useReducedMotion } from "./reduced-motion";
@@ -48,6 +50,13 @@ export interface BattleBarProps {
   theme?: Partial<GiftTheme>;
   labels?: BattleBarLabelsInput;
   style?: StyleProp<ViewStyle>;
+  /**
+   * Makes every side's avatar a button (spec 21.4): open your tray with that side picked,
+   * `tray.selectReceiver(id); tray.open()`. Without it the bar is read-only, as before.
+   */
+  onPressSide?: (id: string) => void;
+  /** The button's label; `{name}` is replaced. Default "Send {name} a gift". */
+  pressSideLabel?: string;
 }
 
 const native = Platform.OS !== "web";
@@ -91,6 +100,8 @@ function SideView(props: {
   still: boolean;
   theme: GiftTheme;
   labels: BattleBarLabelsInput;
+  onPress?: (id: string) => void;
+  pressLabel?: string;
 }) {
   const { side, color, theme, still, index } = props;
   const count = useCount(side.units, still);
@@ -117,39 +128,92 @@ function SideView(props: {
         { transform: [{ scale }], opacity: side.lost ? 0.5 : 1 },
       ]}
     >
-      <View style={[styles.ring, { borderColor: ring, borderRadius: (size + 8) / 2 }]}>
-        {url ? (
-          <Image
-            source={{ uri: url }}
-            onError={() => pictureFailed(url)}
-            fadeDuration={0}
-            accessible={false}
-            style={[styles.avatar, avatarStyle, { backgroundColor: theme.border }]}
-            testID="battle-avatar-image"
-          />
-        ) : (
-          <View
-            style={[styles.avatar, avatarStyle, { backgroundColor: color.color }]}
-            testID="battle-avatar"
-          >
-            <Text
-              style={[styles.avatarText, { color: color.text }, cell && { fontSize: size * 0.45 }]}
-            >
-              {initialOf(side.name)}
-            </Text>
+      {props.onPress ? (
+        <Pressable
+          onPress={() => props.onPress?.(side.id)}
+          accessibilityRole="button"
+          accessibilityLabel={(props.pressLabel ?? PRESS_SIDE_LABEL).replace("{name}", side.name)}
+          hitSlop={Math.max(0, (44 - size - 8) / 2)}
+          testID={`battle-side-${side.id}`}
+          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+        >
+          <View style={[styles.ring, { borderColor: ring, borderRadius: (size + 8) / 2 }]}>
+            {url ? (
+              <Image
+                source={{ uri: url }}
+                onError={() => pictureFailed(url)}
+                fadeDuration={0}
+                accessible={false}
+                style={[styles.avatar, avatarStyle, { backgroundColor: theme.border }]}
+                testID="battle-avatar-image"
+              />
+            ) : (
+              <View
+                style={[styles.avatar, avatarStyle, { backgroundColor: color.color }]}
+                testID="battle-avatar"
+              >
+                <Text
+                  style={[
+                    styles.avatarText,
+                    { color: color.text },
+                    cell && { fontSize: size * 0.45 },
+                  ]}
+                >
+                  {initialOf(side.name)}
+                </Text>
+              </View>
+            )}
+            {side.won ? (
+              <Text
+                style={[
+                  styles.crown,
+                  cell ? { alignSelf: "center" } : right ? { right: 2 } : { left: 2 },
+                ]}
+              >
+                {"♛"}
+              </Text>
+            ) : null}
           </View>
-        )}
-        {side.won ? (
-          <Text
-            style={[
-              styles.crown,
-              cell ? { alignSelf: "center" } : right ? { right: 2 } : { left: 2 },
-            ]}
-          >
-            {"♛"}
-          </Text>
-        ) : null}
-      </View>
+        </Pressable>
+      ) : (
+        <View style={[styles.ring, { borderColor: ring, borderRadius: (size + 8) / 2 }]}>
+          {url ? (
+            <Image
+              source={{ uri: url }}
+              onError={() => pictureFailed(url)}
+              fadeDuration={0}
+              accessible={false}
+              style={[styles.avatar, avatarStyle, { backgroundColor: theme.border }]}
+              testID="battle-avatar-image"
+            />
+          ) : (
+            <View
+              style={[styles.avatar, avatarStyle, { backgroundColor: color.color }]}
+              testID="battle-avatar"
+            >
+              <Text
+                style={[
+                  styles.avatarText,
+                  { color: color.text },
+                  cell && { fontSize: size * 0.45 },
+                ]}
+              >
+                {initialOf(side.name)}
+              </Text>
+            </View>
+          )}
+          {side.won ? (
+            <Text
+              style={[
+                styles.crown,
+                cell ? { alignSelf: "center" } : right ? { right: 2 } : { left: 2 },
+              ]}
+            >
+              {"♛"}
+            </Text>
+          ) : null}
+        </View>
+      )}
       <View style={[styles.who, right && { alignItems: "flex-end" }, cell && styles.whoCell]}>
         <Text
           numberOfLines={1}
@@ -284,6 +348,8 @@ export function BattleBar(props: BattleBarProps) {
           >
             {model.sides.map((s, i) => (
               <SideView
+                onPress={props.onPressSide}
+                pressLabel={props.pressSideLabel}
                 key={s.id}
                 side={s}
                 index={i}
@@ -321,6 +387,8 @@ export function BattleBar(props: BattleBarProps) {
             importantForAccessibility="no-hide-descendants"
           >
             <SideView
+              onPress={props.onPressSide}
+              pressLabel={props.pressSideLabel}
               side={model.sides[0]!}
               index={0}
               color={colA}
@@ -339,6 +407,8 @@ export function BattleBar(props: BattleBarProps) {
               </View>
             </View>
             <SideView
+              onPress={props.onPressSide}
+              pressLabel={props.pressSideLabel}
               side={model.sides[1]!}
               index={1}
               color={colB}

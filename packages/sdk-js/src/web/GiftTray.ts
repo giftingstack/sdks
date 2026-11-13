@@ -1,6 +1,15 @@
 import {
   type Gift,
+  type InputSwapEvent,
+  KEYBOARD_MIN_HEIGHT,
+  SEND_TO_LABEL,
+  type TrayReceiver,
+  battleSidePalette,
+  resolveReceiver,
+  revealOffset,
   PLACEMENT_COLUMNS,
+  inputSwapStep,
+  keyboardPlaceSnap,
   type ScrimTap,
   type SheetLayout,
   type SheetSnap,
@@ -16,6 +25,7 @@ import {
   sendButtonState,
 } from "../core";
 import { outCubic } from "./anim";
+import { avatar } from "./ui";
 import { prefetch, setPicture } from "./images";
 import { PopoverView } from "./popover";
 import { SheetView } from "./sheet";
@@ -56,6 +66,13 @@ export interface GiftTrayOptions {
   placement?: TrayPlacementOption;
   /** Popover: the app's gift button. Its clicks open and close the tray. Read once. */
   anchor?: HTMLElement | null;
+  /**
+   * The app's own text field in its message bar (spec 20, read once). The tray then takes the
+   * keyboard's place: the `anchor` (your `GiftButton`) closes the keyboard and opens the tray, a
+   * focus on the field closes the tray, the button again brings the keyboard back. The sheet
+   * starts closed (unless `open` is given) and opens about as tall as the keyboard was.
+   */
+  input?: HTMLInputElement | HTMLTextAreaElement | null;
   /**
    * It opened or closed. Popover: Escape, a click outside, the anchor, `open()`/`close()`.
    * Sheet: `open()`, `close()`, `toggle()` and a dismissed scrim tap (spec 9.4).
@@ -103,6 +120,18 @@ export interface GiftTrayOptions {
    * reports 0 once; the popover and the inline tray report nothing.
    */
   onInsetChange?: (px: number) => void;
+  /**
+   * A battle (spec 21): the sides the viewer can send to. Two or more show a "Send to" row under
+   * the header; the send goes to the picked side (default: the side this tray last sent to, else
+   * the first). Without it the tray sends to `receiver` as before.
+   */
+  receivers?: TrayReceiver[];
+  /** The receiver without `receivers`, and the fallback when it is one of them. */
+  receiver?: string;
+  /** The picked side changed (a tap, `selectReceiver`, a new list). */
+  onReceiverChange?: (id: string | null) => void;
+  /** Default "Send to". */
+  sendToLabel?: string;
   /** Id of the gift selected first. Default: the first gift. */
   defaultSelectedId?: string;
   /** Turn off sending, for example while a request is running. */
@@ -139,6 +168,13 @@ export class GiftTray {
   private readonly balanceLabel: HTMLElement;
   private readonly topUp: HTMLButtonElement;
   private readonly grid: HTMLElement;
+  /** The "Send to" row of a battle (spec 21.3). */
+  private readonly pickRow: HTMLElement;
+  private pickedId: string | null = null;
+  private lastSentTo: string | null = null;
+  /** The receiver last reported to `onReceiverChange` (undefined: nothing reported yet). */
+  private shownReceiver: string | null | undefined = undefined;
+  private builtReceivers: { list: TrayReceiver[]; theme: unknown; label: string } | null = null;
   private readonly send: HTMLButtonElement;
   private readonly picked: HTMLElement | null = null;
   /** Popover and inline, `collapseOnSelect`: shows the grid again after a pick made the tray small. */
@@ -152,6 +188,12 @@ export class GiftTray {
     footer: HTMLElement;
   } | null = null;
   private readonly anchor: HTMLElement | null;
+  private readonly input: HTMLInputElement | HTMLTextAreaElement | null;
+  /** The bound field's listeners and the keyboard watch (spec 20). */
+  private readonly inputListeners = new AbortController();
+  /** The last keyboard height seen (0: none yet). */
+  private keyboard = 0;
+  private savedExpanded: string | null = null;
   private placement: TrayPlacement | null = null;
   private sheet: SheetView | null = null;
   private popover: PopoverView | null = null;
@@ -173,12 +215,18 @@ export class GiftTray {
     this.doc = container.ownerDocument;
     this.container = container;
     this.anchor = options.anchor ?? null;
+    this.input = options.input ?? null;
+    this.savedExpanded = this.anchor?.getAttribute("aria-expanded") ?? null;
     this.motion = this.doc.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)") ?? null;
     this.openState = new TrayOpenState({
-      open: options.open,
+      // A bound text field: the tray waits for the gift button (spec 20.3).
+      open: options.open ?? (this.input ? false : undefined),
       onChange: (open) => {
         this.sheet?.setOpen(open);
         this.paintScrim();
+        this.paintExpanded();
+        // Opened again: the picked side in sight (the row may have been measured while hidden).
+        if (open) requestAnimationFrame(() => this.revealPicked());
         this.o.onOpenChange?.(open);
       },
     });
@@ -223,6 +271,11 @@ export class GiftTray {
     this.topUp.type = "button";
     this.topUp.textContent = "+ Coins";
     this.topUp.addEventListener("click", () => this.o.onTopUp?.());
+    this.pickRow = el("div", "gs-receivers", body);
+    this.pickRow.setAttribute("role", "radiogroup");
+    this.pickRow.setAttribute("data-gs-receivers", "");
+    this.pickRow.hidden = true;
+    this.pickRow.addEventListener("keydown", (e) => this.onPickKey(e));
     this.grid = el("div", "gs-grid", body);
     this.grid.setAttribute("role", "radiogroup");
     this.grid.addEventListener("keydown", (e) => this.onKey(e));
@@ -258,6 +311,7 @@ export class GiftTray {
     this.placement = this.resolve();
     this.render();
     this.mount();
+    this.bindInput();
     if ((options.placement ?? "auto") === "auto" || !isPlacement(options.placement)) {
       const RO = this.doc.defaultView?.ResizeObserver;
       this.resizeObserver = RO ? new RO(() => this.checkPlacement()) : null;
@@ -272,8 +326,9 @@ export class GiftTray {
 
   /** Popover: open it (focus moves into it). Sheet: show it again at `initialSnap`. Inline: nothing. */
   open(): void {
-    if (this.popover) this.popover.open();
-    else if (this.sheet) this.openState.open();
+    // The keyboard and the tray are never up together (spec 20.3).
+    if (this.input && !this.isOpen() && this.swaps()) this.input.blur();
+    this.openNow();
   }
 
   /** Popover: close it (focus goes back to the anchor when it was inside). Sheet: hide it. */
@@ -282,10 +337,68 @@ export class GiftTray {
     else if (this.sheet) this.openState.close();
   }
 
-  /** Open if closed, close if open: the host's Gift button is `tray.toggle()`. */
+  /**
+   * Open if closed, close if open: the host's Gift button is `tray.toggle()`. With a bound text
+   * field it is the keyboard swap (spec 20.2): closing it puts the focus back on the field.
+   */
   toggle(): void {
-    if (this.popover) this.popover.toggle();
+    if (this.input && this.swaps()) this.swap("button");
+    else if (this.popover) this.popover.toggle();
     else if (this.sheet) this.openState.toggle();
+  }
+
+  /** A text field is bound (the `input` option, spec 20). */
+  hasInput(): boolean {
+    return this.input !== null;
+  }
+
+  private openNow(): void {
+    if (this.popover) this.popover.open();
+    else if (this.sheet) this.openState.open();
+  }
+
+  /** The placement takes part in the keyboard swap: the sheet and the popover (not inline). */
+  private swaps(): boolean {
+    return !!this.sheet || !!this.popover;
+  }
+
+  /** One step of the keyboard swap (spec 20.2): blur before open, close before focus. */
+  private swap(event: InputSwapEvent): void {
+    const input = this.input;
+    if (!input || this.destroyed || !this.swaps()) return;
+    const step = inputSwapStep(this.isOpen(), event);
+    if (step.input === "blur") input.blur();
+    if (step.tray === "open") this.openNow();
+    else if (step.tray === "close") this.close();
+    if (step.input === "focus" && input.isConnected) input.focus();
+  }
+
+  /** The bound field's focus, the anchor's clicks and the keyboard's height (spec 20.3). */
+  private bindInput(): void {
+    const input = this.input;
+    if (!input) return;
+    const signal = this.inputListeners.signal;
+    input.addEventListener("focus", () => this.swap("inputFocus"), { signal });
+    this.anchor?.addEventListener("click", () => this.toggle(), { signal });
+    this.paintExpanded();
+    const win = this.doc.defaultView;
+    const vv = win?.visualViewport;
+    const vk = (win?.navigator as { virtualKeyboard?: VirtualKeyboardLike } | undefined)
+      ?.virtualKeyboard;
+    const note = (): void => {
+      if (!win) return;
+      const fromViewport = vv ? win.innerHeight - vv.height - vv.offsetTop : 0;
+      const k = Math.max(fromViewport, vk?.boundingRect?.height ?? 0);
+      if (k >= KEYBOARD_MIN_HEIGHT) this.keyboard = k;
+    };
+    vv?.addEventListener("resize", note, { signal });
+    vk?.addEventListener?.("geometrychange", note, { signal });
+  }
+
+  /** Sheet with a bound field: the anchor says whether the tray is open (the popover does its own). */
+  private paintExpanded(): void {
+    if (!this.input || !this.anchor || this.popover || this.destroyed) return;
+    this.anchor.setAttribute("aria-expanded", String(!!this.sheet && this.openState.isOpen()));
   }
 
   /** Popover and sheet: whether it is open. The inline tray is always shown: `true`. */
@@ -318,6 +431,29 @@ export class GiftTray {
     if (patch.snaps !== undefined) this.sheet?.setSnaps(patch.snaps);
   }
 
+  /** Battle (spec 21): pick the side the next gift goes to. An id not in `receivers` is ignored. */
+  selectReceiver(id: string): void {
+    if (!this.o.receivers?.some((r) => r.id === id)) return;
+    this.pickedId = id;
+    this.renderReceivers();
+  }
+
+  /** The receiver the next gift goes to: the picked side, else the plain `receiver`. */
+  getReceiver(): string | null {
+    const ids = (this.o.receivers ?? []).map((r) => r.id);
+    return resolveReceiver(ids, {
+      selected: this.pickedId,
+      last: this.lastSentTo,
+      fallback: this.o.receiver,
+    });
+  }
+
+  /** A send to `receiver` succeeded: it becomes the default side (spec 21.2). */
+  noteSent(receiver: string): void {
+    this.lastSentTo = receiver;
+    this.renderReceivers();
+  }
+
   /** The gift shown as selected, or undefined for an empty tray. */
   getSelected(): Gift | undefined {
     return this.o.gifts.find((g) => g.id === this.selectedId) ?? this.o.gifts[0];
@@ -327,6 +463,11 @@ export class GiftTray {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.inputListeners.abort();
+    if (this.input && this.anchor && !this.popover) {
+      if (this.savedExpanded === null) this.anchor.removeAttribute("aria-expanded");
+      else this.anchor.setAttribute("aria-expanded", this.savedExpanded);
+    }
     cancelAnimationFrame(this.raf);
     this.resizeObserver?.disconnect();
     this.sheet?.destroy();
@@ -385,6 +526,12 @@ export class GiftTray {
           container: this.container,
           initialSnap: this.o.initialSnap,
           snaps: this.o.snaps,
+          // A bound text field: `default` is the keyboard's place (the host's own snaps win).
+          snapsFor: this.input
+            ? (containerHeight) => ({
+                default: keyboardPlaceSnap({ keyboardHeight: this.keyboard, containerHeight }),
+              })
+            : undefined,
           columns: () => this.columns(),
           onSnapChange: (snap) => this.o.onSnapChange?.(snap),
           onInsetChange: (px) => this.o.onInsetChange?.(px),
@@ -399,6 +546,7 @@ export class GiftTray {
         root: this.element,
         grid: this.grid,
         label: () => this.title.textContent ?? "",
+        anchorClicks: !this.input,
         onOpenChange: (open) => {
           // Opened again: the whole tray.
           if (!open) this.setCompact(false);
@@ -406,6 +554,7 @@ export class GiftTray {
         },
       });
     }
+    this.paintExpanded();
   }
 
   /** A tap on the scrim (spec 9.4). */
@@ -510,6 +659,7 @@ export class GiftTray {
       this.sheet?.measure();
       this.popover?.measure();
     }
+    this.renderReceivers();
     this.renderSelection();
     this.renderBalance(balance, coinName);
   }
@@ -638,6 +788,115 @@ export class GiftTray {
     box.appendChild(text);
   }
 
+  /** The "Send to" row (spec 21.3): only with two or more receivers. */
+  private renderReceivers(): void {
+    const list = this.o.receivers;
+    const row = this.pickRow;
+    const many = !!list && list.length >= 2;
+    const wasHidden = row.hidden;
+    row.hidden = !many;
+    const current = this.getReceiver();
+    if (list && many) {
+      const label = this.o.sendToLabel ?? SEND_TO_LABEL;
+      const built = this.builtReceivers;
+      if (!built || built.list !== list || built.theme !== this.o.theme || built.label !== label) {
+        this.builtReceivers = { list, theme: this.o.theme, label };
+        const palette = battleSidePalette(this.o.theme, list.length);
+        row.replaceChildren();
+        const caption = this.doc.createElement("span");
+        caption.className = "gs-receivers-label";
+        caption.setAttribute("aria-hidden", "true");
+        caption.textContent = label;
+        row.appendChild(caption);
+        row.setAttribute("aria-label", label);
+        list.forEach((r, i) => {
+          const b = this.doc.createElement("button");
+          b.type = "button";
+          b.className = "gs-receiver";
+          b.setAttribute("role", "radio");
+          b.setAttribute("data-gs-receiver", r.id);
+          b.setAttribute("aria-label", r.name);
+          b.title = r.name;
+          b.style.setProperty("--gs-side", r.color ?? palette[i]!.color);
+          b.style.setProperty("--gs-side-text", palette[i]!.text);
+          const av = avatar(this.doc, r.name, r.avatarUrl, 30);
+          av.classList.add("gs-receiver-avatar");
+          const name = this.doc.createElement("span");
+          name.className = "gs-receiver-name";
+          name.setAttribute("aria-hidden", "true");
+          name.textContent = r.name;
+          b.append(av, name);
+          b.addEventListener("click", () => this.selectReceiver(r.id));
+          row.appendChild(b);
+        });
+      }
+      for (const b of row.querySelectorAll<HTMLElement>("[data-gs-receiver]")) {
+        const on = b.getAttribute("data-gs-receiver") === current;
+        b.setAttribute("aria-checked", String(on));
+        b.setAttribute("tabindex", on ? "0" : "-1");
+      }
+    } else if (row.childElementCount) {
+      row.replaceChildren();
+      this.builtReceivers = null;
+    }
+    // The row is part of the block above the grid: the peek height changes with it.
+    if (wasHidden !== row.hidden) {
+      this.sheet?.measure();
+      this.popover?.measure();
+    }
+    const revealKey = `${current}|${this.builtReceivers ? list?.length : ""}`;
+    if (many && revealKey !== this.revealed) {
+      this.revealed = revealKey;
+      this.revealPicked();
+    }
+    if (current !== this.shownReceiver) {
+      const first = this.shownReceiver === undefined;
+      this.shownReceiver = current;
+      if (!first) this.o.onReceiverChange?.(current);
+    }
+  }
+
+  /** What the row last scrolled to (the pick and the list), so it scrolls only on a change. */
+  private revealed = "";
+
+  /**
+   * The selected side is always in sight (spec 21.3): the ROW scrolls by the least distance so the
+   * whole chip shows. Only the row's own offset: never `scrollIntoView` (that would move the page).
+   */
+  private revealPicked(): void {
+    const row = this.pickRow;
+    if (row.hidden || row.scrollWidth <= row.clientWidth) return;
+    const chip = row.querySelector<HTMLElement>('[aria-checked="true"]');
+    if (!chip) return;
+    const left = revealOffset({
+      scroll: row.scrollLeft,
+      viewport: row.clientWidth,
+      start: chip.offsetLeft,
+      end: chip.offsetLeft + chip.offsetWidth,
+    });
+    if (left === row.scrollLeft) return;
+    const smooth = !(this.motion?.matches ?? false);
+    if (typeof row.scrollTo === "function")
+      row.scrollTo({ left, behavior: smooth ? "smooth" : "auto" });
+    else row.scrollLeft = left;
+  }
+
+  /** Arrow keys move the pick inside the "Send to" row, like the gift grid. */
+  private onPickKey(e: KeyboardEvent): void {
+    const list = this.o.receivers ?? [];
+    const at = list.findIndex((r) => r.id === this.getReceiver());
+    const last = list.length - 1;
+    const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
+    const back = e.key === "ArrowLeft" || e.key === "ArrowUp";
+    if (!forward && !back) return;
+    const next = forward ? (at >= last ? 0 : at + 1) : at <= 0 ? last : at - 1;
+    const r = list[next];
+    if (!r) return;
+    e.preventDefault();
+    this.selectReceiver(r.id);
+    this.pickRow.querySelector<HTMLElement>(`[data-gs-receiver="${CSS.escape(r.id)}"]`)?.focus();
+  }
+
   private renderBalance(balance: number, coinName: string): void {
     this.balanceLabel.textContent = `Balance: ${fmt(balance)} ${coinName}`;
     if (balance === this.target) {
@@ -702,6 +961,12 @@ export class GiftTray {
     if (this.placement === "popover" || this.placement === "inline")
       cell.scrollIntoView?.({ block: "nearest" });
   }
+}
+
+/** `navigator.virtualKeyboard` (Chromium), where present. */
+interface VirtualKeyboardLike {
+  boundingRect?: { height: number };
+  addEventListener?: (type: string, cb: () => void, options?: AddEventListenerOptions) => void;
 }
 
 const isPlacement = (v: unknown): v is TrayPlacementOption =>

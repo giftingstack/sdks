@@ -12,7 +12,7 @@ General rules for all files:
 - "Deep equal" means: same JSON type, same keys, same values. Objects compare without key order.
   Arrays compare in order. `null` and a missing key are different, except where stated.
 - Integers in fixtures are exact. No fixture uses floats except `tiers.json` (`99.5`) and the
-  snap fractions in `sheet.json`.
+  snap fractions in `sheet.json`, and `input-swap.json` (`0.6`, `291.6`).
 - Steps run in order. A failed check must name the scenario and the 1-based step number.
 
 ## tiers.json
@@ -320,6 +320,26 @@ The dim behind the sheet and the open state (spec section 9.4). Pure functions a
   records each value. Steps in order: `{ "call": "open" | "close" | "toggle", "returns": bool }`
   checks the returned new state; `{ "expect": { "open", "changes" } }` checks `isOpen` and that
   the recorded changes equal the list (a call that changes nothing records nothing).
+
+## input-swap.json
+
+The gift button in the app's message bar (spec section 20). Pure functions; no rendering.
+
+- `constants`: `KEYBOARD_PLACE_FALLBACK`, `KEYBOARD_MIN_HEIGHT` and `KEYBOARD_PLACE_MAX_FRACTION`
+  must equal `fallback`, `minKeyboard` and `maxFraction`.
+- `step[]`: `inputSwapStep(open, event)` must deep-equal `expect` (`{ tray, input }`).
+- `place[]`: `keyboardPlaceHeight({ keyboardHeight, containerHeight })` must equal `expect`.
+  `null` means the value is unknown (Dart, Kotlin and Swift: `null`/`nil`). `291.6` is a float.
+- `sequence[]`: start with `open`; for each step call `inputSwapStep(open, event)`, check
+  `expect`, then apply it (`tray: "open"` sets open, `"close"` clears it, `"keep"` keeps it) and
+  check `open`.
+
+## receivers.json
+
+The receiver picker of a battle tray (spec section 21). One pure function.
+
+- `resolve[]`: `resolveReceiver(ids, { selected, last, fallback })` must equal `expect` (an id or
+  `null`). `selected`, `last` and `fallback` may be missing (= not given).
 
 ## placement.json
 

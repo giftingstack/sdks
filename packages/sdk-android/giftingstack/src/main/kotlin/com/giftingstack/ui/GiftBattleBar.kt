@@ -7,6 +7,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -45,6 +46,9 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +59,8 @@ import androidx.compose.ui.unit.sp
 import com.giftingstack.core.BattleBarLabels
 import com.giftingstack.core.BattleBarSide
 import com.giftingstack.core.BattleView
+import com.giftingstack.core.PRESS_SIDE_LABEL
+import com.giftingstack.core.pressSideLabel
 import com.giftingstack.core.battleBarModel
 import com.giftingstack.core.battleGains
 import com.giftingstack.core.battleReadableOn
@@ -70,6 +76,9 @@ import kotlinx.coroutines.delay
 data class BattleBarUser(val name: String, val avatarUrl: String? = null)
 
 private val AVATAR = 40.dp
+
+/** The smallest touch target of a tappable side (SPEC 21.4). */
+private val PRESS_TARGET = 44.dp
 private val GOLD = Color(0xFFFFC83D)
 private const val SLIDE_MS = 800
 private const val COUNT_MS = 650
@@ -91,6 +100,10 @@ private val EaseOutCubic = Easing { t -> 1f - (1f - t).pow(3) }
  *   the sides it does not name. Give the room the same list (`rememberGiftRoom(sideColors = ...)`).
  * @param reducedMotion default: the system "Remove animations" setting. Reduced motion: no
  *   sliding, counting or pulse.
+ * @param onPressSide makes every side's avatar a button (SPEC 21.4, at least 44 dp, labelled [pressSideLabel]) that
+ *   calls it with the side's id: pick that side in the tray and open it (`tray.selectReceiver(id); tray.open()`).
+ *   Null (default): the bar is one read-only element, as before.
+ * @param pressSideLabel the label of a side's button; `{name}` is replaced by the side's name.
  */
 @Composable
 fun GiftBattleBar(
@@ -101,6 +114,8 @@ fun GiftBattleBar(
     reducedMotion: Boolean? = null,
     theme: GiftingTheme = GiftingTheme(),
     labels: BattleBarLabels = BattleBarLabels(),
+    onPressSide: ((String) -> Unit)? = null,
+    pressSideLabel: String = PRESS_SIDE_LABEL,
 ) {
     val still = reducedMotion ?: rememberSystemReducedMotion()
     val loader = currentGiftImageLoader()
@@ -116,9 +131,14 @@ fun GiftBattleBar(
     val clockBorder = if (model.isFinal) Color.Transparent else if (model.urgent) theme.danger else theme.border
     val clockText = if (model.isFinal) theme.accentText else if (model.urgent) theme.danger else theme.text
     val spoken = listOf(model.spoken, model.banner).filter { it.isNotEmpty() }.joinToString(". ")
+    // With tappable sides (SPEC 21.4) the bar is no longer one element: it keeps the spoken summary, the avatars are
+    // buttons, and everything else is hidden from screen readers (its words are in the summary).
+    val pressable = onPressSide != null
+    val readOnly = if (pressable) Modifier.clearAndSetSemantics {} else Modifier
+    val pressOf: (String) -> (() -> Unit)? = { id -> onPressSide?.let { cb -> { cb(id) } } }
 
     val clock: @Composable () -> Unit = {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(readOnly, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
             BasicText(
                 labels.vs,
                 style = TextStyle(color = theme.muted, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.8.sp),
@@ -141,10 +161,19 @@ fun GiftBattleBar(
     }
 
     Column(
-        modifier.clearAndSetSemantics {
-            contentDescription = spoken
-            liveRegion = LiveRegionMode.Polite
-        }.testTag("gift-battle-bar"),
+        (
+            if (pressable) {
+                modifier.semantics {
+                    contentDescription = spoken
+                    liveRegion = LiveRegionMode.Polite
+                }
+            } else {
+                modifier.clearAndSetSemantics {
+                    contentDescription = spoken
+                    liveRegion = LiveRegionMode.Polite
+                }
+            }
+        ).testTag("gift-battle-bar"),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (multi) {
@@ -166,10 +195,12 @@ fun GiftBattleBar(
                         labels = labels,
                         loader = loader,
                         modifier = Modifier.weight(1f),
+                        onPress = pressOf(side.id),
+                        pressLabel = pressSideLabel(side.name, pressSideLabel),
                     )
                 }
             }
-            MultiBar(model.pcts, colors.map { it.first }, theme, still)
+            Box(readOnly) { MultiBar(model.pcts, colors.map { it.first }, theme, still) }
         } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             BattleSideView(
                 side = model.sides[0],
@@ -184,6 +215,8 @@ fun GiftBattleBar(
                 labels = labels,
                 loader = loader,
                 modifier = Modifier.weight(1f),
+                onPress = pressOf(model.sides[0].id),
+                pressLabel = pressSideLabel(model.sides[0].name, pressSideLabel),
             )
             clock()
             BattleSideView(
@@ -199,13 +232,15 @@ fun GiftBattleBar(
                 labels = labels,
                 loader = loader,
                 modifier = Modifier.weight(1f),
+                onPress = pressOf(model.sides[1].id),
+                pressLabel = pressSideLabel(model.sides[1].name, pressSideLabel),
             )
         }
-        if (!multi) SplitBar(model.pct, colors[0].first, colors[1].first, theme, model.isFinal, still)
+        if (!multi) Box(readOnly) { SplitBar(model.pct, colors[0].first, colors[1].first, theme, model.isFinal, still) }
         if (model.banner.isNotEmpty()) {
             BasicText(
                 model.banner,
-                modifier = Modifier.fillMaxWidth().testTag("gift-battle-banner"),
+                modifier = Modifier.fillMaxWidth().then(readOnly).testTag("gift-battle-banner"),
                 style = TextStyle(color = theme.text, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center),
             )
         }
@@ -226,6 +261,8 @@ fun GiftBattleBar(
     theme: GiftingTheme = GiftingTheme(),
     labels: BattleBarLabels = BattleBarLabels(),
     tickMs: Long = 1_000,
+    onPressSide: ((String) -> Unit)? = null,
+    pressSideLabel: String = PRESS_SIDE_LABEL,
 ) {
     val battle by room.battle.collectAsState()
     var view by remember { mutableStateOf<BattleView?>(null) }
@@ -237,7 +274,7 @@ fun GiftBattleBar(
             view = room.battleView()
         }
     }
-    GiftBattleBar(view, modifier, users, sideColors, reducedMotion, theme, labels)
+    GiftBattleBar(view, modifier, users, sideColors, reducedMotion, theme, labels, onPressSide, pressSideLabel)
 }
 
 /** The two-colour form of the bar of a view: `sideColors = a to b` keeps working. */
@@ -250,7 +287,9 @@ fun GiftBattleBar(
     reducedMotion: Boolean? = null,
     theme: GiftingTheme = GiftingTheme(),
     labels: BattleBarLabels = BattleBarLabels(),
-) = GiftBattleBar(view, modifier, users, listOf(sideColors.first, sideColors.second), reducedMotion, theme, labels)
+    onPressSide: ((String) -> Unit)? = null,
+    pressSideLabel: String = PRESS_SIDE_LABEL,
+) = GiftBattleBar(view, modifier, users, listOf(sideColors.first, sideColors.second), reducedMotion, theme, labels, onPressSide, pressSideLabel)
 
 /** The two-colour form of the bar of a room: `sideColors = a to b` keeps working. */
 @Composable
@@ -263,13 +302,15 @@ fun GiftBattleBar(
     theme: GiftingTheme = GiftingTheme(),
     labels: BattleBarLabels = BattleBarLabels(),
     tickMs: Long = 1_000,
-) = GiftBattleBar(room, modifier, users, listOf(sideColors.first, sideColors.second), reducedMotion, theme, labels, tickMs)
+    onPressSide: ((String) -> Unit)? = null,
+    pressSideLabel: String = PRESS_SIDE_LABEL,
+) = GiftBattleBar(room, modifier, users, listOf(sideColors.first, sideColors.second), reducedMotion, theme, labels, tickMs, onPressSide, pressSideLabel)
 
 /**
  * The colour and its text colour of every side: the app's, else the default palette (SPEC 18.7):
  * the theme's accent, its coin colour, teal and pink, then the same four again.
  */
-private fun sidePalette(theme: GiftingTheme, count: Int, over: List<Color>?): List<Pair<Color, Color>> {
+internal fun sidePalette(theme: GiftingTheme, count: Int, over: List<Color?>?): List<Pair<Color, Color>> {
     val defaults =
         listOf(theme.accent to theme.accentText, theme.coin to theme.coinText) +
             BATTLE_EXTRA_COLORS.map { hex -> tokenColor(hex) to (if (battleReadableOn(hex) == "#ffffff") Color.White else Color.Black) }
@@ -320,6 +361,9 @@ private fun BattleSideView(
     labels: BattleBarLabels,
     loader: GiftImageLoader,
     modifier: Modifier,
+    /** SPEC 21.4: the avatar is a button that calls this. Null: read-only, as before. */
+    onPress: (() -> Unit)? = null,
+    pressLabel: String = "",
 ) {
     val scale = remember { Animatable(1f) }
     LaunchedEffect(pulse) {
@@ -336,8 +380,21 @@ private fun BattleSideView(
     val size = cell ?: AVATAR
     val crowded = cell != null && cell < 36.dp
 
+    // SPEC 21.4: with onPress the avatar is a button of at least 44 dp with the platform's pressed feedback.
+    val button =
+        if (onPress != null) {
+            Modifier.defaultMinSize(minWidth = PRESS_TARGET, minHeight = PRESS_TARGET)
+                .clickable(role = Role.Button, onClick = onPress)
+                .clearAndSetSemantics {
+                    contentDescription = pressLabel
+                    role = Role.Button
+                }
+                .testTag("gift-battle-side-$index")
+        } else {
+            Modifier
+        }
     val avatar: @Composable () -> Unit = {
-        Box {
+        Box(button, contentAlignment = Alignment.Center) {
             Box(Modifier.size(size + 8.dp).border(2.dp, ring, CircleShape).padding(4.dp).clearAndSetSemantics {}) {
                 if (url != null) {
                     Box(Modifier.size(size).clip(CircleShape).background(theme.border)) { GiftPicture(url, Modifier.size(size), loader) }
@@ -363,7 +420,7 @@ private fun BattleSideView(
         }
     }
     val who: @Composable (Modifier) -> Unit = { m ->
-        Column(m, horizontalAlignment = if (cell != null) Alignment.CenterHorizontally else if (right) Alignment.End else Alignment.Start) {
+        Column(if (onPress != null) m.clearAndSetSemantics {} else m, horizontalAlignment = if (cell != null) Alignment.CenterHorizontally else if (right) Alignment.End else Alignment.Start) {
             BasicText(
                 side.name,
                 maxLines = 1,

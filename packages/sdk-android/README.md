@@ -14,11 +14,11 @@ post, spec 14), a "while you were away" card with an effect replay (15) and a le
 
 ## Install
 
-The coordinates are `com.giftingstack:giftingstack:0.1.4` on Maven Central:
+The coordinates are `com.giftingstack:giftingstack:0.1.6` on Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("com.giftingstack:giftingstack:0.1.4")
+    implementation("com.giftingstack:giftingstack:0.1.6")
 }
 ```
 
@@ -100,6 +100,49 @@ initialSnap, snaps, onSnapChange, onInsetChange, bottomInset, controller, collap
   `ViewModel` with `viewModelScope` and call `dispose()` in `onCleared()`.
 - `playOn = PlayOn.Tap` (default) plays the effect at the tap and takes it back if the send fails;
   `PlayOn.Success` waits for the server.
+
+### Gift button in your message bar
+
+GiftingStack carries no chat; it fits into yours. Put `GiftButton` in your message bar and bind your
+text field with `Modifier.giftTrayInput(holder)`: the button closes the keyboard and opens the tray in
+its place, a tap on the field closes the tray and the keyboard comes back (SPEC 20).
+
+```kotlin
+val tray = rememberGiftTrayHolder(client, receiver = "mert", effects = effects)
+var barLift by remember { mutableStateOf(0.dp) }
+Box(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize()) {
+        /* your conversation */
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BasicTextField(text, { text = it }, Modifier.weight(1f).giftTrayInput(tray))
+            GiftButton(tray = tray, theme = theme)  // toggles the tray; shows its open state
+            /* your Send button */
+        }
+        Spacer(Modifier.height(barLift))            // the bar sits on the tray, as on the keyboard
+    }
+    GiftTray(tray = tray, collapseOnSelect = true, onInsetChange = { barLift = it })
+    GiftEffectLayer(effects)
+}
+```
+
+- With a bound field the holder starts closed (an explicit `open` still wins), `toggle()` is the swap
+  (the keyboard goes down before the tray opens; the tray closes before the field gets focus back),
+  `open()` hides the keyboard first, and `close()` never moves focus. `holder.inputBound` and
+  `holder.keyboardHeight` (the last keyboard height seen, at least 120 dp) are snapshot state.
+- The sheet's default height is the keyboard's place: the last keyboard height seen (300 dp before
+  any), at most 60 % of the box, unless you pass `snaps = SheetSnapFractions(default = ...)`. The
+  keyboard height comes from `WindowInsets.ime`, so the activity must be edge-to-edge (`enableEdgeToEdge()`).
+  `scrim` stays off by default: the chat stays visible and touchable above the tray.
+- `GiftButton(tray, onClick, label = "Send a gift", filled = false, size = GiftButtonSize.Medium, icon = null, enabled = true, theme, modifier)`:
+  plain (accent glyph, no background) or filled (accent background); active while its tray is open;
+  "expanded"/"collapsed" for screen readers; a 44 dp touch target. Without `tray`, `onClick` is the only action.
+  **Custom icon and sizes:** `size` is `GiftButtonSize.Small` / `Medium` / `Large` (32 / 36 / 44 dp circle, default
+  Medium); there is no free size. `icon = { color -> ... }` replaces the gift glyph with your own composable. It is
+  drawn centred in the glyph box (`22 * circle / 36` dp) and fitted into it: scaled down, never up, aspect ratio
+  kept, overflow clipped, so it can never change the button's size. It gets the glyph colour (`accent`, or
+  `accentText` when `filled`), so a single-colour icon follows the theme.
+- A custom field (or a test) can bind itself with `holder.bindInput(GiftTrayInputBinding)` and report
+  its focus with `holder.onInputFocus()`.
 
 ### Gift wall, "while you were away", leaderboard
 
@@ -212,6 +255,40 @@ GiftBattleBar(
 The gift notice of a battle says who got the gift: `sent Rose to Mia`, with a 2 px border in the side's colour (accent for the first side, coin colour for the second). Pass the same colours to the room as to the bar, and the names from `resolveName`: `rememberGiftRoom(sideColors = listOf(Color(0xFFE0457B), Color(0xFF3A8DFF)), resolveName = ...)`. Outside battles nothing changes. The user's own gift says who got it too when the tray knows the room: `rememberGiftTrayHolder(receiverOf = room::receiverFor, ...)`. An app that plays its own events can set `GiftEffectEvent(receiver = GiftEffectReceiver(name, side, color))`.
 
 The pure model (`battleBarModel`, `formatBattleScore`, `formatBattleClock`, `battleSideColors`) is in `core`; the numbers are the shared fixture `battle-bar.json`. Reduced motion: no sliding, counting or pulse.
+
+### One gift button for a battle (receiver picker)
+
+A battle needs one gift button, not one per side (SPEC 21): give the tray the round's sides and it shows a "Send to"
+row (two or more sides; under the header, above the grid, in sight at every height). Every gift goes to the side
+picked there; the default is the side this viewer gifted last, else the first. Tapping a side of the battle bar picks
+it and opens the tray.
+
+```kotlin
+val colors = listOf(Color(0xFFE0457B), Color(0xFF3A8DFF))      // the same list for the bar, the room and the row
+val battle by room.battle.collectAsState()
+val sides = remember(battle) { room.battleView()?.sides?.map { it.id }.orEmpty() }
+val tray = rememberGiftTrayHolder(
+    client = client,
+    receiver = hostId,                                          // only the fallback while there is no round
+    roomId = "live_42",
+    receiverOf = room::receiverFor,                             // your gift's notice says who got it
+    receivers = sides.mapIndexed { i, id ->
+        TrayReceiver(id, names.getValue(id), color = "#%06x".format(colors[i].toArgb() and 0xFFFFFF))
+    },
+    onReceiverChange = { id -> /* the next gift goes to id */ },
+)
+GiftBattleBar(room, sideColors = colors, onPressSide = { id -> tray.selectReceiver(id); tray.open() })
+GiftTray(tray = tray, sendToLabel = "Send to")                  // the row: 30 dp avatars in the side colours
+```
+
+- `TrayReceiver(id, name, color = null, avatarUrl = null)`: `color` is `#rgb`, `#rrggbb` or `rgba(...)`; null takes
+  the battle palette (`battleSidePalette`), so a bar without `sideColors` and receivers without colours match.
+- Holder: `receivers` (settable; a new list keeps the pick while it is still a side), `selectReceiver(id)` (an id that
+  is not a side is ignored), `receiver` (who the next gift goes to), `onReceiverChange`. Without `receivers` (or with
+  one) the tray sends to `receiver` as before.
+- `GiftBattleBar(onPressSide = ..., pressSideLabel = "Send {name} a gift")`: every avatar (both layouts) becomes a
+  button with a 44 dp touch target. Without `onPressSide` the bar is one read-only element, as before.
+- Pure core: `resolveReceiver`, `SEND_TO_LABEL`, `PRESS_SIDE_LABEL`, `pressSideLabel` (fixture `receivers.json`).
 
 ### Tests without a network
 

@@ -139,9 +139,14 @@ class GiftTrayController(options: GiftTrayOptions) {
      * Sends one gift (optimistic): the coins are taken at once, the effect plays at the tap or
      * after the server, and a failure gives the coins back. Does not check affordability: the
      * Send button does (see [sendButtonState]).
+     *
+     * @param receiver who gets this gift; null: the `receiver` option. The holder's receiver picker passes the
+     *   resolved side (SPEC 21.2).
+     * @return true when the server took the gift (also when the screen is gone by then).
      */
-    suspend fun send(gift: Gift) {
+    suspend fun send(gift: Gift, receiver: String? = null): Boolean {
         val o = options
+        val to = receiver ?: o.receiver
         val client = o.client
         val user = _state.value.user
         pending.incrementAndGet()
@@ -150,7 +155,7 @@ class GiftTrayController(options: GiftTrayOptions) {
         fun show(sender: String, quantity: Int): Int? {
             val battleReceiver =
                 try {
-                    o.receiverOf?.invoke(o.receiver)
+                    o.receiverOf?.invoke(to)
                 } catch (e: Exception) {
                     null // app code: never let it break a send
                 }
@@ -173,13 +178,14 @@ class GiftTrayController(options: GiftTrayOptions) {
         val early = o.playOn == PlayOn.Tap
         val shownId: Int? = if (early) show(user ?: "You", 1) else null
         try {
-            val tx = client.sendGift(SendGiftInput(receiver = o.receiver, giftId = gift.id, reference = o.reference, roomId = o.roomId))
-            if (!alive) return
+            val tx = client.sendGift(SendGiftInput(receiver = to, giftId = gift.id, reference = o.reference, roomId = o.roomId))
+            if (!alive) return true
             _state.update { it.copy(error = null) }
             // App code from here on: a throwing callback must never look like a failed send (the coins are
             // spent), so it must not reach the catch below that refunds the optimistic balance.
             if (!early) safe { show(user ?: tx.sender, tx.quantity) }
             safe { options.onSent?.invoke(tx) }
+            return true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -188,6 +194,7 @@ class GiftTrayController(options: GiftTrayOptions) {
             if (shownId != null) o.effects?.invoke()?.cancel(shownId)
             if (alive) _state.update { it.copy(balance = it.balance + gift.price, error = err) }
             safe { options.onError?.invoke(err) }
+            return false
         } finally {
             if (pending.decrementAndGet() == 0) reconcile(client)
         }

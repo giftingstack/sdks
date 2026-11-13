@@ -5,10 +5,17 @@ import com.giftingstack.core.RoomSocket
 import com.giftingstack.core.RoomSocketFactory
 import com.giftingstack.core.RoomSocketHandlers
 import com.giftingstack.core.Timers
+import com.giftingstack.core.TrayReceiver
+import com.giftingstack.ui.GiftingTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import kotlin.random.Random
 
-/** The room of the demo's Live tab and its stream host. */
+/** The room of the "Battle" mode (two hosts) and the stream host. */
 const val LIVE_ROOM = "pixel_live"
+
+/** The room of the plain "Live room" mode (the default): one host, no battle bar, no score frames. */
+const val LIVE_ROOM_PLAIN = "pixel_live_room"
 
 /** The room of the "Battle 4+" mode: four hosts in every round. */
 const val LIVE_ROOM_4 = "pixel_live_4"
@@ -17,7 +24,7 @@ const val LIVE_HOST = "zoe"
 /** The second host of the battle bar, and the length of a round and of the break after it. */
 const val LIVE_RIVAL = "mateo"
 
-/** The hosts of the battle: the first two play "Battle", all four play "Battle 4+" (a free-for-all, one bar cell and one Gift button each). */
+/** The hosts of the battle: the first two play "Battle", all four play "Battle 4+" (a free-for-all, one bar cell and one side in the tray's "Send to" row each). */
 val LIVE_HOSTS = listOf(LIVE_HOST, LIVE_RIVAL, "emma", "dana")
 const val LIVE_ROUND_MS = 45_000L
 const val LIVE_BREAK_MS = 5_000L
@@ -42,6 +49,22 @@ fun liveStatusLine(state: com.giftingstack.core.RoomState): String =
 val LIVE_SENDERS: List<String> = SENDERS.filter { it !in LIVE_HOSTS }
 
 /**
+ * The side colours of the Live tab, one list for the battle bar, the tray's "Send to" row and the comment column
+ * (SPEC 21.5): the SDK's default palette (the theme's accent, its coin colour, teal, pink), spelled out.
+ */
+fun liveSideColors(theme: GiftingTheme): List<Color> = listOf(theme.accent, theme.coin, Color(0xFF2EC4B6), Color(0xFFFF5D8F))
+
+/** The colour of host [id] (its place in every round is its place in [LIVE_HOSTS]); null for anyone else. */
+fun liveSideColor(id: String, colors: List<Color>): Color? = LIVE_HOSTS.indexOf(id).takeIf { it >= 0 && colors.isNotEmpty() }?.let { colors[it % colors.size] }
+
+/** The tray's receivers for a round with the sides [sides] (the battle view's ids, in order): names and the bar's colours. */
+fun liveReceivers(sides: List<String>, colors: List<Color>): List<TrayReceiver> =
+    sides.mapIndexed { i, id -> TrayReceiver(id, displayName(id), colors.getOrNull(i % maxOf(colors.size, 1))?.let(::hexOf)) }
+
+/** `#rrggbb` of an opaque colour. */
+fun hexOf(c: Color): String = "#" + (c.toArgb() and 0xFFFFFF).toString(16).padStart(6, '0')
+
+/**
  * A pretend rooms server for the demo: a [RoomSocketFactory] that speaks the real wire protocol
  * (SPEC 17: `hello` -> `welcome`, then `gift` and `viewers` frames) so the demo runs the SDK's
  * real [com.giftingstack.core.RoomClient] without a rooms Worker. Other people send gifts every
@@ -61,6 +84,8 @@ class FakeRoomServer(
     private val maxDelayMs: Long = 16_000,
     /** How many hosts every round has: two, or four for the "Battle 4+" mode. */
     private val sides: Int = 2,
+    /** False: a plain live room (one host, the welcome frame has no `battle`, no `scores` frame is ever sent). */
+    private val battle: Boolean = true,
 ) {
     private var nextId = now() * 1000
     private var nextTx = 1
@@ -78,7 +103,7 @@ class FakeRoomServer(
     private val counts = LongArray(4)
 
     /** The sides of every round: the first [sides] hosts. */
-    private fun sidesNow(): List<String> = LIVE_HOSTS.take(sides)
+    private fun sidesNow(): List<String> = LIVE_HOSTS.take(if (battle) sides else 1)
 
     private fun battleJson(): String {
         val scores = sidesNow().mapIndexed { i, id -> """{"id":${q(id)},"units":${units[i]},"gifts":${counts[i]}}""" }.joinToString(",")
@@ -96,7 +121,7 @@ class FakeRoomServer(
         val open = sockets.filter { !it.closed }
         val text = frame(sender, gift, quantity, receiver)
         for (s in open) s.deliver(text)
-        if (side < 0 || now() >= started + LIVE_ROUND_MS) return
+        if (!battle || side < 0 || now() >= started + LIVE_ROUND_MS) return
         units[side] += gift.price * quantity
         counts[side] += quantity.toLong()
         val scores = scoresFrame()
@@ -128,8 +153,8 @@ class FakeRoomServer(
             when {
                 data == "ping" -> push("pong")
                 data.contains("\"t\":\"hello\"") -> {
-                    push("""{"t":"welcome","v":1,"viewers":$viewers,"gap":false,"replay":[],"ttl":3600,"now":${now()},"battle":${battleJson()}}""")
-                    later((started + LIVE_ROUND_MS - now()).coerceAtLeast(0), ::endRound)
+                    push("""{"t":"welcome","v":1,"viewers":$viewers,"gap":false,"replay":[],"ttl":3600,"now":${now()}${if (battle) ""","battle":${battleJson()}""" else ""}}""")
+                    if (battle) later((started + LIVE_ROUND_MS - now()).coerceAtLeast(0), ::endRound)
                     schedule()
                     drift()
                 }
@@ -177,7 +202,7 @@ class FakeRoomServer(
         /** Sends a gift to one of the hosts of this round and counts it into the round while it is open. */
         private fun giftTo(sender: String, gift: Gift, quantity: Int, side: Int) {
             push(frame(sender, gift, quantity, sidesNow()[side]))
-            if (now() >= started + LIVE_ROUND_MS) return
+            if (!battle || now() >= started + LIVE_ROUND_MS) return
             units[side] += gift.price * quantity
             counts[side] += quantity.toLong()
             push(scoresFrame())

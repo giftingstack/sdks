@@ -16,6 +16,9 @@ import androidx.compose.foundation.gestures.awaitVerticalTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +34,9 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -42,10 +48,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,7 +71,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -89,6 +99,9 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.giftingstack.core.Gift
+import com.giftingstack.core.SEND_TO_LABEL
+import com.giftingstack.core.TrayReceiver
+import com.giftingstack.core.initialOf
 import com.giftingstack.core.ScrollOwner
 import com.giftingstack.core.SendButtonAction
 import com.giftingstack.core.SCRIM_OPACITY
@@ -102,6 +115,7 @@ import com.giftingstack.core.SheetMove
 import com.giftingstack.core.SheetSnap
 import com.giftingstack.core.SheetSnapFractions
 import com.giftingstack.core.TraySheetController
+import com.giftingstack.core.keyboardPlaceSnap
 import com.giftingstack.core.sendButtonState
 import com.giftingstack.core.sheetEntranceAlpha
 import com.giftingstack.core.scrimFadeMs
@@ -111,6 +125,8 @@ import com.giftingstack.core.scrimVisible
 import com.giftingstack.core.sheetEntranceRise
 import com.giftingstack.core.sheetMove
 import java.util.Locale
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -147,7 +163,9 @@ private const val BODY_GAP_DP = 12
  * @param sheet `true` (default) = bottom sheet, `false` = the fixed tray. Read once.
  * @param initialSnap the sheet's first state: peek, default (two rows) or expanded.
  * @param snaps snap heights as fractions of the container; null fields use the defaults
- *   (peek and default fit their content, expanded is 90 %, capped at the full content).
+ *   (peek and default fit their content, expanded is 90 %, capped at the full content). When [tray] has a bound text
+ *   field ([giftTrayInput], SPEC 20.3), a null `default` is the keyboard's place: the last keyboard height seen
+ *   (300 dp before any), at most 60 % of the container.
  * @param onSnapChange called when the settled state changes.
  * @param onInsetChange the sheet's visible height: live during a drag, the target when a state is
  *   chosen. Pass it (plus a gap) as the effect layer's `noticeBottom` so the notice sits above the sheet.
@@ -211,8 +229,22 @@ fun GiftTray(
     scrim: Boolean = false,
     scrimTap: ScrimTap = ScrimTap.Lower,
     onDismiss: (() -> Unit)? = null,
+    /** The label of the "Send to" row (SPEC 21.3), shown when [tray] has two or more `receivers`. */
+    sendToLabel: String = SEND_TO_LABEL,
 ) {
     val isOpen = open ?: tray?.isOpen ?: true
+    // The receiver picker (SPEC 21): only with two or more sides; the holder keeps the pick.
+    val receivers = tray?.receivers.orEmpty()
+    val receiverRow: (@Composable () -> Unit)? =
+        if (tray != null && receivers.size >= 2) {
+            { ReceiverRow(receivers, tray.receiver, sendToLabel, isOpen, theme, currentGiftImageLoader()) { tray.selectReceiver(it) } }
+        } else {
+            null
+        }
+    // A bound app text field (SPEC 20.3): remember the keyboard height and take its place.
+    val inputBound = tray?.inputBound == true
+    if (tray != null && inputBound) RecordKeyboardHeight(tray)
+    val keyboardPlace = inputBound && snaps.default == null
     // The open parameter, when given, is the host's to change; otherwise a dismissal closes the holder.
     val dismiss: () -> Unit = {
         if (open == null) tray?.close()
@@ -263,6 +295,7 @@ fun GiftTray(
             if (bigPicture != null) Box(Modifier.align(Alignment.TopEnd)) { WarmUpPicture(bigPicture, loader) }
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(BODY_GAP_DP.dp)) {
                 TrayHeader(title, badge, balance, coinName, onTopUp, theme)
+                receiverRow?.invoke()
                 Column(Modifier.heightIn(max = gridMaxHeight).verticalScroll(rememberScrollState())) {
                     GiftRows(gifts, columnCount, selected?.id, coinName, theme, loader, { selectedId = it }, null)
                 }
@@ -300,7 +333,25 @@ fun GiftTray(
         scrim = scrim,
         scrimTap = scrimTap,
         onDismiss = dismiss,
+        keyboardPlace = keyboardPlace,
+        keyboardHeight = tray?.keyboardHeight?.value?.toDouble(),
+        receiverRow = receiverRow,
     )
+}
+
+/**
+ * Records the keyboard's height on [tray] while an app text field is bound (SPEC 20.3): the IME inset's animation
+ * target (the height the keyboard settles at, not the frames of its slide), kept by the holder when it is at least
+ * [com.giftingstack.core.KEYBOARD_MIN_HEIGHT] dp. Needs an edge-to-edge window, where the IME inset reaches Compose.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RecordKeyboardHeight(tray: GiftTrayHolder) {
+    val target = WindowInsets.imeAnimationTarget
+    val density = LocalDensity.current
+    LaunchedEffect(tray, target, density) {
+        snapshotFlow { target.getBottom(density) }.collect { px -> tray.recordKeyboardHeight((px / density.density).dp) }
+    }
 }
 
 private fun missingTrayData(): Nothing = throw IllegalArgumentException("GiftTray needs a tray, or gifts, balance and onSend.")
@@ -336,6 +387,9 @@ private fun SheetTray(
     scrim: Boolean,
     scrimTap: ScrimTap,
     onDismiss: () -> Unit,
+    keyboardPlace: Boolean,
+    keyboardHeight: Double?,
+    receiverRow: (@Composable () -> Unit)?,
 ) {
     val density = LocalDensity.current.density
     val controller = external ?: remember { TraySheetController(initialSnap) }
@@ -373,8 +427,10 @@ private fun SheetTray(
         // Until the header, the footer and a row are measured the container counts as 0, so the
         // sheet never shows heights computed from half a layout.
         val floorsReady = topPx > 0 && footerPx > 0 && (rows == 0 || rowPx > 0)
-        LaunchedEffect(containerDp, snaps, peekMin, defaultMin, contentHeight, floorsReady) {
-            controller.setLayout(SheetLayout(if (floorsReady) containerDp else 0.0, snaps, peekMin, defaultMin, contentHeight))
+        // With a bound text field the default snap is the keyboard's place (SPEC 20.3); the floors still apply.
+        val sheetSnaps = if (keyboardPlace) snaps.copy(default = keyboardPlaceSnap(keyboardHeight, containerDp)) else snaps
+        LaunchedEffect(containerDp, sheetSnaps, peekMin, defaultMin, contentHeight, floorsReady) {
+            controller.setLayout(SheetLayout(if (floorsReady) containerDp else 0.0, sheetSnaps, peekMin, defaultMin, contentHeight))
         }
 
         val measured = state.heights.expanded > 0.0
@@ -474,9 +530,17 @@ private fun SheetTray(
                     .then(blockTouches)
                     .padding(horizontal = 14.dp),
             ) {
-                Column(Modifier.onSizeChanged { topPx = it.height }.sheetDrag(controller, density)) {
-                    SheetHandle(state.snap, controller, theme)
-                    TrayHeader(title, badge, balance, coinName, onTopUp, theme)
+                // The block above the grid: handle, header and the "Send to" row (SPEC 21.3). Its height is the
+                // peek floor, so the row is in sight in every snap state. Only the handle and the header drag.
+                Column(Modifier.onSizeChanged { topPx = it.height }) {
+                    Column(Modifier.sheetDrag(controller, density)) {
+                        SheetHandle(state.snap, controller, theme)
+                        TrayHeader(title, badge, balance, coinName, onTopUp, theme)
+                    }
+                    if (receiverRow != null) {
+                        Spacer(Modifier.height(RECEIVER_ROW_GAP_DP.dp))
+                        receiverRow()
+                    }
                 }
                 Spacer(Modifier.height(BODY_GAP_DP.dp))
                 val gridHeight = if (measured) (state.heights.expanded - gridTopDp - footerDp).coerceAtLeast(0.0).dp else 0.dp
@@ -737,6 +801,139 @@ private fun TrayHeader(
                         .testTag("gift-topup"),
                 style = TextStyle(color = theme.coin, fontSize = 13.sp, fontWeight = FontWeight.Bold),
             )
+        }
+    }
+}
+
+/** Gap between the header and the "Send to" row of the sheet (in the fixed tray the body gap applies). */
+private const val RECEIVER_ROW_GAP_DP = 10
+
+/** The avatar of a side in the "Send to" row (SPEC 21.3). */
+private val RECEIVER_AVATAR = 30.dp
+
+/** Gap between the label and the first side and between sides (SPEC 21.3). */
+private val RECEIVER_GAP = 8.dp
+
+/**
+ * The horizontal scroll offset that shows the whole chip [start]..[end] (content px) in a [viewport] px wide row
+ * scrolled to [current], moving the least distance (SPEC 21.3): unchanged when the chip is already in sight; else its
+ * start at the left edge when it is cut off on the left or wider than the row; else its end at the right edge.
+ * Clamped to 0..[max].
+ */
+internal fun revealScrollOffset(current: Int, viewport: Int, start: Int, end: Int, max: Int): Int {
+    val target =
+        when {
+            start < current || end - start > viewport -> start
+            end > current + viewport -> end - viewport
+            else -> current
+        }
+    return target.coerceIn(0, max.coerceAtLeast(0))
+}
+
+/** Where a side's chip was laid out in the row's content (px) and whether it was drawn as the selected one. */
+private data class ChipBounds(val start: Int, val end: Int, val selected: Boolean)
+
+/**
+ * The "Send to" row (SPEC 21.3): the label, then every side, one line that scrolls sideways. A side is its 30 dp
+ * avatar in a 2 dp ring of its colour; the [selectedId] side also has an outer ring in `text`, full opacity and its
+ * name in `accent` after the avatar, the others are the avatar only at 0.55 (their name is their accessibility
+ * label). Whenever the selection, the list or [open] changes, the row scrolls its own [ScrollState] the least
+ * distance that shows the whole selected side (animated unless reduced motion); nothing else scrolls. A tap calls
+ * [onSelect]. For screen readers a radio group labelled [label].
+ */
+@Composable
+private fun ReceiverRow(
+    receivers: List<TrayReceiver>,
+    selectedId: String?,
+    label: String,
+    open: Boolean,
+    theme: GiftingTheme,
+    loader: GiftImageLoader,
+    onSelect: (String) -> Unit,
+) {
+    val colors = sidePalette(theme, receivers.size, receivers.map { r -> r.color?.let { runCatching { tokenColor(it) }.getOrNull() } })
+    val scroll = rememberScrollState()
+    val reduced = rememberSystemReducedMotion()
+    var viewport by remember { mutableIntStateOf(0) }
+    // A new list starts with no bounds, so the reveal waits for the new layout.
+    val bounds = remember(receivers) { mutableStateMapOf<String, ChipBounds>() }
+    LaunchedEffect(selectedId, receivers, open) {
+        if (!open || selectedId == null) return@LaunchedEffect
+        // Wait for the layout that drew this side as the selected one (its name widens it).
+        val chip = snapshotFlow { bounds[selectedId]?.takeIf { it.selected && viewport > 0 } }.filterNotNull().first()
+        val target = revealScrollOffset(scroll.value, viewport, chip.start, chip.end, scroll.maxValue)
+        if (target != scroll.value) {
+            if (reduced) scroll.scrollTo(target) else scroll.animateScrollTo(target)
+        }
+    }
+    Row(
+        Modifier.fillMaxWidth()
+            .onSizeChanged { viewport = it.width }
+            .horizontalScroll(scroll)
+            .semantics { contentDescription = label }
+            .selectableGroup()
+            .testTag("gift-send-to"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(RECEIVER_GAP),
+    ) {
+        BasicText(
+            label,
+            // The group carries the label for screen readers.
+            modifier = Modifier.clearAndSetSemantics {},
+            maxLines = 1,
+            softWrap = false,
+            style = TextStyle(color = theme.muted, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+        )
+        receivers.forEachIndexed { i, r ->
+            val selected = r.id == selectedId
+            val (ring, ringText) = colors[i]
+            Row(
+                Modifier.heightIn(min = 44.dp)
+                    // In the row's content coordinates (the scroll is applied outside its content).
+                    .onPlaced { c ->
+                        val x = c.positionInParent().x.roundToInt()
+                        bounds[r.id] = ChipBounds(x, x + c.size.width, selected)
+                    }
+                    .alpha(if (selected) 1f else 0.55f)
+                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onSelect(r.id) })
+                    .clearAndSetSemantics {
+                        contentDescription = r.name
+                        role = Role.RadioButton
+                        this.selected = selected
+                    }
+                    .testTag("gift-receiver-${r.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                // Selected: an outer ring in `text` (2 dp) around the side ring. The side ring (2 dp, side colour)
+                // around the 30 dp avatar, so an unselected side is 34 dp wide.
+                Box(
+                    (if (selected) Modifier.border(2.dp, theme.text, CircleShape).padding(2.dp) else Modifier)
+                        .border(2.dp, ring, CircleShape)
+                        .padding(2.dp),
+                ) {
+                    val url = r.avatarUrl
+                    if (url != null) {
+                        Box(Modifier.size(RECEIVER_AVATAR).clip(CircleShape).background(ring)) {
+                            key(url) { GiftPicture(url, Modifier.size(RECEIVER_AVATAR), loader) }
+                        }
+                    } else {
+                        Box(Modifier.size(RECEIVER_AVATAR).clip(CircleShape).background(ring), contentAlignment = Alignment.Center) {
+                            BasicText(initialOf(r.name), style = TextStyle(color = ringText, fontSize = 13.sp, fontWeight = FontWeight.Bold))
+                        }
+                    }
+                }
+                // Only the selected side shows its name, so four sides fit a 375 dp phone.
+                if (selected) {
+                    BasicText(
+                        r.name,
+                        modifier = Modifier.widthIn(max = 72.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = TextStyle(color = theme.accent, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                    )
+                }
+            }
         }
     }
 }

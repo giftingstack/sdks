@@ -7,6 +7,7 @@ export { configureStyles } from "./styles";
 export type { StyleOptions } from "./styles";
 export {
   GiftAwaySummaryElement,
+  GiftButtonElement,
   GiftEffectLayerElement,
   GiftLeaderboardElement,
   GiftTrayElement,

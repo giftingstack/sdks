@@ -1,5 +1,5 @@
 /**
- * `<gift-effect-layer>`, `<gift-tray>`, `<gift-wall>`, `<gift-away-summary>`,
+ * `<gift-effect-layer>`, `<gift-tray>`, `<gift-button>`, `<gift-wall>`, `<gift-away-summary>`,
  * `<gift-leaderboard>`, `<gift-battle-bar>` and `<gift-room>`: the web SDK as plain HTML elements, for pages that are
  * not built with a framework (or are, and just want a few tags). They are thin: every rule lives in
  * `GiftEffectLayer`, `GiftTray` and `createGiftTray`; this file only reads attributes, sets up and
@@ -29,6 +29,7 @@ import { GiftEffectLayer, type GiftEffectLayerOptions } from "./GiftEffectLayer"
 import { type CreateGiftTrayOptions, type GiftTrayHandle, createGiftTray } from "./createGiftTray";
 import { GiftAwaySummary, type GiftAwaySummaryOptions } from "./GiftAwaySummary";
 import { GiftBattleBar, type GiftBattleBarOptions } from "./GiftBattleBar";
+import { GiftButton } from "./GiftButton";
 import { GiftLeaderboard, type GiftLeaderboardOptions } from "./GiftLeaderboard";
 import type { GiftTray } from "./GiftTray";
 import {
@@ -52,6 +53,7 @@ const HOST_STYLE_ATTR = "data-gs-elements";
 const HOST_CSS = `
 :where(gift-effect-layer) { display: block; position: absolute; inset: 0; pointer-events: none; }
 :where(gift-tray, gift-wall, gift-leaderboard, gift-battle-bar) { display: block; }
+:where(gift-button) { display: inline-flex; flex: none; }
 :where(gift-room) { display: none; }
 :where(gift-away-summary) { display: block; position: absolute; inset: 0; pointer-events: none; }
 gift-tray[data-gs-placement="sheet"] { pointer-events: none; }
@@ -193,13 +195,15 @@ const PLAY_ON = ["tap", "success"] as const;
  * (`tap` | `success`), `tray-title`, `coin-name`, `send-label`, `not-enough-label`,
  * `get-coins-label`, `columns`, `grid-max-height`, `default-selected-id`, `disabled`, `sheet`
  * (`false` = fixed tray), `placement` (`auto` | `sheet` | `popover` | `inline`), `anchor` (CSS
- * selector of your gift button, for the popover), `initial-snap` (`peek` | `default` | `expanded`),
+ * selector of your gift button, for the popover; a `<gift-button>` works), `input` (CSS selector of
+ * your message bar's text field: the tray takes the keyboard's place, spec 20), `initial-snap` (`peek` | `default` | `expanded`),
  * `top-up` (shows the coin button and fires `gift-topup`). Changing one rebuilds the tray, except
  * `disabled`, which updates it in place.
  *
  * Properties: `client` (a `GiftingClient`, required), `theme`, `player` (any `EffectPlayer`, instead of
  * `effects`), `options` (what attributes cannot say: `snaps`, `onSent`...), `tray`, `controller`.
- * Methods: `refresh()`, `open()`, `close()`, `toggle()`.
+ * Methods: `refresh()`, `open()`, `close()`, `toggle()`, `selectReceiver(id)` (a battle: give
+ * `options.receivers`, spec 21).
  *
  * Events, all bubbling: `gift-sent` (`detail`: the transaction), `gift-error` (`detail`: the
  * `GiftingError`; `insufficientBalance` means: open your coin store), `gift-state`, `gift-topup`,
@@ -225,6 +229,7 @@ export class GiftTrayElement extends Base {
     "sheet",
     "placement",
     "anchor",
+    "input",
     "initial-snap",
     "top-up",
   ];
@@ -302,6 +307,10 @@ export class GiftTrayElement extends Base {
   toggle(): void {
     this.handle?.tray.toggle();
   }
+  /** A battle (spec 21): pick the side the next gift goes to. */
+  selectReceiver(id: string): void {
+    this.handle?.selectReceiver(id);
+  }
 
   connectedCallback(): void {
     ensureHostStyle(this.ownerDocument);
@@ -359,7 +368,10 @@ export class GiftTrayElement extends Base {
         reference: text(this, "reference"),
       }),
       theme: this.themeValue ?? this.extra.theme,
-      anchor: this.resolve<HTMLElement>(doc, text(this, "anchor")) ?? this.extra.anchor,
+      anchor: anchorOf(this.resolve<HTMLElement>(doc, text(this, "anchor"))) ?? this.extra.anchor,
+      input:
+        this.resolve<HTMLInputElement | HTMLTextAreaElement>(doc, text(this, "input")) ??
+        this.extra.input,
       container: this,
       client,
       receiver,
@@ -427,6 +439,93 @@ export class GiftTrayElement extends Base {
     } catch {
       return null; // an invalid selector must not break the page
     }
+  }
+}
+
+const GIFT_BUTTON_NAMES = ["small", "medium", "large"] as const;
+
+/** A `<gift-button>` names its inner `<button>` as the tray's anchor. */
+function anchorOf(el: HTMLElement | null): HTMLElement | null {
+  return el instanceof GiftButtonElement ? (el.button ?? el) : el;
+}
+
+/**
+ * `<gift-button>`: the round gift button for your own message bar (spec 20.4). Point a
+ * `<gift-tray anchor="...">` at it (and `input="..."` at your text field) and the tray opens in
+ * the keyboard's place.
+ *
+ * ```html
+ * <form class="bar">
+ *   <input id="msg" placeholder="Message" />
+ *   <gift-button id="gift"></gift-button>
+ * </form>
+ * <gift-tray receiver="mia" anchor="#gift" input="#msg"></gift-tray>
+ * ```
+ *
+ * Attributes: `label` (default "Send a gift"), `filled`, `size` (`small` | `medium` | `large`,
+ * default `medium`), `disabled`. Properties: `theme`, `icon` (SVG markup or a Node, replaces the
+ * gift glyph). Event: `gift-button-press` (bubbles).
+ */
+export class GiftButtonElement extends Base {
+  static readonly observedAttributes = ["label", "filled", "size", "disabled"];
+
+  private view: GiftButton | null = null;
+  private themeValue: Partial<GiftTheme> | undefined;
+  private iconValue: string | Node | undefined;
+
+  /** The inner `<button>` (null until the element is on the page). */
+  get button(): HTMLButtonElement | null {
+    return this.view?.element ?? null;
+  }
+
+  get theme(): Partial<GiftTheme> | undefined {
+    return this.themeValue;
+  }
+  set theme(value: Partial<GiftTheme> | undefined) {
+    this.themeValue = value;
+    this.view?.update({ theme: value });
+  }
+
+  /** A custom glyph: SVG markup or a Node. `undefined` restores the gift glyph. */
+  get icon(): string | Node | undefined {
+    return this.iconValue;
+  }
+  set icon(value: string | Node | undefined) {
+    this.iconValue = value ?? undefined;
+    this.view?.update({ icon: this.iconValue });
+  }
+
+  connectedCallback(): void {
+    ensureHostStyle(this.ownerDocument);
+    if (this.view) return;
+    this.view = new GiftButton(this, {
+      ...this.read(),
+      theme: this.themeValue,
+      icon: this.iconValue,
+      onPress: () => emit(this, "gift-button-press", null),
+    });
+  }
+
+  disconnectedCallback(): void {
+    // Kept while the element is moved; removed only when it is really gone.
+    queueMicrotask(() => {
+      if (this.isConnected) return;
+      this.view?.destroy();
+      this.view = null;
+    });
+  }
+
+  attributeChangedCallback(): void {
+    this.view?.update(this.read());
+  }
+
+  private read() {
+    return {
+      label: text(this, "label") ?? "Send a gift",
+      filled: flag(this, "filled") ?? false,
+      size: oneOf(this, "size", GIFT_BUTTON_NAMES),
+      disabled: flag(this, "disabled") ?? false,
+    };
   }
 }
 
@@ -909,11 +1008,13 @@ export class GiftLeaderboardElement extends Base {
  *
  * Attributes: `reduced-motion` (`true` | `false`; default follows the system), `tick-ms`,
  * `side-colors` (two colours, `"#6d5cf0,#ffd27a"`; default: the theme accent and coin colour).
+ * `pressable`: every side's avatar is a button that fires `gift-side-press` (`detail`: the side's
+ * user id): open your tray with that side picked (spec 21.4).
  * Properties: `room` (a `RoomHandle`), `view` (a `BattleView`, when you drive it yourself),
  * `resolveUsers`, `theme`, `labels`, `options` (what attributes cannot say), `bar`.
  */
 export class GiftBattleBarElement extends Base {
-  static readonly observedAttributes = ["reduced-motion", "tick-ms", "side-colors"];
+  static readonly observedAttributes = ["reduced-motion", "tick-ms", "side-colors", "pressable"];
 
   private instance: GiftBattleBar | null = null;
   private extra: Partial<GiftBattleBarOptions> = {};
@@ -997,6 +1098,9 @@ export class GiftBattleBarElement extends Base {
         reducedMotion: flag(this, "reduced-motion"),
         tickMs: number(this, "tick-ms"),
         sideColors: sideColorsOf(this),
+        onPressSide: flag(this, "pressable")
+          ? (id: string) => emit(this, "gift-side-press", id)
+          : undefined,
       }),
     };
   }
@@ -1184,6 +1288,7 @@ export function defineGiftElements(registry?: CustomElementRegistry): void {
   if (!reg) return;
   if (!reg.get("gift-effect-layer")) reg.define("gift-effect-layer", GiftEffectLayerElement);
   if (!reg.get("gift-tray")) reg.define("gift-tray", GiftTrayElement);
+  if (!reg.get("gift-button")) reg.define("gift-button", GiftButtonElement);
   if (!reg.get("gift-wall")) reg.define("gift-wall", GiftWallElement);
   if (!reg.get("gift-away-summary")) reg.define("gift-away-summary", GiftAwaySummaryElement);
   if (!reg.get("gift-leaderboard")) reg.define("gift-leaderboard", GiftLeaderboardElement);
@@ -1195,6 +1300,7 @@ declare global {
   interface HTMLElementTagNameMap {
     "gift-effect-layer": GiftEffectLayerElement;
     "gift-tray": GiftTrayElement;
+    "gift-button": GiftButtonElement;
     "gift-wall": GiftWallElement;
     "gift-away-summary": GiftAwaySummaryElement;
     "gift-leaderboard": GiftLeaderboardElement;

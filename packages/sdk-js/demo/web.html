@@ -2,7 +2,10 @@
 <html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <meta name="theme-color" content="#0a0a11" />
     <title>GiftingStack demo</title>
     <!-- In the head, not imported from web.ts: render-blocking, so the first paint is already styled
@@ -35,6 +38,12 @@
             </svg>
             Live
           </button>
+          <button class="tab" type="button" data-tab="chat">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 5h16v11H9l-5 4z" />
+            </svg>
+            Chat
+          </button>
           <button class="tab narrow" type="button" data-tab="top">
             <svg viewBox="0 0 24 24">
               <path
@@ -63,6 +72,7 @@
       <main class="main" id="main">
         <section class="panel" data-panel="feed" aria-label="Feed"></section>
         <section class="panel" data-panel="live" aria-label="Live" hidden></section>
+        <section class="panel dm" data-panel="chat" aria-label="Chat" hidden></section>
         <section class="panel" data-panel="top" aria-label="Top" hidden></section>
         <section class="panel" data-panel="inbox" aria-label="Inbox" hidden></section>
         <section class="panel me" data-panel="me" aria-label="Me" hidden></section>

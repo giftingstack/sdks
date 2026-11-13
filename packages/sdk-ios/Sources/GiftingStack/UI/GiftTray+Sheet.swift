@@ -309,6 +309,12 @@ extension GiftTray {
             VStack(spacing: 0) {
                 sheetHandle(st)
                 header
+                // The "Send to" row (spec 21.3) is part of the block above the grid: the peek height grows by it,
+                // so it is in sight in every snap state.
+                if showsReceiverRow {
+                    receiverRow
+                        .padding(.top, 10)
+                }
             }
             // Its natural height whatever the body's frame is (the body is 0 high until measured).
             .fixedSize(horizontal: false, vertical: true)
@@ -491,8 +497,22 @@ extension GiftTray {
             rowHeight: Double(rowHeight),
             giftCount: gifts.count,
             columns: columns,
-            snaps: snaps
+            snaps: sheetSnaps(container: container)
         )
+    }
+
+    /// The host's `snaps`; with a bound text field (spec 20.3) the `default` snap is the keyboard's place
+    /// (`keyboardPlaceHeight` as a fraction of the container) unless the host gave `snaps.default` itself. The
+    /// sheet's own floor (header, two rows, Send) still applies.
+    func sheetSnaps(container: CGFloat) -> SheetSnaps? {
+        guard inputBound, snaps?.default == nil,
+              let fraction = keyboardPlaceSnap(keyboardHeight: boundKeyboardHeight, containerHeight: Double(container))
+        else {
+            return snaps
+        }
+        var next = snaps ?? SheetSnaps()
+        next.default = fraction
+        return next
     }
 
     /// Feeds a measurement to the controller. Uses only `measure` and the model, never this

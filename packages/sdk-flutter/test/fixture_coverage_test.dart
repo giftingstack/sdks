@@ -17,6 +17,7 @@ const Map<String, String> runners = <String, String>{
   'tray.json': 'test/conformance_test.dart',
   'sheet.json': 'test/sheet_conformance_test.dart',
   'tray-scrim.json': 'test/tray_scrim_conformance_test.dart',
+  'input-swap.json': 'test/input_swap_conformance_test.dart',
   'theme.json': 'test/theme_conformance_test.dart',
   'remote-recipes.json': 'test/remote_recipes_conformance_test.dart',
   'wall.json': 'test/components_conformance_test.dart',
@@ -31,6 +32,7 @@ const Map<String, String> runners = <String, String>{
   'rooms-battle.json': 'test/rooms_conformance_test.dart',
   'battle-bar.json': 'test/battle_bar_conformance_test.dart',
   'pictures.json': 'test/pictures_conformance_test.dart',
+  'receivers.json': 'test/receivers_conformance_test.dart',
 };
 
 /// Web only by the SPEC (9.3): native platforms skip these on purpose.

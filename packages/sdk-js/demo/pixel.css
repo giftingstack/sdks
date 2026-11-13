@@ -153,7 +153,7 @@ p {
   right: 0;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   padding-bottom: env(safe-area-inset-bottom);
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--card) 94%, transparent);
@@ -395,7 +395,8 @@ p {
 }
 .live-state {
   margin: 0;
-  padding: 0 14px 10px;
+  /* Room under the comment bar above it (it used to touch the bar's bottom edge). */
+  padding: 10px 14px 14px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -824,4 +825,272 @@ p {
 /* Three or more sides: two columns, so a name never wraps in a squeezed round button. */
 [data-block] .post-actions:has(.pill.gift:nth-child(3)) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* ---- chat (the app's own messaging screen; the gift tray comes from the SDK) ---- */
+.dm {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.dm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.dm-head b {
+  display: block;
+  font-size: 15px;
+}
+.dm-head small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.dm-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 0;
+  list-style: none;
+}
+.dm-msg {
+  max-width: 78%;
+  padding: 9px 13px;
+  border-radius: 18px;
+  font-size: 15px;
+  line-height: 1.35;
+  background: var(--card);
+  border: 1px solid var(--line);
+  align-self: flex-start;
+  border-bottom-left-radius: 6px;
+}
+.dm-msg.me {
+  align-self: flex-end;
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 6px;
+}
+.dm-giftmsg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dm-giftmsg img {
+  flex: none;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+/* The message bar: held at the bottom of the screen, above the tab bar, and right above the gift
+   tray while it is up (--tray-inset, set by web.ts), where a keyboard would push it. */
+.dm-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(62px, var(--tray-inset, 0px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  z-index: 1;
+}
+.dm-list {
+  padding-bottom: 80px;
+}
+.dm-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--card);
+  padding: 0 6px 0 14px;
+}
+.dm-field input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+/* The gift button in the field is the SDK's GiftButton (.gs-gift-button, themed like the tray). */
+.dm-send {
+  display: grid;
+  place-items: center;
+  border: 0;
+  cursor: pointer;
+}
+.dm-send svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+.dm-send {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+.dm-note {
+  margin: 4px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (min-width: 1000px) {
+  .dm-bar {
+    position: sticky;
+    bottom: 12px;
+    padding: 8px 0;
+    border-top: 0;
+  }
+  .dm-list {
+    padding-bottom: 14px;
+  }
+}
+
+/* ---- live: the stream's chat over the video, and the comment bar under it ---- */
+.live-chat {
+  position: absolute;
+  left: 10px;
+  right: 30%;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+  /* Older lines fade out at the top, as in live apps. */
+  mask-image: linear-gradient(to bottom, transparent 0, #000 40%);
+}
+.live-chat li {
+  max-width: 100%;
+  padding: 5px 10px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.3;
+  animation: live-chat-in 0.25s ease-out;
+}
+.live-chat li b {
+  color: #c9c1ff;
+  font-weight: 700;
+  margin-right: 4px;
+}
+.live-chat li.gift {
+  background: linear-gradient(90deg, rgba(255, 184, 61, 0.9), rgba(255, 120, 160, 0.85));
+  color: #1b1030;
+  font-weight: 600;
+}
+.live-chat li.gift b {
+  color: #1b1030;
+}
+/* A battle gift line: the receiving side's colour (the score bar's palette). */
+.live-chat li.gift.side-gift {
+  background: var(--side);
+  color: var(--side-text);
+}
+.live-chat li.gift.side-gift b {
+  color: var(--side-text);
+}
+.live-chat li svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+@keyframes live-chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-chat li {
+    animation: none;
+  }
+}
+.live-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 14px 0;
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--card2);
+}
+.live-bar input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+/* The live bar's gift button: the SDK's GiftButton, filled. */
+
+/* ---- phone: the live stage fills the screen ----
+   The Live panel is as tall as the page (above the tab bar); the open card takes what the heading
+   and the mode switch leave, and the picture takes what the host line, the score bar and the
+   comment bar leave. A battle's bigger lower part gives the picture less; it never goes under
+   200 px, and then the page scrolls. */
+@media (max-width: 999px) {
+  .panel[data-panel="live"]:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+  .panel[data-panel="live"] > .card:not([hidden]) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel[data-panel="live"] .live-stage {
+    flex: 1;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 18px 18px 0 0;
+  }
+  .panel[data-panel="live"] .live-stage .art {
+    flex: 1;
+    aspect-ratio: auto;
+    min-height: 0;
+    position: relative;
+  }
+  /* A percentage height does not resolve inside a stretched flex item: the picture fills the box
+     by position instead. */
+  .panel[data-panel="live"] .live-stage .art svg {
+    position: absolute;
+    inset: 0;
+  }
+  /* The page is as tall as the screen already: the footer line below it would only push the
+     page 56 px past the tab bar (half hidden under it), so it is left out on the Live tab. */
+  .main:has(.panel[data-panel="live"]:not([hidden])) .foot {
+    display: none;
+  }
 }

@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.1.6
+
+- Gift button in your message bar (SPEC 20): `GiftButton(tray = holder)` is a small round button with a gift
+  glyph for the app's chat or comment bar (plain or `filled`, active while the tray is open, "expanded" /
+  "collapsed" for screen readers, a 44 dp touch target). `Modifier.giftTrayInput(holder)` binds the app's text
+  field: the button closes the keyboard and opens the tray in its place, a tap on the field closes the tray and
+  the keyboard comes back. With a bound field the holder starts closed (an explicit `open` wins), `toggle()` is
+  that swap, `open()` hides the keyboard first, and the sheet's default height is the last keyboard height seen
+  (`WindowInsets.ime`, 300 dp before any, at most 60 % of the box) unless `snaps.default` is given. Nothing
+  changes for an app that binds no field. New: `holder.inputBound`, `holder.keyboardHeight`,
+  `holder.bindInput`, `holder.onInputFocus`, `GiftTrayInputBinding`, and the pure core `inputSwapStep`,
+  `keyboardPlaceHeight`, `keyboardPlaceSnap` (tested with the `input-swap.json` fixture).
+- `GiftButton` custom icon and fixed sizes (SPEC 20.4): `size` is now the enum `GiftButtonSize` (`Small` 32,
+  `Medium` 36 default, `Large` 44 dp) instead of a free `Dp`, and `icon: (@Composable (color: Color) -> Unit)?`
+  replaces the gift glyph, fitted into the fixed glyph box (scaled down, never up, clipped) so it cannot change
+  the button's size. Not yet published, so the `Dp` parameter never shipped.
+- `GiftTrayHolder(open = ...)` and `rememberGiftTrayHolder(open = ...)` take `Boolean?` (default `null`: open,
+  or closed once a field is bound). Passing `true` or `false` works as before.
+- The demo has a Chat tab (a one-to-one conversation with the gift button in its message bar) and a comment
+  bar under the live stream bound the same way.
+- One gift button for a battle: the receiver picker (SPEC 21). `rememberGiftTrayHolder(receivers = ...,
+  onReceiverChange = ...)` (or the settable `holder.receivers`) takes the round's sides as `TrayReceiver(id, name,
+  color, avatarUrl)`; with two or more the tray shows a "Send to" row under the header (`GiftTray(sendToLabel = ...)`):
+  30 dp avatars in a 2 dp ring of the side colour (default `battleSidePalette`), gap 8; the picked side at full
+  opacity with an outer ring in the text colour and its name in the accent (at most 72 dp, then "…"), the others the
+  avatar only at 0.55 (the name is their accessibility label), so four sides fit a 375 dp phone; a radio group for
+  screen readers, scrolling sideways. When the pick changes (a tap, `selectReceiver`, a new list, opening the tray)
+  the row scrolls its own offset the least distance that shows the whole picked side (animated unless reduced
+  motion); nothing else scrolls. The row is part of the block above the grid, so the peek height includes it. Every successful
+  send goes to `holder.receiver` (the pick, else the side gifted last, else the plain `receiver` when it is a side,
+  else the first) and makes that side the default of the next list; `holder.selectReceiver(id)` picks from app code
+  (an id that is not a side is ignored). `GiftBattleBar(onPressSide = ..., pressSideLabel = "Send {name} a gift")`
+  turns every side's avatar into a button (44 dp target) in both layouts. Without receivers and without
+  `onPressSide` nothing changes. `GiftTrayController.send(gift, receiver = null)` takes the receiver and returns
+  whether the server took the gift. Pure core `resolveReceiver`, `SEND_TO_LABEL`, `PRESS_SIDE_LABEL`, `pressSideLabel`
+  (fixture `receivers.json`, `ReceiversConformanceTest`; holder logic in `ReceiverPickerTest`).
+- Demo: Battle and Battle 4+ have no per-side "Gift X" buttons any more. The comment bar's gift button opens the tray
+  with the round's sides in its "Send to" row (the bar's colours), a tap on a side of the bar picks it and opens the
+  tray, and a gift line in the live comment column names the side that got it and takes its colour.
+
+## 0.1.5
+
+No Android change. The shared version moved with the web tray (the footer no longer scrolls the page).
+
 ## 0.1.4
 
 - The tray title stays on one line and ends with "…" when it does not fit (SPEC 9): a long or translated `title` no longer wraps and pushes the small (peek) tray taller.
